@@ -92,6 +92,13 @@ def run(
                 token=os.environ.get("HERMES_TOKEN", ""),
                 workspace_id=os.environ.get("HERMES_WORKSPACE", "default"),
             )
+        elif a == "claude_code":
+            from llm_test.adapters.claude_code import ClaudeCodeAdapter
+            adapters[a] = ClaudeCodeAdapter(
+                cli_path=os.environ.get("CLAUDE_CLI_PATH", "claude"),
+                backend_url=base_url,
+                use_local_model=True,
+            )
         else:
             console.print(f"[yellow]adapter '{a}' not yet wired in Phase 12; skipping[/yellow]")
     if not adapters:
