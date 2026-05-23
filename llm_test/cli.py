@@ -84,6 +84,14 @@ def run(
         a = a.strip()
         if a == "raw":
             adapters[a] = OpenAIRawAdapter(base_url=base_url, api_key=api_key)
+        elif a == "hermes":
+            from llm_test.adapters.hermes import HermesAdapter
+            adapters[a] = HermesAdapter(
+                api_url=os.environ.get("HERMES_API_URL", "http://localhost:8644"),
+                gateway_url=os.environ.get("HERMES_GATEWAY_URL", "http://localhost:8642"),
+                token=os.environ.get("HERMES_TOKEN", ""),
+                workspace_id=os.environ.get("HERMES_WORKSPACE", "default"),
+            )
         else:
             console.print(f"[yellow]adapter '{a}' not yet wired in Phase 12; skipping[/yellow]")
     if not adapters:
