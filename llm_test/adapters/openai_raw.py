@@ -51,6 +51,13 @@ class OpenAIRawAdapter:
                 resp.raise_for_status()
                 data = resp.json()
                 msg = data["choices"][0]["message"]
+                # Reasoning-model fallback: some servers (vLLM with DeepSeek/QwQ etc.)
+                # put the final assistant text in `reasoning` or `reasoning_content` when
+                # `content` is null. Normalize so downstream sees one field.
+                if not msg.get("content"):
+                    fallback = msg.get("reasoning") or msg.get("reasoning_content")
+                    if fallback:
+                        msg["content"] = fallback
                 messages.append(msg)
                 tool_calls = msg.get("tool_calls") or []
                 if not tool_calls:

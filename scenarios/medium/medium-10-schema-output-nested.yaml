@@ -1,0 +1,65 @@
+id: medium-10-schema-output-nested
+title: "Two tools then nested JSON output"
+tier: medium
+category: structured_output
+domain: generic
+description: |
+  Call get_weather and get_stock_price, then return a nested JSON object that combines both.
+tags: [structured_output, multi_tool]
+ranking_dimensions: [overall, structured_output, agentic]
+prompt: |
+  Get the current weather in Warsaw AND the current price of AAPL.
+  Return ONLY a JSON object of the form:
+  {
+    "weather": {"city": "Warsaw", "temp_c": <int>, "condition": <string>},
+    "stock":   {"symbol": "AAPL", "price": <number>}
+  }
+  No prose, no markdown fence.
+tools: [get_weather, get_stock_price]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 45
+tool_responses:
+  get_weather:
+    - match: { location: "Warsaw" }
+      returns: { temp_c: 7, condition: "cloudy" }
+    - match: any
+      returns: { error: "city not found" }
+  get_stock_price:
+    - match: { symbol: "AAPL" }
+      returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
+    - match: any
+      returns: { error: "symbol not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_weather
+    - check: tool_called
+      tool: get_stock_price
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [weather, stock]
+        properties:
+          weather:
+            type: object
+            required: [city, temp_c, condition]
+            properties:
+              city: { type: string }
+              temp_c: { type: integer }
+              condition: { type: string }
+          stock:
+            type: object
+            required: [symbol, price]
+            properties:
+              symbol: { type: string }
+              price: { type: number }
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 2
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

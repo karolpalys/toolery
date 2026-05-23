@@ -1,0 +1,40 @@
+id: medium-08-empty-results-retry
+title: "Retry search with broader query after empty result"
+tier: medium
+category: error_recovery
+domain: generic
+description: "First web_search returns empty. Model must retry with a different/broader query, not give up."
+tags: [error_recovery, retry]
+ranking_dimensions: [overall, agentic]
+prompt: |
+  Find me the latest information about the Q3 2026 internal sales report.
+  If your first search doesn't return useful results, try a different query.
+tools: [web_search]
+budget:
+  max_tool_calls: 3
+  max_turns: 4
+  timeout_seconds: 45
+tool_responses:
+  web_search:
+    - match: { query: "Q3 2026 internal sales report" }
+      returns: { results: [], note: "no results" }
+    - match: any
+      returns:
+        results:
+          - { title: "Sales Q3 2026 — Internal Update", url: "intra://docs/sales-q3-2026", snippet: "Total: $4.2M, up 12% YoY." }
+scoring:
+  required:
+    - check: tool_called
+      tool: web_search
+    - check: call_count_at_least
+      n: 2
+    - check: response_contains
+      patterns: ["4"]
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 3
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

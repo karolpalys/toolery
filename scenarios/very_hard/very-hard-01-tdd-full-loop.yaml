@@ -1,0 +1,111 @@
+id: very-hard-01-tdd-full-loop
+title: "Full TDD with branch + lint + scope"
+tier: very_hard
+category: hard_mode
+domain: dev_ops
+description: |
+  Branch off main, rename a function across only the 4 code files (not CHANGELOG),
+  run tests and lint, fix any lint failure, commit. Five simultaneous constraints.
+tags: [coding, refactor, multi_constraint, budget_pressure, distractor]
+ranking_dimensions: [overall, coding, agentic, budget_efficiency]
+prompt: |
+  Rename function `compute_total()` to `calculate_total()` across the codebase:
+  - Use grep first to find all call sites.
+  - Update only the 4 code files; do NOT modify docs/CHANGELOG.md even if it appears
+    in the grep output.
+  - Run the tests to confirm green.
+  - Run the linter; if it reports a long line, fix it.
+  - Create a branch (any name starting with feature/ or refactor/) BEFORE committing,
+    and commit with a message of at least 16 characters that mentions "rename".
+  - Do NOT commit to main.
+tools: [grep, read_file, edit_file, run_tests, run_lint, git_branch, git_status, git_add, git_commit, git_diff, list_files, run_bash]
+budget:
+  max_tool_calls: 14
+  max_turns: 10
+  timeout_seconds: 180
+tool_responses:
+  grep:
+    - match: { pattern: "compute_total" }
+      returns: |
+        src/core/billing.py:42:def compute_total(items):
+        src/core/billing.py:87:    return compute_total(self.items)
+        src/api/handlers.py:15:    total = compute_total(order.items)
+        src/cli.py:103:    print(compute_total(parsed))
+        docs/CHANGELOG.md:12:- Added compute_total()
+        tests/test_billing.py:8:from src.core.billing import compute_total
+        tests/test_billing.py:34:    assert compute_total([{"amount": 100}]) == 100
+    - match: any
+      returns: ""
+  read_file:
+    - match: any
+      returns: "(file content)"
+  edit_file:
+    - match: any
+      returns: { ok: true, lines_changed: 2 }
+  run_tests:
+    - match: any
+      returns: "PASSED 47 tests, 0 failed."
+  run_lint:
+    - match: any
+      call_index: 0
+      returns: "src/core/billing.py:42: E501 line too long (88 > 79)"
+    - match: any
+      returns: "clean"
+  git_branch:
+    - match: any
+      returns: { ok: true, current: "feature/rename-compute-total" }
+  git_status:
+    - match: any
+      returns: "On branch feature/rename-compute-total\n\tmodified: src/core/billing.py\n\tmodified: src/api/handlers.py\n\tmodified: src/cli.py\n\tmodified: tests/test_billing.py"
+  git_add:
+    - match: any
+      returns: { ok: true }
+  git_commit:
+    - match: any
+      returns: { ok: true, hash: "abc1234" }
+  git_diff:
+    - match: any
+      returns: "(diff content)"
+  list_files:
+    - match: any
+      returns: ["src/core/billing.py", "src/api/handlers.py", "src/cli.py", "tests/test_billing.py"]
+  run_bash:
+    - match: any
+      returns: { stdout: "", stderr: "", returncode: 0 }
+scoring:
+  required:
+    - check: tool_called
+      tool: grep
+    - check: tool_called
+      tool: edit_file
+    - check: tool_called
+      tool: run_tests
+    - check: tool_called
+      tool: run_lint
+    - check: tool_called
+      tool: git_branch
+    - check: tool_called
+      tool: git_commit
+    - check: tool_args_match_regex
+      tool: git_branch
+      arg: name
+      pattern: "^(feature|refactor|rename)/"
+    - check: tool_args_match_regex
+      tool: git_commit
+      arg: message
+      pattern: "(?i)rename.{10,}"
+  forbidden:
+    - check: tool_args_match_regex
+      tool: edit_file
+      arg: path
+      pattern: "CHANGELOG"
+    - check: tool_args_contain
+      tool: git_commit
+      args: { branch: "main" }
+  partial:
+    - check: call_count_at_most
+      n: 12
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

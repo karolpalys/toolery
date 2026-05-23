@@ -1,0 +1,70 @@
+id: hard-08-conditional-with-context
+title: "Cross-reference earlier tool result"
+tier: hard
+category: context_state_tracking
+domain: generic
+description: |
+  Get positions, then for each position above a threshold, fetch the current price.
+  Tests whether the model uses information from a prior tool result correctly in subsequent
+  tool calls (no copy/paste mistakes).
+tags: [state_tracking, chain]
+ranking_dimensions: [overall, agentic, context_state_tracking]
+prompt: |
+  Look up my current portfolio positions. For any position whose quantity is greater
+  than 100 shares, fetch the current stock price and tell me the dollar exposure
+  (qty * price) for each such position. Skip positions with qty ≤ 100.
+tools: [get_positions, get_stock_price, calculator]
+budget:
+  max_tool_calls: 5
+  max_turns: 5
+  timeout_seconds: 90
+tool_responses:
+  get_positions:
+    - match: any
+      returns:
+        - { symbol: "AAPL", qty: 250 }
+        - { symbol: "MSFT", qty: 50 }
+        - { symbol: "NVDA", qty: 180 }
+        - { symbol: "GOOG", qty: 75 }
+  get_stock_price:
+    - match: { symbol: "AAPL" }
+      returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
+    - match: { symbol: "NVDA" }
+      returns: { symbol: "NVDA", price: 480.10, currency: "USD" }
+    - match: { symbol: "MSFT" }
+      returns: { symbol: "MSFT", price: 420.50, currency: "USD" }
+    - match: { symbol: "GOOG" }
+      returns: { symbol: "GOOG", price: 165.00, currency: "USD" }
+    - match: any
+      returns: { error: "not found" }
+  calculator:
+    - match: any
+      returns: { result: 0.0 }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_positions
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "AAPL" }
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "NVDA" }
+    - check: response_contains
+      patterns: ["AAPL"]
+    - check: response_contains
+      patterns: ["NVDA"]
+  forbidden:
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "MSFT" }
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "GOOG" }
+  partial:
+    - check: call_count_at_most
+      n: 4
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

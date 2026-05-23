@@ -1,0 +1,46 @@
+id: medium-06-date-parsing
+title: "Parse relative date + timezone"
+tier: medium
+category: parameter_precision
+domain: generic
+description: |
+  User says "next Tuesday at 3 PM Warsaw time". Model must call add_calendar_event
+  with timezone=Europe/Warsaw and a start time that contains "15:00" or "3:00 PM".
+  Reference date for the bench is set so 'next Tuesday' is unambiguous.
+tags: [date_parsing, timezone, parameter_precision]
+ranking_dimensions: [overall, tool_selection]
+prompt: |
+  Schedule a team sync next Tuesday at 3 PM Warsaw time, titled "Team Sync",
+  duration 60 minutes.
+tools: [add_calendar_event]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  add_calendar_event:
+    - match: any
+      returns: { ok: true, event_id: "evt-1" }
+scoring:
+  required:
+    - check: tool_called
+      tool: add_calendar_event
+    - check: tool_args_match_regex
+      tool: add_calendar_event
+      arg: title
+      pattern: "(?i)team.?sync"
+    - check: tool_args_contain
+      tool: add_calendar_event
+      args: { timezone: "Europe/Warsaw" }
+    - check: tool_args_match_regex
+      tool: add_calendar_event
+      arg: start
+      pattern: "(T15:00|15:00:00|3:00 ?PM|3 ?PM)"
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 1
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

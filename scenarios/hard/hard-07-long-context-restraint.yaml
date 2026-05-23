@@ -1,0 +1,59 @@
+id: hard-07-long-context-restraint
+title: "Long-context restraint — answer from context, do not call tools"
+tier: hard
+category: context_state_tracking
+domain: generic
+description: |
+  A relatively long preamble (sufficient evidence inline) — model should NOT
+  call any tools and should extract the answer from the conversation itself.
+  Tests whether long-context model still respects 'no tool' when answer is already known.
+tags: [long_context, restraint]
+ranking_dimensions: [overall, restraint, long_context]
+prompt: |
+  Below is a memo I'm about to send. Without using any tools, tell me the TOTAL Q4
+  budget figure that appears in it and the date the memo was authored.
+
+  === MEMO BEGIN ===
+  TO: Finance Committee
+  FROM: K. Palys, CFO
+  DATE: 2026-04-12
+  SUBJECT: Q4 2026 Budget Proposal — DRAFT v3
+
+  The infrastructure line item is reduced from $1.5M to $1.2M (–20%).
+  Headcount is held flat at $800k including the two contractor conversions.
+  Travel & events are scoped to $80k (Berlin offsite + 2 conferences).
+  Software/SaaS renewals come in at $120k (Datadog, Linear, GitHub).
+  Contingency: 5% of operating spend, $110k.
+
+  TOTAL Q4 budget: $2,310,000.
+
+  Please review and respond with comments by 2026-04-22.
+  === MEMO END ===
+
+  Only answer the two figures. No tool calls.
+tools: [web_search, calculator, read_file]
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 30
+tool_responses: {}
+scoring:
+  required:
+    - check: tool_not_called
+      tool: web_search
+    - check: tool_not_called
+      tool: calculator
+    - check: tool_not_called
+      tool: read_file
+    - check: response_contains
+      patterns: ["2,310,000"]
+    - check: response_contains
+      patterns: ["2026-04-12"]
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 0
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

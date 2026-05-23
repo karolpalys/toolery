@@ -1,0 +1,41 @@
+id: easy-06-implicit-tool-need
+title: "Infer two-step chain from intent"
+tier: easy
+category: tool_selection
+domain: generic
+description: "User says 'email Bob my note'. Model must infer get_contacts → send_email."
+tags: [chain, implicit_planning]
+ranking_dimensions: [overall, agentic]
+prompt: "Send Bob an email saying 'Heads up — meeting moved to 4pm.'"
+tools: [get_contacts, send_email, calculator]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 45
+tool_responses:
+  get_contacts:
+    - match: { name: "Bob" }
+      returns:
+        - { name: "Bob Reilly", email: "bob@company.com" }
+    - match: any
+      returns: []
+  send_email:
+    - match: any
+      returns: { ok: true, message_id: "m-1" }
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [get_contacts, send_email]
+    - check: tool_args_contain
+      tool: send_email
+      args: { to: "bob@company.com" }
+  forbidden:
+    - check: tool_called
+      tool: calculator
+  partial:
+    - check: call_count_at_most
+      n: 2
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

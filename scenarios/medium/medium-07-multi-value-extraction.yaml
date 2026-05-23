@@ -1,0 +1,42 @@
+id: medium-07-multi-value-extraction
+title: "Split one request into multiple tool calls"
+tier: medium
+category: multi_step_chains
+domain: generic
+description: |
+  User asks for weather in TWO cities. Model must issue two get_weather calls
+  (parallel or sequential — both acceptable here) and report both temperatures.
+tags: [multi_value, parallel_ok]
+ranking_dimensions: [overall, agentic]
+prompt: "What's the weather in Warsaw and in Tokyo right now? Give me both."
+tools: [get_weather]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  get_weather:
+    - match: { location: "Warsaw" }
+      returns: { temp_c: 7, condition: "cloudy" }
+    - match: { location: "Tokyo" }
+      returns: { temp_c: 18, condition: "rain" }
+    - match: any
+      returns: { error: "city not found" }
+scoring:
+  required:
+    - check: call_count_exactly
+      n: 2
+    - check: tool_called
+      tool: get_weather
+    - check: response_contains
+      patterns: ["7"]
+    - check: response_contains
+      patterns: ["18"]
+  forbidden: []
+  partial:
+    - check: tool_called_in_parallel
+      tools: [get_weather]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

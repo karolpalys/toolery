@@ -1,0 +1,31 @@
+id: easy-07-trivial-knowledge
+title: "Answer trivia without tools"
+tier: easy
+category: restraint_refusal
+domain: generic
+description: "Basic factual question should be answered from model knowledge, not by calling tools."
+tags: [restraint, knowledge]
+ranking_dimensions: [overall, restraint]
+prompt: "What is the capital of France?"
+tools: [web_search, calculator]
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 15
+tool_responses: {}
+scoring:
+  required:
+    - check: tool_not_called
+      tool: web_search
+    - check: tool_not_called
+      tool: calculator
+    - check: response_contains
+      patterns: ["Paris"]
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 0
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

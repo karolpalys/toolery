@@ -1,0 +1,99 @@
+id: very-hard-04-long-context-multi-constraint
+title: "Long context + 4 simultaneous constraints"
+tier: very_hard
+category: hard_mode
+domain: dev_ops
+description: |
+  Inline a longer technical brief, then ask the model to act on it under four
+  simultaneous constraints: target file, scope, locale, and budget.
+  Model must NOT touch files outside the listed scope.
+tags: [long_context, multi_constraint, scope]
+ranking_dimensions: [overall, agentic, long_context, budget_efficiency]
+prompt: |
+  Below is a refactor brief. Apply ONLY changes that match ALL four constraints below.
+
+  === BRIEF BEGIN ===
+  Two helper functions in `src/utils/strings.py` need a small rename:
+    - `to_snake()`            → `to_snake_case()`
+    - `from_snake()`          → `from_snake_case()`
+  They are referenced by:
+    - src/api/handlers.py      (callers, lines 12-18)
+    - src/cli.py               (callers, lines 44-46)
+    - src/web/routes.py        (callers, lines 88-93)
+    - tests/test_strings.py    (imports + assertions, lines 5-12)
+    - docs/style-guide.md      (mentions only — do NOT touch)
+    - CHANGELOG.md             (mentions only — do NOT touch)
+  Comments in src/utils/strings.py that reference the old name (line 4-7) are descriptive,
+  not active code — do NOT modify them as part of this rename.
+
+  Constraints:
+    (C1) Touch only src/ files and tests/ files.
+    (C2) Do not edit comments inside src/utils/strings.py (only function defs + bodies).
+    (C3) The commit message must be in English and contain the literal word "rename".
+    (C4) Stay within 8 tool calls total (you have budget of 10 — keep 2 as safety margin).
+  === BRIEF END ===
+
+  Make the changes and produce a single commit.
+tools: [grep, read_file, edit_file, list_files, git_status, git_add, git_commit, git_diff, run_bash]
+budget:
+  max_tool_calls: 10
+  max_turns: 8
+  timeout_seconds: 180
+tool_responses:
+  grep:
+    - match: any
+      returns: |
+        src/utils/strings.py:8:def to_snake(s): ...
+        src/utils/strings.py:15:def from_snake(s): ...
+        src/api/handlers.py:12:    return to_snake(name)
+        src/cli.py:44:    print(to_snake(arg))
+        src/web/routes.py:88:    key = from_snake(route)
+        tests/test_strings.py:5:from src.utils.strings import to_snake, from_snake
+        docs/style-guide.md:34:Use `to_snake()` for variable names.
+        CHANGELOG.md:55:Renamed to_snake to_snake_case (planned).
+  read_file:
+    - match: any
+      returns: "(file content)"
+  edit_file:
+    - match: any
+      returns: { ok: true, lines_changed: 2 }
+  list_files:
+    - match: any
+      returns: ["src/", "tests/", "docs/", "CHANGELOG.md"]
+  git_status:
+    - match: any
+      returns: "Modified: src/utils/strings.py, src/api/handlers.py, src/cli.py, src/web/routes.py, tests/test_strings.py"
+  git_add:
+    - match: any
+      returns: { ok: true }
+  git_commit:
+    - match: any
+      returns: { ok: true, hash: "abc1234" }
+  git_diff:
+    - match: any
+      returns: "(diff)"
+  run_bash:
+    - match: any
+      returns: { stdout: "", stderr: "", returncode: 0 }
+scoring:
+  required:
+    - check: tool_called
+      tool: edit_file
+    - check: tool_called
+      tool: git_commit
+    - check: tool_args_match_regex
+      tool: git_commit
+      arg: message
+      pattern: "(?i)rename"
+  forbidden:
+    - check: tool_args_match_regex
+      tool: edit_file
+      arg: path
+      pattern: "(CHANGELOG|docs/)"
+  partial:
+    - check: call_count_at_most
+      n: 8
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

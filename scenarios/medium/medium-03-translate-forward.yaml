@@ -1,0 +1,41 @@
+id: medium-03-translate-forward
+title: "Translate then email"
+tier: medium
+category: multi_step_chains
+domain: generic
+description: "User asks to email Bob a German translation. Model produces translation and uses it in the email body."
+tags: [chain, localization]
+ranking_dimensions: [overall, agentic, localization]
+prompt: |
+  Email bob@company.com with the subject "Greeting" and a body that is the
+  German translation of: "Hello, the meeting is moved to Tuesday."
+tools: [send_email]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  send_email:
+    - match: any
+      returns: { ok: true, message_id: "m-1" }
+scoring:
+  required:
+    - check: tool_called
+      tool: send_email
+    - check: tool_args_contain
+      tool: send_email
+      args: { to: "bob@company.com" }
+    - check: tool_args_match_regex
+      tool: send_email
+      arg: body
+      pattern: "(?i)(Hallo|Guten|Sitzung|Besprechung|Dienstag|verlegt|verschoben|Treffen)"
+  forbidden: []
+  partial:
+    - check: tool_args_match_regex
+      tool: send_email
+      arg: subject
+      pattern: "^Greeting"
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

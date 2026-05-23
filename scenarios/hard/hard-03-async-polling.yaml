@@ -1,0 +1,49 @@
+id: hard-03-async-polling
+title: "Submit async job and poll until done"
+tier: hard
+category: multi_step_chains
+domain: dev_ops
+description: |
+  Submit a batch job (run_bash), the first status check returns "pending",
+  subsequent ones return "complete". Model must keep polling, not just submit and stop.
+tags: [async, polling, chain]
+ranking_dimensions: [overall, agentic]
+prompt: |
+  Submit a backup job by running `backup_script.sh start`. It runs asynchronously.
+  Then poll its status with `backup_script.sh status` until it reports complete,
+  and tell me the result. Don't run more than 4 status checks.
+tools: [run_bash]
+budget:
+  max_tool_calls: 5
+  max_turns: 5
+  timeout_seconds: 90
+tool_responses:
+  run_bash:
+    - match: { cmd: "backup_script.sh start" }
+      returns: { stdout: "submitted job_id=4271", stderr: "", returncode: 0 }
+    - match: { cmd: "backup_script.sh status" }
+      call_index: 1
+      returns: { stdout: "pending", stderr: "", returncode: 0 }
+    - match: { cmd: "backup_script.sh status" }
+      call_index: 2
+      returns: { stdout: "pending", stderr: "", returncode: 0 }
+    - match: { cmd: "backup_script.sh status" }
+      returns: { stdout: "complete: 14.2 GB written", stderr: "", returncode: 0 }
+    - match: any
+      returns: { stdout: "", stderr: "unknown cmd", returncode: 1 }
+scoring:
+  required:
+    - check: tool_called
+      tool: run_bash
+    - check: call_count_at_least
+      n: 3
+    - check: response_contains
+      patterns: ["complete"]
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 5
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

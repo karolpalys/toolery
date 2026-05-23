@@ -1,0 +1,46 @@
+id: medium-05-conditional-branch
+title: "Conditional action based on tool result"
+tier: medium
+category: multi_step_chains
+domain: generic
+description: |
+  Check weather in Warsaw; if rainy, add umbrella reminder to calendar.
+  In this scenario the mocked weather IS rainy, so the calendar event must be added.
+tags: [conditional, chain]
+ranking_dimensions: [overall, agentic]
+prompt: |
+  Check the weather in Warsaw for today. If it's going to rain, add a calendar
+  event titled "Bring umbrella" at 8:00 AM Warsaw time. If it's not raining, do nothing.
+tools: [get_weather, add_calendar_event]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 45
+tool_responses:
+  get_weather:
+    - match: { location: "Warsaw" }
+      returns: { temp_c: 12, condition: "rain", precipitation_mm: 8 }
+    - match: any
+      returns: { error: "city not found" }
+  add_calendar_event:
+    - match: any
+      returns: { ok: true, event_id: "evt-1" }
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [get_weather, add_calendar_event]
+    - check: tool_args_match_regex
+      tool: add_calendar_event
+      arg: title
+      pattern: "(?i)umbrella"
+    - check: tool_args_contain
+      tool: add_calendar_event
+      args: { timezone: "Europe/Warsaw" }
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 2
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

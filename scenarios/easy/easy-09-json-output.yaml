@@ -1,0 +1,42 @@
+id: easy-09-json-output
+title: "Call tool then format result as JSON schema"
+tier: easy
+category: structured_output
+domain: generic
+description: "Get weather and return the result as valid JSON matching a simple schema."
+tags: [structured_output, single_turn]
+ranking_dimensions: [overall, structured_output]
+prompt: |
+  Get the current weather in Warsaw and return your final answer as JSON matching:
+  {"temp_c": <integer>, "condition": <string>}
+  Only the JSON object, no prose.
+tools: [get_weather]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  get_weather:
+    - match: { location: "Warsaw" }
+      returns: { temp_c: 7, condition: "cloudy" }
+    - match: any
+      returns: { error: "city not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_weather
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [temp_c, condition]
+        properties:
+          temp_c: { type: integer }
+          condition: { type: string }
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 1
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
