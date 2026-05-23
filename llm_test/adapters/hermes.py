@@ -59,7 +59,8 @@ class HermesAdapter:
         self,
         cli_path: str = "hermes",
         timeout_per_scenario: int = 300,
-        ignore_user_config: bool = True,
+        ignore_user_config: bool = False,
+        provider: str | None = None,
         # Kept for backward-compat with existing CLI wiring; ignored.
         api_url: str | None = None,
         gateway_url: str | None = None,
@@ -69,7 +70,11 @@ class HermesAdapter:
         resolved = shutil.which(cli_path) if cli_path == "hermes" else cli_path
         self.cli_path = resolved or cli_path
         self.timeout = timeout_per_scenario
+        # Default False: keep user's config.yaml (provider/base_url/api_key) so we hit
+        # the local LLM endpoint configured there. Set True only when you genuinely
+        # want to bypass user config (testing in isolation).
         self.ignore_user_config = ignore_user_config
+        self.provider = provider
 
     async def run_scenario(
         self, scenario: Scenario, model: str, timeout: int
@@ -85,6 +90,8 @@ class HermesAdapter:
         ]
         if self.ignore_user_config:
             cmd.append("--ignore-user-config")
+        if self.provider:
+            cmd.extend(["--provider", self.provider])
         if model:
             cmd.extend(["-m", model])
 
