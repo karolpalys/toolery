@@ -58,7 +58,8 @@ LLM-test/
 │   ├── easy/                    # 10
 │   ├── medium/                  # 10
 │   ├── hard/                    # 8
-│   └── very_hard/               # 4
+│   ├── very_hard/               # 4
+│   └── templates/               # reusable context_prefill snippets (kod, transkrypty, JSON dumps)
 ├── tools/                       # tool implementations (mock + real)
 │   ├── generic.py               # weather, email, contacts, search, calc, files, calendar
 │   └── domain.py                # orderbook, vllm_config, git, k8s, dataset_ops
@@ -422,7 +423,7 @@ Pełny transcript = źródło prawdy. `.md` jest derived. Jeśli zmienimy scorin
 
 ## 10. System rankingów
 
-### 7 wymiarów (każdy = osobny `rankings/<dim>.md` + PNG)
+### 8 wymiarów (każdy = osobny `rankings/<dim>.md` + PNG)
 
 1. **overall** — wszystkie 32 zadania
 2. **coding** — 8 coding scenarios + tagged coding-shaped
@@ -431,7 +432,7 @@ Pełny transcript = źródło prawdy. `.md` jest derived. Jeśli zmienimy scorin
 5. **restraint** — "don't use tool" patterns
 6. **long_context** — scenariusze z `context_prefill_tokens > 10000`
 7. **budget_efficiency** — score / call_count, dla wszystkich zadań
-8. **speed** — median tg tokens/s z najświeższego perf runu modelu (osobny — to nie pass-rate)
+8. **speed** — median tg tokens/s z najświeższego perf runu modelu (derived z `perf_results`, nie z pass-rate — osobny ranking)
 
 ### Mechanizm regeneracji
 
