@@ -169,6 +169,16 @@ def run(
 
 
 @app.command()
+def compare(run_a: str = typer.Argument(...), run_b: str = typer.Argument(...),
+            out: Path = typer.Option(None, "--out")):  # noqa: B008
+    """Compare two runs (statistical diff)."""
+    from llm_test.compare import compare_runs
+    out_path = out or (_results_dir() / "compare" / f"{run_a}__vs__{run_b}.md")
+    compare_runs(store=_store(), run_a=run_a, run_b=run_b, out_path=out_path)
+    console.print(f"[green]✓ Wrote {out_path}[/green]")
+
+
+@app.command()
 def rankings(
     regen: bool = typer.Option(False, "--regen", help="Regenerate rankings .md"),
     dimension: str = typer.Option("all", help="overall|coding|agentic|safety|restraint|long_context|budget_efficiency|speed|all"),

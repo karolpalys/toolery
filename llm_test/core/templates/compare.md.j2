@@ -1,0 +1,25 @@
+# Compare: {{ run_a.model }} ({{ run_a.run_id }}) vs {{ run_b.model }} ({{ run_b.run_id }})
+
+**A:** {{ run_a.run_id }} — config: {{ run_a.config }}
+**B:** {{ run_b.run_id }} — config: {{ run_b.config }}
+**Common adapter:** {{ common_adapter }}, scenarios: {{ common_scenarios }}
+
+## Overall ({{ common_adapter }}, n={{ trials }} trials)
+| Metric | A | B | Δ | p-value |
+|--------|--:|--:|--:|--------:|
+{% for m in metrics -%}
+| {{ m.name }} | {{ "%.1f%%"|format(m.a*100) }} | {{ "%.1f%%"|format(m.b*100) }} | {{ "%+.1f"|format((m.a - m.b)*100) }} | {{ "%.3f"|format(m.p) }}{% if m.p < 0.05 %} ✓{% endif %} |
+{% endfor %}
+
+## Regressions (B → A worse)
+{% for r in regressions -%}
+- ✗ {{ r.scenario_id }}: {{ r.b_pass }}/{{ r.b_total }} → {{ r.a_pass }}/{{ r.a_total }}
+{% endfor %}
+
+## Improvements (B → A better)
+{% for r in improvements -%}
+- ✓ {{ r.scenario_id }}: {{ r.b_pass }}/{{ r.b_total }} → {{ r.a_pass }}/{{ r.a_total }}
+{% endfor %}
+
+## Identical scenarios (no change)
+{{ identical_count }} scenarios (use --verbose to list)
