@@ -112,3 +112,77 @@ def test_call_count_at_least_and_exactly():
     assert check_call_count_at_least(calls, ScoringCheck.model_validate({"check": "call_count_at_least", "n": 2}), None).result == "pass"
     assert check_call_count_exactly(calls, ScoringCheck.model_validate({"check": "call_count_exactly", "n": 3}), None).result == "pass"
     assert check_call_count_exactly(calls, ScoringCheck.model_validate({"check": "call_count_exactly", "n": 2}), None).result == "fail"
+
+
+def test_response_contains_pass():
+    chk = ScoringCheck.model_validate({"check": "response_contains", "patterns": ["7", "cloud"]})
+    from llm_test.core.scorer import check_response_contains
+    assert check_response_contains([], chk, "It's 7°C and cloudy.").result == "pass"
+
+
+def test_response_not_contains_pass():
+    chk = ScoringCheck.model_validate({"check": "response_not_contains", "patterns": ["forbidden"]})
+    from llm_test.core.scorer import check_response_not_contains
+    assert check_response_not_contains([], chk, "all clear").result == "pass"
+
+
+def test_response_matches_schema_pass():
+    chk = ScoringCheck.model_validate({
+        "check": "response_matches_schema",
+        "schema": {"type": "object", "required": ["temp"], "properties": {"temp": {"type": "integer"}}},
+    })
+    from llm_test.core.scorer import check_response_matches_schema
+    assert check_response_matches_schema([], chk, '{"temp": 7}').result == "pass"
+
+
+def test_response_language_pl():
+    chk = ScoringCheck.model_validate({"check": "response_language", "language": "pl"})
+    from llm_test.core.scorer import check_response_language
+    assert check_response_language([], chk, "Cześć, dzisiaj jest 7 stopni i pochmurno.").result == "pass"
+
+
+def test_unique_tools_called():
+    calls = _calls(("a", {}), ("a", {}), ("b", {}))
+    chk = ScoringCheck.model_validate({"check": "unique_tools_called", "tools": ["a", "b"]})
+    from llm_test.core.scorer import check_unique_tools_called
+    assert check_unique_tools_called(calls, chk, None).result == "pass"
+
+
+def test_no_hallucinated_tool():
+    calls = _calls(("real_tool", {}), ("ghost_tool", {}))
+    chk = ScoringCheck.model_validate({"check": "no_hallucinated_tool", "allowed": ["real_tool"]})
+    from llm_test.core.scorer import check_no_hallucinated_tool
+    assert check_no_hallucinated_tool(calls, chk, None).result == "fail"
+
+
+def test_budget_respected():
+    calls = _calls(("a", {}), ("b", {}))
+    chk = ScoringCheck.model_validate({"check": "budget_respected", "max_tool_calls": 2})
+    from llm_test.core.scorer import check_budget_respected
+    assert check_budget_respected(calls, chk, None).result == "pass"
+
+
+def test_clarification_asked():
+    chk = ScoringCheck.model_validate({
+        "check": "clarification_asked",
+        "phrases": ["which Jordan", "could you clarify", "do you mean"],
+    })
+    from llm_test.core.scorer import check_clarification_asked
+    assert check_clarification_asked([], chk, "I found 3 Jordans — which Jordan did you mean?").result == "pass"
+
+
+def test_error_surfaced():
+    calls = [ToolCall(index=0, name="get_stock_price", args={}, result={"error": "rate_limit"}, result_kind="error")]
+    chk = ScoringCheck.model_validate({"check": "error_surfaced", "tool": "get_stock_price"})
+    from llm_test.core.scorer import check_error_surfaced
+    assert check_error_surfaced(calls, chk, "The price service returned a rate-limit error.").result == "pass"
+
+
+def test_final_state_equals():
+    calls = _calls(("send_email", {"to": "a@b.com"}))
+    chk = ScoringCheck.model_validate({
+        "check": "final_state_equals",
+        "state": {"send_email_to": "a@b.com"},
+    })
+    from llm_test.core.scorer import check_final_state_equals
+    assert check_final_state_equals(calls, chk, None).result == "pass"
