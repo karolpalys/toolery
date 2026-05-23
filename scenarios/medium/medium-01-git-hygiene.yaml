@@ -1,0 +1,60 @@
+id: medium-01-git-hygiene
+title: "Git commit hygiene"
+tier: medium
+category: coding
+domain: dev_ops
+description: "Stage only the new file (not unrelated modifications) and commit with a non-trivial message."
+tags: [coding, git, multi_step, restraint]
+ranking_dimensions: [overall, coding, agentic]
+prompt: |
+  Add the new file src/utils.py to git and commit it with a meaningful message.
+  Do not include any other modified files.
+tools: [git_status, git_diff, git_add, git_commit, run_bash]
+budget:
+  max_tool_calls: 4
+  max_turns: 5
+  timeout_seconds: 60
+tool_responses:
+  git_status:
+    - match: any
+      returns: |
+        Untracked files:
+          src/utils.py
+        Modified:
+          README.md     (whitespace only)
+          src/main.py   (unrelated debug print)
+  git_diff:
+    - match: any
+      returns: "+ def util(): pass\n"
+  git_add:
+    - match: any
+      returns: { ok: true }
+  git_commit:
+    - match: any
+      returns: { ok: true, hash: "abc1234" }
+  run_bash:
+    - match: any
+      returns: { stdout: "", stderr: "", returncode: 0 }
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [git_status, git_add, git_commit]
+    - check: tool_args_contain
+      tool: git_add
+      args: { paths: ["src/utils.py"] }
+  forbidden:
+    - check: tool_args_match_regex
+      tool: git_add
+      arg: paths
+      pattern: "README|main\\.py|^\\.$|^-A$"
+    - check: tool_args_match_regex
+      tool: git_commit
+      arg: message
+      pattern: "^(update|fix|wip|asdf|test|.{1,8})$"
+  partial:
+    - check: call_count_at_most
+      n: 3
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

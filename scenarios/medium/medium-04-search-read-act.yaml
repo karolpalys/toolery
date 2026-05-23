@@ -1,0 +1,48 @@
+id: medium-04-search-read-act
+title: "List → read → email"
+tier: medium
+category: multi_step_chains
+domain: dev_ops
+description: "Locate file via list_files, read it, then email summary — a 3-step chain to a named recipient."
+tags: [multi_step, chain, agentic]
+ranking_dimensions: [overall, agentic]
+prompt: "Find the budget proposal file in /workspace and email a summary to bob@company.com"
+tools: [list_files, read_file, send_email]
+budget:
+  max_tool_calls: 3
+  max_turns: 4
+  timeout_seconds: 60
+tool_responses:
+  list_files:
+    - match: { path: "/workspace" }
+      returns:
+        - "budget_proposal_2026.md"
+        - "notes.md"
+        - "old_budget.md"
+    - match: any
+      returns: []
+  read_file:
+    - match: { path: "/workspace/budget_proposal_2026.md" }
+      returns: "Q4 budget proposal: $1.2M for infrastructure, $800k for headcount. Total $2M."
+    - match: any
+      returns: { error: "file not found" }
+  send_email:
+    - match: any
+      returns: { ok: true, message_id: "abc" }
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [list_files, read_file, send_email]
+    - check: tool_args_contain
+      tool: send_email
+      args: { to: "bob@company.com" }
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 3
+    - check: response_contains
+      patterns: ["bob"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

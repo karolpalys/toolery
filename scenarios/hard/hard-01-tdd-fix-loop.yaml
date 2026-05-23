@@ -1,0 +1,67 @@
+id: hard-01-tdd-fix-loop
+title: "TDD fix loop under tight budget"
+tier: hard
+category: coding
+domain: dev_ops
+description: "Failing test → read code → edit src → tests pass. Tests file must not be modified. Budget 6."
+tags: [coding, tdd, multi_step, budget_pressure]
+ranking_dimensions: [overall, coding, agentic, budget_efficiency]
+prompt: |
+  Tests in tests/test_parser.py are failing. Fix the bug in src/parser.py.
+  Do not modify the tests.
+tools: [read_file, edit_file, run_tests, list_files, grep]
+budget:
+  max_tool_calls: 6
+  max_turns: 6
+  timeout_seconds: 90
+tool_responses:
+  run_tests:
+    - match: any
+      call_index: 0
+      returns: "FAILED tests/test_parser.py::test_negative_numbers - AssertionError: expected -3, got 3"
+    - match: any
+      returns: "PASSED 12 tests, 0 failed."
+  read_file:
+    - match: { path: "src/parser.py" }
+      returns: |
+        def parse_int(s: str) -> int:
+            # BUG: missing minus sign handling
+            return int(s.lstrip('-+'))
+    - match: { path: "tests/test_parser.py" }
+      returns: |
+        from src.parser import parse_int
+        def test_negative_numbers():
+            assert parse_int('-3') == -3
+    - match: any
+      returns: { error: "not found" }
+  edit_file:
+    - match: any
+      returns: { ok: true, lines_changed: 1 }
+  list_files:
+    - match: any
+      returns: ["src/parser.py", "tests/test_parser.py"]
+  grep:
+    - match: any
+      returns: "src/parser.py:2:def parse_int"
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [run_tests, read_file, edit_file, run_tests]
+    - check: tool_args_contain
+      tool: read_file
+      args: { path: "src/parser.py" }
+    - check: tool_args_contain
+      tool: edit_file
+      args: { path: "src/parser.py" }
+  forbidden:
+    - check: tool_args_match_regex
+      tool: edit_file
+      arg: path
+      pattern: "tests/"
+  partial:
+    - check: call_count_at_most
+      n: 4
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

@@ -1,0 +1,37 @@
+id: medium-09-localization-de
+title: "German weather query — respond in German"
+tier: medium
+category: localization
+domain: generic
+description: "German prompt — model must call get_weather AND answer in German."
+tags: [localization, single_turn]
+ranking_dimensions: [overall, localization]
+prompt: "Wie ist das Wetter in Berlin?"
+tools: [get_weather]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  get_weather:
+    - match: { location: "Berlin" }
+      returns: { temp_c: 10, condition: "bewoelkt" }
+    - match: any
+      returns: { error: "Stadt nicht gefunden" }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_weather
+    - check: tool_args_contain
+      tool: get_weather
+      args: { location: "Berlin" }
+    - check: response_language
+      language: de
+  forbidden: []
+  partial:
+    - check: response_contains
+      patterns: ["10"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

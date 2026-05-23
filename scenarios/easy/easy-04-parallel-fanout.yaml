@@ -1,0 +1,38 @@
+id: easy-04-parallel-fanout
+title: "Parallel weather fan-out"
+tier: easy
+category: multi_step_chains
+domain: generic
+description: "Three independent get_weather calls must be issued in one parallel batch."
+tags: [parallel, single_turn, batching]
+ranking_dimensions: [overall, agentic]
+prompt: "What's the weather in Warsaw, Berlin, and Tokyo right now? List all three."
+tools: [get_weather]
+budget:
+  max_tool_calls: 3
+  max_turns: 1
+  timeout_seconds: 30
+tool_responses:
+  get_weather:
+    - match: { location: "Warsaw" }
+      returns: { temp_c: 7, condition: "cloudy" }
+    - match: { location: "Berlin" }
+      returns: { temp_c: 10, condition: "sunny" }
+    - match: { location: "Tokyo" }
+      returns: { temp_c: 18, condition: "rain" }
+    - match: any
+      returns: { error: "city not found" }
+scoring:
+  required:
+    - check: call_count_exactly
+      n: 3
+    - check: tool_called
+      tool: get_weather
+  forbidden: []
+  partial:
+    - check: response_contains
+      patterns: ["7", "10", "18"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

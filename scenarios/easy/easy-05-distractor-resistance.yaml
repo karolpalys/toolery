@@ -1,0 +1,41 @@
+id: easy-05-distractor-resistance
+title: "Pick stock_price among distractors"
+tier: easy
+category: tool_selection
+domain: generic
+description: "Call get_stock_price despite calculator + web_search + get_weather being present."
+tags: [tool_selection, single_turn, distractor]
+ranking_dimensions: [overall, tool_selection]
+prompt: "What's the current price of AAPL?"
+tools: [get_stock_price, calculator, web_search, get_weather]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  get_stock_price:
+    - match: { symbol: "AAPL" }
+      returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
+    - match: any
+      returns: { error: "symbol not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_stock_price
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "AAPL" }
+  forbidden:
+    - check: tool_called
+      tool: calculator
+    - check: tool_called
+      tool: web_search
+    - check: tool_called
+      tool: get_weather
+  partial:
+    - check: response_contains
+      patterns: ["175"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
