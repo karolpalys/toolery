@@ -80,7 +80,7 @@ class Scenario(BaseModel):
     @field_validator("id")
     @classmethod
     def id_is_kebab(cls, v: str) -> str:
-        if not re.match(r"^[a-z0-9]+(-[a-z0-9]+)+$", v):
+        if not re.match(r"^[a-z][a-z0-9]*(-[a-z0-9]+)+$", v):
             raise ValueError(f"id must be kebab-case, got: {v!r}")
         return v
 
@@ -107,10 +107,10 @@ class TraceResult(BaseModel):
     trial_index: int
     messages: list[Message]
     tool_calls: list[ToolCall]
-    final_response: str | None
+    final_response: str | None = None
     started_at_iso: str
     duration_ms: int
-    error: str | None
+    error: str | None = None
     adapter_metadata: dict[str, Any] = {}
 
 
