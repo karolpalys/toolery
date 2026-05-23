@@ -99,6 +99,12 @@ def run(
                 backend_url=base_url,
                 use_local_model=True,
             )
+        elif a == "codex":
+            from llm_test.adapters.codex import CodexAdapter
+            adapters[a] = CodexAdapter(
+                cli_path=os.environ.get("CODEX_CLI_PATH", "codex"),
+                backend_url=base_url, use_local_model=True,
+            )
         else:
             console.print(f"[yellow]adapter '{a}' not yet wired in Phase 12; skipping[/yellow]")
     if not adapters:
