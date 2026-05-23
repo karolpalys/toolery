@@ -1,0 +1,38 @@
+adapters:
+  raw:
+    enabled: true
+    base_url_env: LLM_TEST_BASE_URL
+    api_key_env: OPENAI_API_KEY
+    request_timeout: 60
+    max_concurrent: 4
+  hermes:
+    enabled: false
+    gateway_url: http://localhost:8642
+    api_url: http://localhost:8644
+    token_env: HERMES_TOKEN
+    workspace_id: default
+  claude_code:
+    enabled: false
+    cli_path: claude
+    use_local_model: true
+    backend_url_env: LLM_TEST_BASE_URL
+    timeout_per_scenario: 300
+  codex:
+    enabled: false
+    cli_path: codex
+    use_local_model: true
+
+storage:
+  results_dir: ./results
+  sqlite_path: ./results/runs.db
+  trace_compression: gzip
+
+ranking:
+  history_window_runs: 5
+  half_life_days: 14
+  bootstrap_iterations: 1000
+  min_runs_for_ranking: 2
+
+scenarios:
+  dir: ./scenarios
+  validate_on_load: true
