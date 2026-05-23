@@ -269,3 +269,112 @@ REGISTRY.update({
     "error_surfaced": check_error_surfaced,
     "final_state_equals": check_final_state_equals,
 })
+
+
+from llm_test.core.models import Scenario, ScenarioResult, TraceResult  # noqa: E402
+
+
+def _classify_failure(required_results, forbidden_results, budget_violated, hallucinated) -> str | None:
+    if budget_violated:
+        return "budget_violated"
+    if hallucinated:
+        return "hallucinated_tool"
+    # forbidden_results is the raw (un-inverted) list; a "pass" means the forbidden thing happened
+    if any(r.result == "pass" for r in forbidden_results):
+        return "forbidden_action"
+    failed_req = [r for r in required_results if r.result == "fail"]
+    if not failed_req:
+        return None
+    first = failed_req[0].check
+    if first in ("tool_called", "unique_tools_called", "tool_called_in_order"):
+        return "wrong_tool" if "called" in first else "missing_step"
+    if first in ("tool_args_contain", "tool_args_match_regex", "tool_args_type"):
+        return "wrong_args"
+    if first == "clarification_asked":
+        return "no_clarification"
+    if first == "response_matches_schema":
+        return "bad_response_format"
+    return "wrong_tool"
+
+
+def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
+    calls = trace.tool_calls
+    response = trace.final_response
+
+    if trace.error:
+        return ScenarioResult(
+            scenario_id=scenario.id, adapter=trace.adapter, trial_index=trace.trial_index,
+            status="error", score=0.0, call_count=len(calls),
+            budget_max=scenario.budget.max_tool_calls, latency_ms=trace.duration_ms,
+            failure_kind="model_crash", checks=[], trace=trace,
+        )
+
+    def run(chk):
+        fn = REGISTRY.get(chk.check)
+        if fn is None:
+            return CheckResult(check=chk.check, result="fail", detail=f"unknown check {chk.check!r}")
+        return fn(calls, chk, response)
+
+    required = [run(c) for c in scenario.scoring.required]
+    forbidden_raw = [run(c) for c in scenario.scoring.forbidden]
+    forbidden = [
+        CheckResult(check=r.check, result="fail" if r.result == "pass" else "pass",
+                    detail=f"(inverted) {r.detail}")
+        for r in forbidden_raw
+    ]
+    partial = [run(c) for c in scenario.scoring.partial]
+
+    budget_violated = len(calls) > scenario.budget.max_tool_calls
+    allowed_tools = set(scenario.tools)
+    hallucinated = any(c.name not in allowed_tools for c in calls)
+
+    all_checks = required + forbidden + partial
+    if budget_violated:
+        all_checks.append(CheckResult(check="budget_respected", result="fail",
+                                      detail=f"{len(calls)}>{scenario.budget.max_tool_calls}"))
+    if hallucinated:
+        bad = [c.name for c in calls if c.name not in allowed_tools]
+        all_checks.append(CheckResult(check="no_hallucinated_tool", result="fail",
+                                      detail=f"called outside allowed: {bad}"))
+
+    required_all_pass = all(r.result == "pass" for r in required) and not budget_violated and not hallucinated
+    forbidden_clean = all(r.result == "pass" for r in forbidden)
+
+    if not forbidden_clean or not required_all_pass:
+        kind = _classify_failure(required, forbidden_raw, budget_violated, hallucinated)
+        return ScenarioResult(
+            scenario_id=scenario.id, adapter=trace.adapter, trial_index=trace.trial_index,
+            status="fail", score=scenario.scoring.weights["fail"],
+            call_count=len(calls), budget_max=scenario.budget.max_tool_calls,
+            latency_ms=trace.duration_ms, failure_kind=kind,
+            checks=all_checks, trace=trace,
+        )
+
+    if partial:
+        n_pass = sum(1 for p in partial if p.result == "pass")
+        ratio = n_pass / len(partial)
+        if ratio == 1.0:
+            return ScenarioResult(
+                scenario_id=scenario.id, adapter=trace.adapter, trial_index=trace.trial_index,
+                status="pass", score=scenario.scoring.weights["pass"],
+                call_count=len(calls), budget_max=scenario.budget.max_tool_calls,
+                latency_ms=trace.duration_ms, failure_kind=None,
+                checks=all_checks, trace=trace,
+            )
+        partial_weight = scenario.scoring.weights["partial"]
+        pass_weight = scenario.scoring.weights["pass"]
+        score = partial_weight + (pass_weight - partial_weight) * ratio
+        return ScenarioResult(
+            scenario_id=scenario.id, adapter=trace.adapter, trial_index=trace.trial_index,
+            status="partial", score=score, call_count=len(calls),
+            budget_max=scenario.budget.max_tool_calls, latency_ms=trace.duration_ms,
+            failure_kind=None, checks=all_checks, trace=trace,
+        )
+
+    return ScenarioResult(
+        scenario_id=scenario.id, adapter=trace.adapter, trial_index=trace.trial_index,
+        status="pass", score=scenario.scoring.weights["pass"],
+        call_count=len(calls), budget_max=scenario.budget.max_tool_calls,
+        latency_ms=trace.duration_ms, failure_kind=None,
+        checks=all_checks, trace=trace,
+    )
