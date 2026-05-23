@@ -73,6 +73,7 @@ def run(
     scenarios_dir: Path = typer.Option(Path("scenarios")),  # noqa: B008
     concurrency: int = typer.Option(4),
     no_tui: bool = typer.Option(True, "--no-tui/--tui", help="MVP: --no-tui only"),
+    with_perf: bool = typer.Option(False, "--with-perf"),
 ):
     """Run benchmark."""
     # Import tools to register them
@@ -164,8 +165,38 @@ def run(
     (run_dir / "summary.md").write_text(md)
     store.finish_run(run_id, finished_at=datetime.now(UTC).isoformat(),
                      duration_s=duration, status="done")
+
+    if with_perf:
+        from llm_test.perf.benchy import run_benchy
+        try:
+            perf = run_benchy(model=model, base_url=base_url, depth=[0, 16384, 131072], runs=3)
+            for row in perf.rows:
+                store.write_perf(run_id, depth=row["depth"],
+                                 pp_tps=row.get("pp_tps"), tg_tps=row.get("tg_tps"),
+                                 ttft_ms=row.get("ttft_ms"), ttft_p95_ms=row.get("ttft_p95_ms"),
+                                 pp_tokens=row.get("pp_tokens"), tg_tokens=row.get("tg_tokens"),
+                                 benchy_runs=row.get("n_runs"),
+                                 raw_json=json.dumps(row))
+            console.print(f"[green]✓ perf: collected {len(perf.rows)} depth points[/green]")
+        except Exception as e:
+            console.print(f"[yellow]perf collection failed: {e}[/yellow]")
+
     console.print(f"[green]✓ Run finished: {run_dir}[/green]")
     console.print(f"  [bold]summary.md[/bold]: {run_dir/'summary.md'}")
+
+
+@app.command()
+def perf(model: str = typer.Option(..., "--model"),
+         base_url: str = typer.Option("http://localhost:8000", "--base-url"),
+         pp: int = 4096, tg: int = 512,
+         depth: str = "0,16384,131072", runs: int = 3):
+    """Run llama-benchy only (no scoring)."""
+    from llm_test.perf.benchy import run_benchy
+    res = run_benchy(model=model, base_url=base_url, pp=pp, tg=tg,
+                     depth=[int(x) for x in depth.split(",")], runs=runs)
+    for row in res.rows:
+        console.print(f"depth={row['depth']:>7} pp_tps={row.get('pp_tps',0):.1f} "
+                      f"tg_tps={row.get('tg_tps',0):.2f} ttft={row.get('ttft_ms',0):.0f}ms")
 
 
 @app.command()
