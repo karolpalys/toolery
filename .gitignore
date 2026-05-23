@@ -11,3 +11,7 @@ dist/
 build/
 .coverage
 htmlcov/
+.env
+.env.*
+.idea/
+.vscode/
