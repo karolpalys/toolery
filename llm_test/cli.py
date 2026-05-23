@@ -179,6 +179,13 @@ def compare(run_a: str = typer.Argument(...), run_b: str = typer.Argument(...),
 
 
 @app.command()
+def tui():
+    """Launch the Textual TUI."""
+    from llm_test.tui.app import LLMTestApp
+    LLMTestApp(run_id=None).run()
+
+
+@app.command()
 def rankings(
     regen: bool = typer.Option(False, "--regen", help="Regenerate rankings .md"),
     dimension: str = typer.Option("all", help="overall|coding|agentic|safety|restraint|long_context|budget_efficiency|speed|all"),
