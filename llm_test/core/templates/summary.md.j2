@@ -1,0 +1,34 @@
+# Run: {{ run_id }}
+
+**Model:** {{ model }}
+**Adapters:** {{ adapters | join(", ") }}
+**Trials per task:** {{ trials }}    **Total scenarios:** {{ scenarios_n }}    **Total trials:** {{ results | length }}
+**Duration:** {{ "%.1f"|format(duration_s) }}s    **Cost:** $0 (deterministic)
+
+## Scores per adapter (Overall, Easy, Medium, Hard, Very Hard)
+
+| Adapter | Overall | Easy | Medium | Hard | Very Hard |
+|---------|--------:|-----:|-------:|-----:|----------:|
+{% for a in adapters -%}
+| {{ a }} | {{ overall[a].overall }} | {{ overall[a].easy }} | {{ overall[a].medium }} | {{ overall[a].hard }} | {{ overall[a].very_hard }} |
+{% endfor %}
+
+## Top failures
+{% for f in top_failures -%}
+- {{ f.scenario_id }} ({{ f.adapter }}): {{ f.failure_kind }} — {{ f.detail }}
+{% endfor %}
+
+{% if perf_rows %}
+## Perf (llama-benchy)
+
+| depth | pp tok/s | tg tok/s | TTFT (ms) |
+|------:|---------:|---------:|----------:|
+{% for r in perf_rows -%}
+| {{ r.depth }} | {{ "%.1f"|format(r.pp_tps or 0) }} | {{ "%.2f"|format(r.tg_tps or 0) }} | {{ "%.0f"|format(r.ttft_ms or 0) }} |
+{% endfor %}
+{% endif %}
+
+## Links
+- [Per-scenario details](scenarios/)
+- [Raw traces](traces/)
+- [Charts](../../charts/{{ run_id }}/)

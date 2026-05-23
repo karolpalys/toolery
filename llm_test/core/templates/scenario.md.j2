@@ -1,0 +1,24 @@
+# {{ scenario_id }}
+
+**Title:** {{ title }}  **Tier:** {{ tier }}  **Category:** {{ category }}  **Trials per adapter:** {{ trials }}
+
+## Per-adapter
+
+| Adapter | Pass | Partial | Fail | Score | Median calls | Median latency (ms) |
+|---------|-----:|--------:|-----:|------:|-------------:|--------------------:|
+{% for row in per_adapter -%}
+| {{ row.adapter }} | {{ row.pass_n }}/{{ row.total }} | {{ row.partial_n }} | {{ row.fail_n }} | {{ "%.2f"|format(row.score) }} | {{ row.median_calls }} | {{ row.median_latency }} |
+{% endfor %}
+
+## Last-trial checks (per adapter)
+{% for adapter, checks in checks_by_adapter.items() %}
+### {{ adapter }}
+{% for c in checks -%}
+- {{ "✓" if c.result == "pass" else ("◐" if c.result == "partial" else "✗") }} `{{ c.check }}` — {{ c.detail }}
+{% endfor %}
+{% endfor %}
+
+## Failures
+{% for f in failures -%}
+- ({{ f.adapter }}, trial {{ f.trial_index }}, {{ f.status }}): {{ f.failure_kind }}
+{% endfor %}
