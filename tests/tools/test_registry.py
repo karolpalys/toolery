@@ -22,3 +22,16 @@ def test_registry_openai_schema_for_subset():
     schemas = reg.openai_schemas(["get_weather"])
     assert len(schemas) == 1
     assert schemas[0]["function"]["name"] == "get_weather"
+
+
+def test_all_generic_tools_registered():
+    reg = ToolRegistry.default()
+    required = [
+        "get_weather", "web_search", "send_email", "get_contacts", "calculator",
+        "read_file", "write_file", "list_files", "add_calendar_event",
+        "get_exchange_rate", "get_stock_price",
+    ]
+    for name in required:
+        spec = reg.get(name)
+        assert spec.name == name
+        assert spec.json_schema["function"]["name"] == name
