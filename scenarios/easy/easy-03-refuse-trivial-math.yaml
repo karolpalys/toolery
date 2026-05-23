@@ -1,0 +1,29 @@
+id: easy-03-refuse-trivial-math
+title: "Refuse trivial calculator"
+tier: easy
+category: restraint_refusal
+domain: generic
+description: "Answer 2+2 directly without calling calculator."
+tags: [restraint, single_turn]
+ranking_dimensions: [overall, restraint]
+prompt: "What is 2 + 2?"
+tools: [calculator]
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 15
+tool_responses: {}
+scoring:
+  required:
+    - check: tool_not_called
+      tool: calculator
+    - check: response_contains
+      patterns: ["4"]
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 0
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

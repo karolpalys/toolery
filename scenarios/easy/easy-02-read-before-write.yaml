@@ -1,0 +1,42 @@
+id: easy-02-read-before-write
+title: "Read before write"
+tier: easy
+category: coding
+domain: dev_ops
+description: "Read existing file content before overwriting to avoid data loss."
+tags: [coding, file_ops, single_turn]
+ranking_dimensions: [overall, coding]
+prompt: "Append a TODO line 'TODO: review' to /workspace/notes.md"
+tools: [read_file, write_file, list_files]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  read_file:
+    - match: { path: "/workspace/notes.md" }
+      returns: "# Notes\n\nExisting content here.\n"
+    - match: any
+      returns: { error: "file not found" }
+  write_file:
+    - match: any
+      returns: { ok: true, bytes_written: 64 }
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [read_file, write_file]
+    - check: tool_args_contain
+      tool: write_file
+      args: { path: "/workspace/notes.md" }
+  forbidden:
+    - check: tool_args_match_regex
+      tool: write_file
+      arg: content
+      pattern: "^TODO: review\\s*$"
+  partial:
+    - check: call_count_at_most
+      n: 2
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

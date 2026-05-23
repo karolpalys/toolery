@@ -1,0 +1,39 @@
+id: easy-01-direct-weather
+title: "Direct weather lookup"
+tier: easy
+category: tool_selection
+domain: generic
+description: "Use get_weather instead of web_search."
+tags: [tool_call, single_turn]
+ranking_dimensions: [overall, tool_selection]
+prompt: "What's the weather in Warsaw right now?"
+tools:
+  - get_weather
+  - web_search
+budget:
+  max_tool_calls: 1
+  max_turns: 1
+  timeout_seconds: 30
+tool_responses:
+  get_weather:
+    - match: { location: "Warsaw" }
+      returns: { temp_c: 7, condition: "cloudy" }
+    - match: any
+      returns: { error: "city not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_weather
+    - check: tool_args_contain
+      tool: get_weather
+      args: { location: "Warsaw" }
+  forbidden:
+    - check: tool_called
+      tool: web_search
+  partial:
+    - check: response_contains
+      patterns: ["7", "cloudy"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
