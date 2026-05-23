@@ -1,0 +1,14 @@
+# {{ dimension | title }} Ranking
+
+Last updated: {{ updated_iso }}   |   Tracked: {{ model_count }} models, {{ run_count }} runs total
+
+| # | Model | Overall | Best adapter | Runs |
+|---|-------|--------:|--------------|-----:|
+{% for row in rows -%}
+| {{ loop.index }} | {{ row.model }} | {{ "%.1f%%"|format(row.score*100) }} | {{ row.best_adapter }} | {{ row.runs }} |
+{% endfor %}
+
+## Method
+- Last {{ window }} runs per model, half-life decay {{ half_life }} days
+- Bootstrap {{ bootstrap_iters }} resamples for 95% CI
+- McNemar test vs next model in ranking; p < 0.05 marked as "statistically distinguishable"

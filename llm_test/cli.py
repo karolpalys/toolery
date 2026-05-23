@@ -166,3 +166,25 @@ def run(
                      duration_s=duration, status="done")
     console.print(f"[green]✓ Run finished: {run_dir}[/green]")
     console.print(f"  [bold]summary.md[/bold]: {run_dir/'summary.md'}")
+
+
+@app.command()
+def rankings(
+    regen: bool = typer.Option(False, "--regen", help="Regenerate rankings .md"),
+    dimension: str = typer.Option("all", help="overall|coding|agentic|safety|restraint|long_context|budget_efficiency|speed|all"),
+):
+    """Manage rankings."""
+    from llm_test.rankings.compute import regenerate_rankings
+    out = _results_dir() / "rankings"
+    dims = ["overall", "coding", "agentic", "safety", "restraint", "long_context",
+            "budget_efficiency"] if dimension == "all" else [dimension]
+    if regen:
+        regenerate_rankings(store=_store(), dimensions=dims, out_dir=out)
+        console.print(f"[green]✓ Regenerated rankings: {out}[/green]")
+    else:
+        for d in dims:
+            p = out / f"{d}.md"
+            if p.exists():
+                console.print(f"[bold]{d}[/bold] → {p}")
+            else:
+                console.print(f"[yellow]{d}: not yet generated (run with --regen)[/yellow]")
