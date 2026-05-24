@@ -8,6 +8,7 @@ from llm_test.core import runner_subprocess
 from llm_test.core.endpoint_scanner import EndpointInfo
 from llm_test.tui.app import LLMTestApp
 from llm_test.tui.home_tab import HomeTab
+from llm_test.tui.launch_modal import LaunchModal
 
 
 @pytest.mark.asyncio
@@ -47,7 +48,8 @@ async def test_launch_flow_switches_to_live(monkeypatch):
         tbl.focus()
         await pilot.press("enter")
         await pilot.pause()
-        # Modal should now be open — click Run
+        # Verify modal opened before clicking Run (catches silent modal failures)
+        assert isinstance(app.screen, LaunchModal)
         await pilot.click("#run")
         await pilot.pause()
         # Wait for the @work worker to finish (it spawns subprocess + switches tab)
