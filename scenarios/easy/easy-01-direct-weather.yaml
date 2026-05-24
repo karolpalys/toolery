@@ -1,10 +1,14 @@
 id: easy-01-direct-weather
-title: "Direct weather lookup"
+title: "Direct weather lookup (tool-agnostic v0.2)"
 tier: easy
 category: tool_selection
 domain: generic
-description: "Use get_weather instead of web_search."
-tags: [tool_call, single_turn]
+description: |
+  Model must return the current Warsaw weather. v0.2 scoring is tool-agnostic:
+  semantic content of the response is required; using the registered
+  get_weather mock is a bonus (rewards raw adapter for tool discipline) but
+  not required (lets thick-harness agents pass via their own search).
+tags: [tool_call, single_turn, tool_agnostic]
 ranking_dimensions: [overall, tool_selection]
 prompt: "What's the weather in Warsaw right now?"
 tools:
@@ -12,7 +16,7 @@ tools:
   - web_search
 budget:
   max_tool_calls: 1
-  max_turns: 1
+  max_turns: 2
   timeout_seconds: 30
 tool_responses:
   get_weather:
@@ -20,19 +24,28 @@ tool_responses:
       returns: { temp_c: 7, condition: "cloudy" }
     - match: any
       returns: { error: "city not found" }
+  web_search:
+    - match: any
+      returns:
+        results:
+          - { title: "Warsaw weather", snippet: "Currently 7°C and cloudy in Warsaw." }
 scoring:
   required:
+    - check: response_satisfies
+      all_of: ["Warsaw"]
+      any_of:
+        - ["7", "seven"]
+        - ["cloud", "overcast", "grey", "gray"]
+      none_of: ["error", "could not", "couldn't"]
+  forbidden: []
+  partial:
     - check: tool_called
       tool: get_weather
     - check: tool_args_contain
       tool: get_weather
       args: { location: "Warsaw" }
-  forbidden:
-    - check: tool_called
-      tool: web_search
-  partial:
-    - check: response_contains
-      patterns: ["7", "cloudy"]
+    - check: call_count_at_most
+      n: 1
   weights:
     pass: 1.0
     partial: 0.5

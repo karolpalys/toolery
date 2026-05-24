@@ -1,12 +1,16 @@
 id: easy-05-distractor-resistance
-title: "Pick stock_price among distractors"
+title: "Pick stock_price among distractors (tool-agnostic v0.2)"
 tier: easy
 category: tool_selection
 domain: generic
-description: "Call get_stock_price despite calculator + web_search + get_weather being present."
-tags: [tool_selection, single_turn, distractor]
+description: |
+  Model must return the AAPL price. v0.2 scoring is tool-agnostic — using our
+  mocked get_stock_price is bonus, not required. Hermes-style agents using
+  their own search/lookup can still pass if their final response contains
+  the correct figure.
+tags: [tool_selection, single_turn, distractor, tool_agnostic]
 ranking_dimensions: [overall, tool_selection]
-prompt: "What's the current price of AAPL?"
+prompt: "What's the current price of AAPL? Give the dollar figure."
 tools: [get_stock_price, calculator, web_search, get_weather]
 budget:
   max_tool_calls: 1
@@ -18,23 +22,30 @@ tool_responses:
       returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
     - match: any
       returns: { error: "symbol not found" }
+  web_search:
+    - match: any
+      returns:
+        results:
+          - { title: "AAPL quote", snippet: "Apple (AAPL) trading at $175.43 USD." }
 scoring:
   required:
+    - check: response_satisfies
+      all_of: ["175"]
+      any_of:
+        - ["AAPL", "Apple"]
+        - ["$", "USD", "dollar"]
+      none_of: ["error", "couldn't", "could not find"]
+  forbidden:
+    - check: tool_called
+      tool: get_weather
+  partial:
     - check: tool_called
       tool: get_stock_price
     - check: tool_args_contain
       tool: get_stock_price
       args: { symbol: "AAPL" }
-  forbidden:
-    - check: tool_called
-      tool: calculator
-    - check: tool_called
-      tool: web_search
-    - check: tool_called
-      tool: get_weather
-  partial:
-    - check: response_contains
-      patterns: ["175"]
+    - check: call_count_at_most
+      n: 1
   weights:
     pass: 1.0
     partial: 0.5

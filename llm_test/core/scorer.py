@@ -257,11 +257,49 @@ def check_final_state_equals(calls, chk, response):
     return _ok("final_state_equals", "state matched")
 
 
+def check_response_satisfies(calls, chk, response):
+    """Tool-agnostic semantic check on the final response.
+
+    Three composable sub-checks (all optional, evaluated as logical AND):
+      - all_of:  list of substrings, every one must appear (case-insensitive)
+      - any_of:  list of groups; each group is a list of synonyms — at least one
+                 substring from EACH group must appear
+      - none_of: list of forbidden substrings — none may appear
+
+    Lets us assert "model produced the right semantic outcome" without binding
+    the assertion to a specific tool name. Useful when the same task can be
+    completed by different toolings (raw mock tools vs. Hermes web_search etc.).
+    """
+    if response is None:
+        return _bad("response_satisfies", "no response")
+    text = response.lower()
+    d = chk.model_dump()
+
+    all_of = d.get("all_of") or []
+    missing = [p for p in all_of if str(p).lower() not in text]
+    if missing:
+        return _bad("response_satisfies", f"missing all_of: {missing}")
+
+    any_of = d.get("any_of") or []
+    for group in any_of:
+        group_list = group if isinstance(group, list) else [group]
+        if not any(str(p).lower() in text for p in group_list):
+            return _bad("response_satisfies", f"missing any_of group: {group_list}")
+
+    none_of = d.get("none_of") or []
+    found_forbidden = [p for p in none_of if str(p).lower() in text]
+    if found_forbidden:
+        return _bad("response_satisfies", f"forbidden present: {found_forbidden}")
+
+    return _ok("response_satisfies", "all semantic conditions met")
+
+
 REGISTRY.update({
     "response_contains": check_response_contains,
     "response_not_contains": check_response_not_contains,
     "response_matches_schema": check_response_matches_schema,
     "response_language": check_response_language,
+    "response_satisfies": check_response_satisfies,
     "unique_tools_called": check_unique_tools_called,
     "no_hallucinated_tool": check_no_hallucinated_tool,
     "budget_respected": check_budget_respected,

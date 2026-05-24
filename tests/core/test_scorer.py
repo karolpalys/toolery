@@ -186,3 +186,75 @@ def test_final_state_equals():
     })
     from llm_test.core.scorer import check_final_state_equals
     assert check_final_state_equals(calls, chk, None).result == "pass"
+
+
+def test_response_satisfies_all_of_pass():
+    from llm_test.core.scorer import check_response_satisfies
+    chk = ScoringCheck.model_validate({
+        "check": "response_satisfies",
+        "all_of": ["Warsaw", "7"],
+    })
+    r = check_response_satisfies([], chk, "Current weather in Warsaw is 7°C and cloudy.")
+    assert r.result == "pass"
+
+
+def test_response_satisfies_all_of_fail():
+    from llm_test.core.scorer import check_response_satisfies
+    chk = ScoringCheck.model_validate({
+        "check": "response_satisfies",
+        "all_of": ["Warsaw", "Tokyo"],   # Tokyo missing
+    })
+    r = check_response_satisfies([], chk, "Weather in Warsaw is 7°C.")
+    assert r.result == "fail"
+    assert "Tokyo" in r.detail
+
+
+def test_response_satisfies_any_of_pass():
+    from llm_test.core.scorer import check_response_satisfies
+    chk = ScoringCheck.model_validate({
+        "check": "response_satisfies",
+        "any_of": [["cloud", "overcast", "rain"], ["7", "8", "9"]],
+    })
+    r = check_response_satisfies([], chk, "It's 7°C and cloudy out there.")
+    assert r.result == "pass"
+
+
+def test_response_satisfies_any_of_fail():
+    from llm_test.core.scorer import check_response_satisfies
+    chk = ScoringCheck.model_validate({
+        "check": "response_satisfies",
+        "any_of": [["cloud", "overcast", "rain"]],
+    })
+    r = check_response_satisfies([], chk, "It's sunny.")
+    assert r.result == "fail"
+
+
+def test_response_satisfies_none_of_blocks_forbidden():
+    from llm_test.core.scorer import check_response_satisfies
+    chk = ScoringCheck.model_validate({
+        "check": "response_satisfies",
+        "all_of": ["7"],
+        "none_of": ["error", "couldn't"],
+    })
+    bad = check_response_satisfies([], chk, "Sorry, I couldn't reach the service.")
+    assert bad.result == "fail"
+    ok = check_response_satisfies([], chk, "It's 7°C and clear.")
+    assert ok.result == "pass"
+
+
+def test_response_satisfies_combined():
+    from llm_test.core.scorer import check_response_satisfies
+    chk = ScoringCheck.model_validate({
+        "check": "response_satisfies",
+        "all_of": ["Warsaw"],
+        "any_of": [["cloud", "overcast"]],
+        "none_of": ["error"],
+    })
+    r = check_response_satisfies([], chk, "Warsaw is overcast today.")
+    assert r.result == "pass"
+
+
+def test_response_satisfies_no_response():
+    from llm_test.core.scorer import check_response_satisfies
+    chk = ScoringCheck.model_validate({"check": "response_satisfies", "all_of": ["x"]})
+    assert check_response_satisfies([], chk, None).result == "fail"

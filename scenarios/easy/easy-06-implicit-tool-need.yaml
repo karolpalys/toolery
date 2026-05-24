@@ -1,12 +1,15 @@
 id: easy-06-implicit-tool-need
-title: "Infer two-step chain from intent"
+title: "Infer two-step chain from intent (tool-agnostic v0.2)"
 tier: easy
 category: tool_selection
 domain: generic
-description: "User says 'email Bob my note'. Model must infer get_contacts → send_email."
-tags: [chain, implicit_planning]
+description: |
+  User asks to email Bob. Model must figure out contact lookup → email send.
+  v0.2 scoring is tool-agnostic — semantic outcome required (correct recipient
+  + message gist), proper mock tool path is bonus.
+tags: [chain, implicit_planning, tool_agnostic]
 ranking_dimensions: [overall, agentic]
-prompt: "Send Bob an email saying 'Heads up — meeting moved to 4pm.'"
+prompt: "Send Bob an email saying 'Heads up — meeting moved to 4pm.' Bob's last name is Reilly, he works in our company."
 tools: [get_contacts, send_email, calculator]
 budget:
   max_tool_calls: 2
@@ -24,15 +27,20 @@ tool_responses:
       returns: { ok: true, message_id: "m-1" }
 scoring:
   required:
-    - check: tool_called_in_order
-      sequence: [get_contacts, send_email]
-    - check: tool_args_contain
-      tool: send_email
-      args: { to: "bob@company.com" }
+    - check: response_satisfies
+      all_of: ["bob"]
+      any_of:
+        - ["meeting", "moved", "4pm", "4 pm", "16:00", "reschedul"]
+        - ["sent", "send", "email", "message"]
+      none_of: ["error", "couldn't find"]
   forbidden:
     - check: tool_called
       tool: calculator
   partial:
+    - check: tool_called
+      tool: send_email
+    - check: tool_called_in_order
+      sequence: [get_contacts, send_email]
     - check: call_count_at_most
       n: 2
   weights:

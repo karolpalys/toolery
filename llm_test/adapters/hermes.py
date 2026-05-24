@@ -61,6 +61,7 @@ class HermesAdapter:
         timeout_per_scenario: int = 300,
         ignore_user_config: bool = False,
         provider: str | None = None,
+        use_worktree: bool = True,
         # Kept for backward-compat with existing CLI wiring; ignored.
         api_url: str | None = None,
         gateway_url: str | None = None,
@@ -75,6 +76,12 @@ class HermesAdapter:
         # want to bypass user config (testing in isolation).
         self.ignore_user_config = ignore_user_config
         self.provider = provider
+        # Default True: --worktree runs Hermes in an isolated git worktree so any
+        # files it creates / edits / commits don't pollute the caller's tree.
+        # Without it Hermes' edit_file / git_commit / write_file tools act on
+        # the literal cwd — which means a benchmark like 'rename foo across the
+        # codebase' will actually modify llm_test/ and create stray commits.
+        self.use_worktree = use_worktree
 
     async def run_scenario(
         self, scenario: Scenario, model: str, timeout: int
@@ -92,6 +99,8 @@ class HermesAdapter:
             cmd.append("--ignore-user-config")
         if self.provider:
             cmd.extend(["--provider", self.provider])
+        if self.use_worktree:
+            cmd.append("--worktree")
         if model:
             cmd.extend(["-m", model])
 
