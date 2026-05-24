@@ -16,7 +16,7 @@ async def test_e2e_three_scenarios_with_mock():
     plans = {
         "easy-01-direct-weather": ScenarioPlan(
             tool_calls=[ToolCall(index=0, name="get_weather", args={"location": "Warsaw"})],
-            final_response="It's 7°C and cloudy.",
+            final_response="It's 7°C and cloudy in Warsaw.",
         ),
         "easy-02-read-before-write": ScenarioPlan(
             tool_calls=[
