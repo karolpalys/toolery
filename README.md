@@ -48,6 +48,25 @@ llm-test scenarios --tier easy    # available scenarios
   - `CLAUDE_CLI_PATH`, `CODEX_CLI_PATH` — path to CLI binaries
   - `LLM_TEST_RESULTS_DIR` — where to persist runs (default: ./results)
 
+## TUI workflow
+
+`llm-test tui` opens a 5-tab terminal dashboard:
+
+- **Home** — discover local OpenAI-compatible endpoints by probing common
+  ports (8000/8080/8081/8888/8889/5000/5001/11434), with an optional deep
+  scan of 8000–9000. Pick a row to open a launch modal with pre-filled
+  flags and a harness picker; the modal spawns `llm-test run` as a
+  subprocess and switches focus to Live.
+- **Live** — current run, polled every 2 s from `runs.db`.
+- **History** — past runs.
+- **Rankings** — 8-dimension ranking matrix.
+- **Scenarios** — scenario catalog.
+
+Harnesses are gated on host availability: `raw` is always selectable;
+`hermes`, `claude_code`, and `codex` are disabled with a reason hint if
+the CLI binary or env var (`CLAUDE_CLI_PATH` / `CODEX_CLI_PATH`) is
+missing.
+
 ## What it tests
 
 - 4-tier difficulty taxonomy (easy / medium / hard / very_hard)
