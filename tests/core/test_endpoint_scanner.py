@@ -1,4 +1,8 @@
-from llm_test.core.endpoint_scanner import EndpointInfo
+import httpx
+import pytest
+import respx
+
+from llm_test.core.endpoint_scanner import EndpointInfo, scan
 
 
 def test_endpoint_info_serializes_basic_fields():
@@ -14,13 +18,6 @@ def test_endpoint_info_serializes_basic_fields():
     assert info.model_id == "MiniMax-M2.7"
     assert info.models == ["MiniMax-M2.7"]
     assert info.server_hint == "vLLM"
-
-
-import httpx
-import pytest
-import respx
-
-from llm_test.core.endpoint_scanner import scan
 
 
 @pytest.mark.asyncio
