@@ -52,6 +52,14 @@ def test_codex_available_via_env():
     assert result["codex"].available is True
 
 
+def test_codex_available_via_path():
+    result = available_adapters(
+        path_lookup=lambda name: "/usr/bin/codex" if name == "codex" else None,
+        env={},
+    )
+    assert result["codex"].available is True
+
+
 def test_codex_unavailable_without_either():
     result = available_adapters(path_lookup=lambda _: None, env={})
     assert result["codex"].available is False
