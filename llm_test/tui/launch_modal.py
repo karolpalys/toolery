@@ -87,7 +87,9 @@ class LaunchModal(ModalScreen[RunArgs | None]):
 
     def _selected_tier(self) -> str:
         rs = self.query_one("#tier", RadioSet)
-        return (rs.pressed_button.label.plain if rs.pressed_button else "all")
+        if rs.pressed_button is None:
+            return "all"
+        return rs.pressed_button.id.removeprefix("tier-")
 
     def _selected_adapter(self) -> str:
         rs = self.query_one("#adapter", RadioSet)
