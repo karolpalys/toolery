@@ -1,0 +1,49 @@
+id: easy-16-coding-pytest-count
+title: "Run pytest, count passing tests"
+tier: easy
+category: coding
+domain: dev_ops
+description: |
+  Model runs the test suite and reports the count of passing tests from the
+  pytest summary line. Single tool call, trivial parsing of the canonical
+  "N passed in X.Ys" tail.
+tags: [coding, parse_output, single_turn]
+ranking_dimensions: [overall, coding]
+prompt: "Run the test suite and tell me how many tests passed."
+tools: [bash_exec]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  bash_exec:
+    - match: { command_regex: 'pytest' }
+      returns:
+        stdout: "..... [100%]\n5 passed in 0.42s\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 420
+    - match: any
+      returns: { stdout: "", stderr: "command not found", exit_code: 127, duration_ms: 2 }
+scoring:
+  required:
+    - check: tool_called
+      tool: bash_exec
+    - check: response_satisfies
+      all_of: ["5"]
+      none_of: ["error", "fail"]
+    - check: no_hallucinated_tool
+      allowed: [bash_exec]
+  forbidden: []
+  partial:
+    - check: command_regex_match
+      pattern: 'pytest'
+    - check: call_count_at_most
+      n: 1
+    - check: response_satisfies
+      any_of:
+        - ["pass", "passed", "test"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
