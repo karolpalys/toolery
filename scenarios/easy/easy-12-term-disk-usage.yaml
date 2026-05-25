@@ -1,0 +1,41 @@
+id: easy-12-term-disk-usage
+title: "Disk usage of /var/log"
+tier: easy
+category: terminal_handling
+domain: dev_ops
+description: |
+  Model must run a single bash command to find the size of /var/log
+  and report the human-readable value back to the user.
+tags: [term_shell, single_turn]
+ranking_dimensions: [overall, terminal]
+prompt: "How much disk space is /var/log using on this server?"
+tools: [bash_exec]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  bash_exec:
+    - match: { command_regex: '^du\s+.*-s.*\s/var/log' }
+      returns: { stdout: "1.4G\t/var/log\n", stderr: "", exit_code: 0, duration_ms: 18 }
+    - match: { command_regex: '^df\s' }
+      returns: { stdout: "Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1       100G   45G   55G  45% /\n", stderr: "", exit_code: 0, duration_ms: 12 }
+    - match: any
+      returns: { stdout: "", stderr: "command not found", exit_code: 127, duration_ms: 2 }
+scoring:
+  required:
+    - check: command_regex_match
+      pattern: '^du\s+.*-s.*\s/var/log'
+    - check: response_satisfies
+      all_of: ["1.4", "G"]
+      none_of: ["error", "could not"]
+    - check: no_hallucinated_tool
+      allowed: [bash_exec]
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 1
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

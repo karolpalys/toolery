@@ -1,0 +1,42 @@
+id: easy-14-term-ansi-strip
+title: "Read prompt from TTY buffer with ANSI colors"
+tier: easy
+category: terminal_handling
+domain: dev_ops
+description: |
+  Model reads a TTY buffer containing ANSI color codes and reports the
+  semantic content to the user — must NOT paste raw escape sequences
+  into its response.
+tags: [term_ansi, single_turn]
+ranking_dimensions: [overall, terminal]
+prompt: "Look at the terminal session 'sess-1' and tell me what state the prompt is reporting."
+tools: [read_tty_buffer]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  read_tty_buffer:
+    - match: { session_id: "sess-1" }
+      returns:
+        raw: "\x1b[32muser@host:~$\x1b[0m ready"
+        cols: 80
+        rows: 24
+    - match: any
+      returns: { raw: "", cols: 80, rows: 24 }
+scoring:
+  required:
+    - check: tool_called
+      tool: read_tty_buffer
+    - check: ansi_stripped_in_response
+    - check: response_satisfies
+      any_of:
+        - ["ready"]
+    - check: no_hallucinated_tool
+      allowed: [read_tty_buffer]
+  forbidden: []
+  partial: []
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

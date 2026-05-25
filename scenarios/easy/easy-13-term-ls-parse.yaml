@@ -1,0 +1,43 @@
+id: easy-13-term-ls-parse
+title: "List .log files in /etc"
+tier: easy
+category: terminal_handling
+domain: dev_ops
+description: |
+  Model must enumerate .log files under /etc via the shell and report
+  the list back. Tests parsing a simple newline-separated listing.
+tags: [term_parse, single_turn]
+ranking_dimensions: [overall, terminal]
+prompt: "Which .log files are in /etc/? Just list their names."
+tools: [bash_exec]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  bash_exec:
+    - match: { command_regex: '^(ls|find)\s' }
+      returns:
+        stdout: "/etc/nginx.log\n/etc/auth.log\n/etc/kern.log\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 7
+    - match: any
+      returns: { stdout: "", stderr: "no match", exit_code: 1, duration_ms: 2 }
+scoring:
+  required:
+    - check: tool_called
+      tool: bash_exec
+    - check: response_satisfies
+      all_of: ["nginx.log", "auth.log", "kern.log"]
+      none_of: ["error", "no such"]
+    - check: no_hallucinated_tool
+      allowed: [bash_exec]
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 1
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
