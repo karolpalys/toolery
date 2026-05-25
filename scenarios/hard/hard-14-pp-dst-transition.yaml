@@ -1,0 +1,71 @@
+id: hard-14-pp-dst-transition
+title: "Pick the right side of a DST transition when scheduling"
+tier: hard
+category: parameter_precision
+domain: generic
+description: |
+  User asks to schedule a call "the morning after we switch off DST", which
+  in Europe/Warsaw means 2026-10-25. On that day, 02:30 happens twice
+  (once CEST, once CET). The user explicitly says "08:00 local"; model must
+  pass a timestamp that resolves unambiguously to 08:00 CET (+01:00). Tests
+  whether the model handles ambiguous date wording AND timezone arithmetic.
+tags: [parameter_precision, datetime, dst, timezone]
+ranking_dimensions: [overall, parameter_precision]
+prompt: |
+  Today is Friday 2026-10-23. We change off DST in Europe/Warsaw on Sunday
+  2026-10-25 at 03:00 (clocks roll back to 02:00). I want a 30-minute call
+  with the team on the morning AFTER we switch off DST, at 08:00 local time
+  Warsaw. Title: "Post-DST sync". Schedule it.
+tools: [add_calendar_event]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  add_calendar_event:
+    - match: any
+      returns: { ok: true, event_id: "evt-77" }
+scoring:
+  required:
+    - check: tool_called
+      tool: add_calendar_event
+    - check: tool_args_contain
+      tool: add_calendar_event
+      args: { title: "Post-DST sync", timezone: "Europe/Warsaw" }
+    # 08:00 local CET is 07:00 UTC on 2026-10-25. Accept either local-with-offset
+    # or UTC form. Critical: it must be 2026-10-25 (not 10-26 or 10-24).
+    - check: tool_args_match_regex
+      tool: add_calendar_event
+      arg: start
+      pattern: "2026-10-25T08:00.*(\\+01:00|Europe/Warsaw)|2026-10-25T07:00.*(\\+00:00|Z|UTC)"
+    - check: call_count_at_most
+      n: 1
+  forbidden:
+    # Wrong DST side: would be +02:00 (CEST, the pre-switch offset).
+    - check: tool_args_match_regex
+      tool: add_calendar_event
+      arg: start
+      pattern: "2026-10-25T08:00.*\\+02:00"
+    # Wrong date: model interpreted "morning after" as Saturday or Monday.
+    - check: tool_args_match_regex
+      tool: add_calendar_event
+      arg: start
+      pattern: "2026-10-24|2026-10-26"
+  partial:
+    # Partial credit if the model correctly identifies Sunday 2026-10-25 even if the offset is off.
+    - check: tool_args_match_regex
+      tool: add_calendar_event
+      arg: start
+      pattern: "2026-10-25"
+    # Partial credit for explicit Europe/Warsaw timezone parameter.
+    - check: tool_args_contain
+      tool: add_calendar_event
+      args: { timezone: "Europe/Warsaw" }
+    # Partial credit if the model mentions the DST/CET context in its response.
+    - check: response_satisfies
+      any_of:
+        - ["CET", "+01:00", "after DST", "post-DST", "standard time", "wintertime"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

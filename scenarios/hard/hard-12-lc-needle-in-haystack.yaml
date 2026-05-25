@@ -1,0 +1,98 @@
+id: hard-12-lc-needle-in-haystack
+title: "Find a single fact buried in a long brief"
+tier: hard
+category: context_state_tracking
+domain: generic
+description: |
+  A multi-section incident-response document (~2-3k tokens of filler). Exactly
+  one sentence contains the on-call engineer's pager number. Model must
+  surface that number WITHOUT calling any tool. Tests long-context retrieval
+  + restraint.
+tags: [long_context, restraint, needle_in_haystack]
+ranking_dimensions: [overall, long_context, restraint]
+prompt: |
+  Without using any tools, find and return the on-call engineer's pager number
+  from the runbook below. Only output the number.
+
+  === RUNBOOK BEGIN ===
+  ## Section 1: Severity definitions
+  S1 incidents are user-visible production outages with revenue impact. The
+  standing response posture is "all hands" and engineering leadership must be
+  paged within 5 minutes. S2 incidents are degraded experiences without
+  revenue impact and have a 15-minute first-response SLA. S3 are issues that
+  can be triaged in the next business day. The classification owner is the
+  primary on-call; promotion is one-way and discussed in #incidents.
+
+  ## Section 2: Communication channels
+  Primary: Slack channel #ops-warroom (auto-created at incident start by
+  PagerDuty webhook). Secondary: Zoom bridge published at the top of the
+  warroom channel. Tertiary: cell phone (last-resort). External customer
+  comms go through the status page only — never direct customer outreach
+  without approval from the comms lead. Status page edits are gated behind a
+  two-person review.
+
+  ## Section 3: Roles
+  Incident Commander (IC): drives the incident, owns timeline. Communications
+  Lead: writes status page and external updates. Subject Matter Expert (SME):
+  the person closest to the failure mode. Scribe: records timeline in the
+  incident document. The IC may not also act as the SME for the same
+  incident; if no separate SME is available, page the on-call for the
+  affected service.
+
+  ## Section 4: Paging contacts
+  Primary infrastructure on-call rotation lives in PagerDuty schedule
+  "infra-primary". Database on-call: schedule "db-primary". For network-layer
+  issues, page the network team via schedule "net-primary". Application-tier
+  on-call rotation is "app-primary". The pager number for the on-call
+  engineer (current rotation) is +48-22-555-7142 — call this if PagerDuty is
+  itself unavailable. Customer support escalation: support-lead@company.com.
+
+  ## Section 5: Post-incident review
+  PIRs are mandatory for S1 and S2 incidents and must be filed within 5
+  business days of resolution. The template lives in the wiki under
+  /incidents/pir-template. PIRs are blameless; the goal is system learning,
+  not individual accountability. Action items must be tagged with an owner
+  and a due date. Weekly review of open action items happens at the Tuesday
+  reliability sync at 10:00 Warsaw time.
+
+  ## Section 6: Tools we use
+  PagerDuty for paging. Slack for chat. StatusPage.io for external comms.
+  Zoom for voice. Datadog for metrics. Loki for logs. Jaeger for traces.
+  Sentry for application errors. GitHub for runbook source. Terraform for
+  infrastructure as code. Vault for secrets. Each tool's runbook entry has
+  a current point-of-contact and an "if this is broken" backup channel.
+  === RUNBOOK END ===
+tools: [web_search, calculator, read_file]
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 30
+tool_responses: {}
+scoring:
+  required:
+    - check: tool_not_called
+      tool: web_search
+    - check: tool_not_called
+      tool: calculator
+    - check: tool_not_called
+      tool: read_file
+    - check: response_contains
+      patterns: ["+48-22-555-7142"]
+    - check: call_count_at_most
+      n: 0
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 0
+    # Partial credit if the model gets a fuzzy form of the number.
+    - check: response_satisfies
+      any_of:
+        - ["555-7142", "+48 22 555", "48-22-555", "5557142"]
+    # Partial credit if the model stays terse (number only, no extra prose).
+    - check: response_satisfies
+      none_of:
+        - ["I cannot", "I'm unable", "not found", "no pager"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

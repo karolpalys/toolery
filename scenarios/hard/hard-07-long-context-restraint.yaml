@@ -53,6 +53,14 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 0
+    # Even without exact comma formatting, partial credit for surfacing the total.
+    - check: response_satisfies
+      any_of:
+        - ["2310000", "2.31", "$2,310,000", "2,310,000"]
+    # Partial credit for naming the CFO/author as a sign of careful reading.
+    - check: response_satisfies
+      any_of:
+        - ["K. Palys", "CFO", "Finance Committee"]
   weights:
     pass: 1.0
     partial: 0.5
