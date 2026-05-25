@@ -50,7 +50,7 @@ scoring:
       any_of:
         - ["exit", "exited", "success", "completed", "finished", "done"]
     - check: tool_called_in_order
-      order: [process_start, process_status]
+      sequence: [process_start, process_status]
   weights:
     pass: 1.0
     partial: 0.5
