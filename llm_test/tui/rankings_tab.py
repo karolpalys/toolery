@@ -51,18 +51,6 @@ _HEADERS = {
     "terminal": "Term",
 }
 
-# Short headers for the conditional UC:<Name> column (rendered after Overall
-# when a use-case persona is active in results/setup.json).
-_USE_CASE_HEADERS = {
-    "coding_assistant": "UC:Coding",
-    "reasoning": "UC:Reason",
-    "agentic_orchestrator": "UC:Agentic",
-    "safety_rag": "UC:Safety",
-    "customer_support": "UC:Support",
-    "data_analyst": "UC:Data",
-    "local_coding_agent": "UC:LocalCA",
-}
-
 # Perf columns rendered after the score cols.
 _PERF_COLS = ["pp_tps", "tg_tps"]
 _PERF_HEADERS = {"pp_tps": "PP t/s", "tg_tps": "Gen t/s"}
@@ -219,7 +207,6 @@ class RankingsTab(Container):
         self._sort_by: str | None = "overall"   # default sort
         self._sort_desc: bool = True
         self._rows_cache: list[dict] = []
-        self._active_use_case_key: str | None = None
 
     def compose(self):
         with Vertical():
@@ -273,12 +260,6 @@ class RankingsTab(Container):
             tbl.add_column(header, key=key)
         for dim in _DIMENSIONS:
             tbl.add_column(_HEADERS[dim], key=f"dim:{dim}")
-            # Insert use-case column right after `overall` so it's visually prominent.
-            if dim == "overall" and self._active_use_case_key:
-                header = _USE_CASE_HEADERS.get(
-                    self._active_use_case_key, f"UC:{self._active_use_case_key[:6]}"
-                )
-                tbl.add_column(header, key="dim:use_case")
         for p in _PERF_COLS:
             tbl.add_column(_PERF_HEADERS[p], key=f"perf:{p}")
         tbl.add_column("Runs", key="runs")
@@ -295,8 +276,6 @@ class RankingsTab(Container):
         for dim in _DIMENSIONS:
             d = dim
             self._sort_keys[f"dim:{d}"] = lambda r, d=d: -(r["scores"].get(d, -1.0))
-        if self._active_use_case_key:
-            self._sort_keys["dim:use_case"] = lambda r: -(r["scores"].get("use_case", -1.0))
         for p in _PERF_COLS:
             self._sort_keys[f"perf:{p}"] = lambda r, p=p: -(r["perf"].get(p, -1.0))
 
@@ -309,16 +288,7 @@ class RankingsTab(Container):
         store = Store(db)
         store.init_schema()
 
-        # Load active use-case from setup.json (if any). When active, compute_matrix
-        # additionally returns scores['use_case'] per row.
-        from llm_test.rankings.compute import load_active_use_case
-        uc_key, uc_weights = load_active_use_case(results_dir)
-        self._active_use_case_key = uc_key
-
-        matrix = compute_matrix(
-            store=store, dimensions=_DIMENSIONS,
-            use_case_weights=uc_weights,
-        )
+        matrix = compute_matrix(store=store, dimensions=_DIMENSIONS)
         if not matrix:
             summary.update("[yellow]No results recorded yet — run a test first.[/yellow]")
             self._rows_cache = []
@@ -379,12 +349,6 @@ class RankingsTab(Container):
             scored.sort(key=lambda kv: kv[1], reverse=True)
             for rank, (i, _v) in enumerate(scored[:3], start=1):
                 podium_score[(i, dim)] = rank
-        if self._active_use_case_key:
-            scored = [(i, r["scores"].get("use_case")) for i, r in enumerate(rows)
-                      if r["scores"].get("use_case") is not None]
-            scored.sort(key=lambda kv: kv[1], reverse=True)
-            for rank, (i, _v) in enumerate(scored[:3], start=1):
-                podium_score[(i, "use_case")] = rank
         podium_perf: dict[tuple[int, str], int] = {}
         for p in _PERF_COLS:
             scored = [(i, r["perf"].get(p)) for i, r in enumerate(rows)
@@ -402,10 +366,6 @@ class RankingsTab(Container):
             for dim in _DIMENSIONS:
                 cells.append(_fmt_score(r["scores"].get(dim),
                                         podium_score.get((i, dim))))
-                # Insert UC cell right after Overall.
-                if dim == "overall" and self._active_use_case_key:
-                    cells.append(_fmt_score(r["scores"].get("use_case"),
-                                            podium_score.get((i, "use_case"))))
             for p in _PERF_COLS:
                 cells.append(_fmt_perf(r["perf"].get(p),
                                        podium_perf.get((i, p))))
