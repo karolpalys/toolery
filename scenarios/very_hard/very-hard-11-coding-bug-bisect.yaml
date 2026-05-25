@@ -1,0 +1,83 @@
+id: very-hard-11-coding-bug-bisect
+title: "Bisect: which of 3 commits broke the test?"
+tier: very_hard
+category: coding
+domain: dev_ops
+description: |
+  3-commit history; HEAD's pytest is failing. Model must use git log + git
+  checkout + pytest in a (preferably bisect-style) sequence to identify
+  the offending commit. Tight budget rewards efficient narrowing — random
+  linear scan blows the budget.
+tags: [coding, debug, multi_step, budget_pressure, bisect]
+ranking_dimensions: [overall, coding, agentic, budget_efficiency]
+prompt: |
+  pytest fails on HEAD. There are 3 recent commits. Find out which commit
+  introduced the failing test. Return the short SHA of the offending commit
+  and a one-line description.
+tools: [bash_exec]
+budget:
+  max_tool_calls: 6
+  max_turns: 6
+  timeout_seconds: 60
+tool_responses:
+  bash_exec:
+    - match: { command_regex: '^git\s+log' }
+      returns:
+        stdout: "c003abc broken: refactor parse_int\nc002def add feature foo\nc001abc initial commit\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 12
+    - match: { command_regex: 'git\s+checkout\s+c003' }
+      returns: { stdout: "HEAD is now at c003abc\n", stderr: "", exit_code: 0, duration_ms: 8 }
+    - match: { command_regex: 'git\s+checkout\s+c002' }
+      returns: { stdout: "HEAD is now at c002def\n", stderr: "", exit_code: 0, duration_ms: 8 }
+    - match: { command_regex: 'git\s+checkout\s+c001' }
+      returns: { stdout: "HEAD is now at c001abc\n", stderr: "", exit_code: 0, duration_ms: 8 }
+    - match: { command_regex: 'git\s+checkout\s+HEAD' }
+      returns: { stdout: "Already on HEAD\n", stderr: "", exit_code: 0, duration_ms: 4 }
+    - match: { command_regex: 'git\s+bisect' }
+      returns:
+        stdout: "Bisecting: 1 revision left to test after this (roughly 1 step)\n[c003abc] broken: refactor parse_int\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 15
+    - match: { command_regex: 'pytest' }
+      call_index: 0
+      returns:
+        stdout: "FAILED tests/test_parser.py::test_negative_numbers\n0 passed, 1 failed in 0.20s\n"
+        stderr: ""
+        exit_code: 1
+        duration_ms: 200
+    - match: { command_regex: 'pytest' }
+      call_index: ">=1"
+      returns:
+        stdout: "1 passed in 0.20s\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 200
+    - match: any
+      returns: { stdout: "", stderr: "unknown command", exit_code: 1, duration_ms: 2 }
+scoring:
+  required:
+    - check: tool_called
+      tool: bash_exec
+    - check: response_satisfies
+      all_of: ["c003"]
+      none_of: ["c001", "c002 is the broken"]
+    - check: no_hallucinated_tool
+      allowed: [bash_exec]
+  forbidden: []
+  partial:
+    - check: command_regex_match
+      pattern: '^git\s+log'
+    - check: command_regex_match
+      pattern: 'git\s+checkout|git\s+bisect'
+    - check: call_count_at_most
+      n: 5
+    - check: response_satisfies
+      any_of:
+        - ["broken", "refactor", "parse_int", "introduced"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
