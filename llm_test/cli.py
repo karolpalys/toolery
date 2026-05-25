@@ -218,7 +218,8 @@ def run(
 
     # Auto-regenerate rankings so the new run is reflected in TUI Rankings tab.
     try:
-        from llm_test.rankings.compute import regenerate_rankings
+        from llm_test.rankings.compute import regenerate_rankings, load_active_use_case
+        uc_key, uc_weights = load_active_use_case(_results_dir())
         regenerate_rankings(
             store=store,
             dimensions=["overall", "coding", "agentic", "safety", "restraint",
@@ -227,6 +228,8 @@ def run(
                         "context_state_tracking", "structured_output",
                         "tool_selection", "localization", "terminal"],
             out_dir=_results_dir() / "rankings",
+            use_case_weights=uc_weights,
+            use_case_key=uc_key,
         )
         console.print("[green]✓ Rankings regenerated[/green]")
     except Exception as e:
@@ -280,8 +283,16 @@ def rankings(
             "parameter_precision", "context_state_tracking", "structured_output",
             "tool_selection", "localization", "terminal"] if dimension == "all" else [dimension]
     if regen:
-        regenerate_rankings(store=_store(), dimensions=dims, out_dir=out)
-        console.print(f"[green]✓ Regenerated rankings: {out}[/green]")
+        from llm_test.rankings.compute import load_active_use_case
+        uc_key, uc_weights = load_active_use_case(_results_dir())
+        regenerate_rankings(
+            store=_store(), dimensions=dims, out_dir=out,
+            use_case_weights=uc_weights, use_case_key=uc_key,
+        )
+        msg = f"[green]✓ Regenerated rankings: {out}[/green]"
+        if uc_key:
+            msg += f"\n[dim]  · Use-case '{uc_key}' applied → use_case_{uc_key}.md[/dim]"
+        console.print(msg)
     else:
         for d in dims:
             p = out / f"{d}.md"
