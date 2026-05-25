@@ -179,3 +179,34 @@ def test_load_active_use_case_malformed_json_returns_none():
         key, weights = load_active_use_case(results_dir)
         assert key is None
         assert weights is None
+
+
+def test_scenario_dim_weight_default_unchanged():
+    """Back-compat: calling without override uses _DIM_WEIGHTS."""
+    assert _scenario_dim_weight(["overall", "coding"]) == 2.0
+
+
+def test_scenario_dim_weight_with_override():
+    """When override is passed, it takes precedence."""
+    override = {"coding": 5.0, "agentic": 4.0}
+    assert _scenario_dim_weight(["overall", "coding"], weights_override=override) == 5.0
+    assert _scenario_dim_weight(["overall", "agentic"], weights_override=override) == 4.0
+
+
+def test_scenario_dim_weight_override_picks_max():
+    """Max-of-dims still applies with override."""
+    override = {"coding": 5.0, "localization": 0.1}
+    assert _scenario_dim_weight(
+        ["overall", "coding", "localization"], weights_override=override
+    ) == 5.0
+
+
+def test_scenario_dim_weight_override_unknown_dim_defaults_to_one():
+    """Override doesn't break default-1.0 fallback for unknown dims."""
+    override = {"coding": 5.0}
+    # 'restraint' not in override → default 1.0; 'coding' in override → 5.0; max = 5.0
+    assert _scenario_dim_weight(
+        ["overall", "coding", "restraint"], weights_override=override
+    ) == 5.0
+    # only restraint → no override match → 1.0
+    assert _scenario_dim_weight(["overall", "restraint"], weights_override=override) == 1.0

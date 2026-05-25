@@ -139,8 +139,20 @@ _DIM_WEIGHTS: dict[str, float] = {
 }
 
 
-def _scenario_dim_weight(ranking_dims: list[str]) -> float:
-    weights = [_DIM_WEIGHTS.get(d, 1.0) for d in ranking_dims if d != "overall"]
+def _scenario_dim_weight(
+    ranking_dims: list[str],
+    weights_override: dict[str, float] | None = None,
+) -> float:
+    """Compute the per-scenario weight for the Overall (or use-case) column.
+
+    Returns the MAX of the weights of the scenario's non-overall dimensions.
+    Dimensions not in the weights map fall back to 1.0.
+
+    When `weights_override` is None, uses the default `_DIM_WEIGHTS` map.
+    When provided, uses the override (e.g. a use-case persona's weights).
+    """
+    weights_map = weights_override if weights_override is not None else _DIM_WEIGHTS
+    weights = [weights_map.get(d, 1.0) for d in ranking_dims if d != "overall"]
     return max(weights) if weights else 1.0
 
 
