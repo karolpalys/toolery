@@ -1,0 +1,87 @@
+id: medium-32-coding-write-test-from-fn
+title: "Write a pytest test for an existing function, then verify"
+tier: medium
+category: coding
+domain: dev_ops
+description: |
+  Stretched medium (close to hard). Read a function with a docstring describing
+  its contract (returns a/b, raises ValueError on b==0), write a pytest file
+  that exercises both the happy path and the error path, then run pytest
+  to confirm the test is well-formed and green.
+tags: [coding, write_test, multi_step, stretched_medium]
+ranking_dimensions: [overall, coding, agentic]
+prompt: |
+  Read /workspace/calculator.py. Write a pytest file at /workspace/tests/test_calculator.py
+  with at least 2 test functions covering the documented behavior. Then run pytest
+  to confirm your tests pass.
+tools: [read_file, write_file, bash_exec, list_files]
+budget:
+  max_tool_calls: 4
+  max_turns: 4
+  timeout_seconds: 60
+tool_responses:
+  read_file:
+    - match: { path: "/workspace/calculator.py" }
+      returns: |
+        def divide(a: float, b: float) -> float:
+            """Return a / b. Raises ValueError when b == 0."""
+            if b == 0:
+                raise ValueError("cannot divide by zero")
+            return a / b
+    - match: any
+      returns: { error: "file not found" }
+  write_file:
+    - match: { command_regex: 'test_calculator\.py' }
+      returns: { ok: true, bytes_written: 256 }
+    - match: any
+      returns: { ok: true, bytes_written: 0 }
+  bash_exec:
+    - match: { command_regex: 'pytest' }
+      returns:
+        stdout: "..                                                            [100%]\n2 passed in 0.18s\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 180
+    - match: any
+      returns: { stdout: "", stderr: "not found", exit_code: 127, duration_ms: 2 }
+  list_files:
+    - match: any
+      returns: ["calculator.py", "tests/"]
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [read_file, write_file, bash_exec]
+    - check: tool_args_match_regex
+      tool: write_file
+      arg: path
+      pattern: 'test_calculator\.py'
+    - check: tool_args_match_regex
+      tool: write_file
+      arg: content
+      pattern: '(?s)def test_.*\(.*\).*divide'
+    - check: response_satisfies
+      any_of:
+        - ["pass", "passed", "green", "success"]
+    - check: no_hallucinated_tool
+      allowed: [read_file, write_file, bash_exec, list_files]
+  forbidden: []
+  partial:
+    - check: tool_args_contain
+      tool: read_file
+      args: { path: "/workspace/calculator.py" }
+    - check: tool_args_match_regex
+      tool: write_file
+      arg: content
+      pattern: '(ValueError|pytest\.raises)'
+    - check: tool_args_match_regex
+      tool: write_file
+      arg: content
+      pattern: '(?s)assert.*assert'
+    - check: command_regex_match
+      pattern: 'pytest'
+    - check: call_count_at_most
+      n: 3
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
