@@ -40,6 +40,15 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 1
+    - check: tool_called
+      tool: add_calendar_event
+    - check: tool_args_contain
+      tool: add_calendar_event
+      args: { timezone: "Europe/Warsaw" }
+    - check: tool_args_match_regex
+      tool: add_calendar_event
+      arg: title
+      pattern: "(?i)team.?sync"
   weights:
     pass: 1.0
     partial: 0.5

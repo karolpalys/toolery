@@ -1,0 +1,63 @@
+id: medium-18-pp-enum-currency
+title: "Use a valid ISO-4217 currency code, not a free-form name"
+tier: medium
+category: parameter_precision
+domain: generic
+description: |
+  User says "convert 100 dollars to euros". Model must call get_exchange_rate
+  with base="USD" and quote="EUR" — not "dollars"/"euros"/"€"/"$". Tests
+  whether the model normalises informal currency names to ISO-4217 codes
+  before calling the tool.
+tags: [parameter_precision, enum, normalisation]
+ranking_dimensions: [overall, parameter_precision, tool_selection]
+prompt: "How much is 100 dollars in euros today?"
+tools: [get_exchange_rate, calculator]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 30
+tool_responses:
+  get_exchange_rate:
+    - match: { base: "USD", quote: "EUR" }
+      returns: { base: "USD", quote: "EUR", rate: 0.9234 }
+    - match: any
+      returns: { error: "unsupported currency code — use ISO-4217" }
+  calculator:
+    - match: any
+      returns: { value: 92.34 }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_exchange_rate
+    - check: tool_args_contain
+      tool: get_exchange_rate
+      args: { base: "USD", quote: "EUR" }
+    - check: response_contains
+      patterns: ["92.34"]
+    - check: call_count_at_most
+      n: 2
+  forbidden:
+    # Common failure modes: passing the user's words verbatim.
+    - check: tool_args_match_regex
+      tool: get_exchange_rate
+      arg: base
+      pattern: "(?i)dollar|usd-dollar|\\$"
+    - check: tool_args_match_regex
+      tool: get_exchange_rate
+      arg: quote
+      pattern: "(?i)euro|euros|€|eu-euro"
+  partial:
+    - check: tool_called
+      tool: get_exchange_rate
+    - check: tool_args_match_regex
+      tool: get_exchange_rate
+      arg: base
+      pattern: "^USD$"
+    - check: tool_args_match_regex
+      tool: get_exchange_rate
+      arg: quote
+      pattern: "^EUR$"
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

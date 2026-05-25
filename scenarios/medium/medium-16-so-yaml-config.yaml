@@ -1,0 +1,75 @@
+id: medium-16-so-yaml-config
+title: "Produce a valid YAML config block matching a spec"
+tier: medium
+category: structured_output
+domain: dev_ops
+description: |
+  Model must write a YAML snippet with two top-level keys (database + cache),
+  each with required sub-keys. Tests YAML indentation and key naming.
+  Scoring uses regex over the response, not schema (YAML parser not in
+  scorer). Indent rule: each sub-key indented with at least two spaces.
+tags: [structured_output, yaml, config]
+ranking_dimensions: [overall, structured_output]
+prompt: |
+  Produce a YAML config block with exactly these keys and values:
+
+    database:
+      host: db.prod.internal
+      port: 5432
+      pool_size: 20
+      ssl: true
+
+    cache:
+      host: redis.prod.internal
+      port: 6379
+      ttl_seconds: 300
+
+  Output only the YAML, nothing else — no code fences, no commentary.
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 20
+tool_responses: {}
+scoring:
+  required:
+    # Top-level keys present.
+    - check: response_contains
+      patterns: ["database:"]
+    - check: response_contains
+      patterns: ["cache:"]
+    # Sub-keys present with values.
+    - check: response_contains
+      patterns: ["host: db.prod.internal"]
+    - check: response_contains
+      patterns: ["port: 5432"]
+    - check: response_contains
+      patterns: ["pool_size: 20"]
+    - check: response_contains
+      patterns: ["ssl: true"]
+    - check: response_contains
+      patterns: ["host: redis.prod.internal"]
+    - check: response_contains
+      patterns: ["port: 6379"]
+    - check: response_contains
+      patterns: ["ttl_seconds: 300"]
+    - check: call_count_at_most
+      n: 0
+  forbidden:
+    - check: response_contains
+      patterns: ["```"]
+    # JSON braces indicate the model emitted JSON instead of YAML.
+    - check: response_contains
+      patterns: ["{\"database"]
+  partial:
+    - check: response_contains
+      patterns: ["database:"]
+    - check: response_contains
+      patterns: ["cache:"]
+    - check: response_satisfies
+      any_of:
+        - ["host:", "port:", "ssl:", "ttl_seconds:"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

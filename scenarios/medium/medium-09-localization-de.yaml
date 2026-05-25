@@ -31,6 +31,11 @@ scoring:
   partial:
     - check: response_contains
       patterns: ["10"]
+    - check: tool_called
+      tool: get_weather
+    - check: response_satisfies
+      any_of:
+        - ["Wetter", "Berlin", "Grad", "Celsius", "bewölkt", "bewoelkt"]
   weights:
     pass: 1.0
     partial: 0.5

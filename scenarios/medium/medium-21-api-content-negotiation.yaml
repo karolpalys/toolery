@@ -1,0 +1,65 @@
+id: medium-21-api-content-negotiation
+title: "Set Accept header to choose JSON over default HTML"
+tier: medium
+category: parameter_precision
+domain: dev_ops
+description: |
+  API endpoint returns HTML by default; passing Accept: application/json
+  returns structured JSON. User asks for "the JSON". Model must set the
+  Accept header explicitly. Tests awareness of HTTP content negotiation.
+tags: [api, headers, content_negotiation, parameter_precision]
+ranking_dimensions: [overall, parameter_precision]
+prompt: |
+  Hit GET https://api.example.com/v1/info and get the JSON response. The
+  endpoint serves HTML unless you ask for JSON via the Accept header.
+  Tell me the value of the "version" field.
+tools: [http_get]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  http_get:
+    - match:
+        url: "https://api.example.com/v1/info"
+        headers: { Accept: "application/json" }
+      returns:
+        status: 200
+        headers: { "Content-Type": "application/json" }
+        body: { version: "4.7.0", build: "2026-05-24" }
+    - match: { url: "https://api.example.com/v1/info" }
+      returns:
+        status: 200
+        headers: { "Content-Type": "text/html" }
+        body: "<html><body><h1>API v4.7.0 (HTML default)</h1></body></html>"
+scoring:
+  required:
+    - check: tool_called
+      tool: http_get
+    - check: tool_args_match_regex
+      tool: http_get
+      arg: headers
+      pattern: "[Aa]ccept.*application/json"
+    - check: response_contains
+      patterns: ["4.7.0"]
+    - check: call_count_at_most
+      n: 1
+  forbidden:
+    # If response mentions HTML it means model didn't switch content type and
+    # is describing the HTML page rather than the JSON.
+    - check: response_contains
+      patterns: ["<html>", "HTML default"]
+  partial:
+    - check: tool_called
+      tool: http_get
+    - check: tool_args_match_regex
+      tool: http_get
+      arg: url
+      pattern: "api\\.example\\.com/v1/info"
+    - check: response_satisfies
+      any_of:
+        - ["4.7.0", "version", "JSON"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

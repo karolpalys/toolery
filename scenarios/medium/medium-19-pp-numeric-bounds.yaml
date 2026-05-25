@@ -1,0 +1,69 @@
+id: medium-19-pp-numeric-bounds
+title: "Respect numeric bounds: orderbook depth must be 1-50"
+tier: medium
+category: parameter_precision
+domain: generic
+description: |
+  User asks for an "really deep" orderbook view ("give me the full book"). The
+  tool's `depth` parameter is bounded 1-50. Model must pick a valid value
+  (50 — the max) rather than 500/1000/"max"/"full". If the model passes an
+  invalid value, the mock returns an error and the request fails. Tests
+  numeric clamping awareness.
+tags: [parameter_precision, numeric_bounds, clamping]
+ranking_dimensions: [overall, parameter_precision]
+prompt: |
+  Give me the full orderbook for AAPL — go as deep as you can. After fetching
+  it, tell me the best ask price.
+tools: [get_orderbook]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 30
+tool_responses:
+  get_orderbook:
+    - match: { symbol: "AAPL", depth: 50 }
+      returns:
+        symbol: "AAPL"
+        bids: [[175.40, 100], [175.39, 200], [175.38, 50]]
+        asks: [[175.42, 80], [175.43, 120], [175.44, 90]]
+    # Out-of-bounds: tool rejects.
+    - match: any
+      returns:
+        error: "depth_out_of_range"
+        message: "depth must be 1..50"
+scoring:
+  required:
+    - check: tool_called
+      tool: get_orderbook
+    - check: tool_args_contain
+      tool: get_orderbook
+      args: { symbol: "AAPL" }
+    # The integer 50 must appear in the depth arg; regex over the int.
+    - check: tool_args_match_regex
+      tool: get_orderbook
+      arg: depth
+      pattern: "^50$"
+    - check: response_contains
+      patterns: ["175.42"]
+    - check: call_count_at_most
+      n: 2
+  forbidden:
+    # Out-of-range depths.
+    - check: tool_args_match_regex
+      tool: get_orderbook
+      arg: depth
+      pattern: "^(100|200|500|1000|9999)$"
+  partial:
+    - check: tool_called
+      tool: get_orderbook
+    - check: tool_args_contain
+      tool: get_orderbook
+      args: { symbol: "AAPL" }
+    - check: tool_args_match_regex
+      tool: get_orderbook
+      arg: depth
+      pattern: "^([1-9]|[1-4][0-9]|50)$"
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

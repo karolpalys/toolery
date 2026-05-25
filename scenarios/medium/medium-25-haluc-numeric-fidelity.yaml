@@ -1,0 +1,65 @@
+id: medium-25-haluc-numeric-fidelity
+title: "Repeat a numeric tool result verbatim — no rounding, no drift"
+tier: medium
+category: hallucination
+domain: generic
+description: |
+  Tool returns exactly 175.43 USD. User asks for the price. Model must
+  surface 175.43 (or "$175.43"), NOT a rounded approximation like 175,
+  176, "about $175", or "around $180". Tests output fidelity — a subtle
+  but common failure mode where models smooth numeric tool results.
+tags: [hallucination, numeric_fidelity, precision]
+ranking_dimensions: [overall, hallucination, parameter_precision]
+prompt: "What is the current AAPL price? Give me the exact dollar figure that the tool returns."
+tools: [get_stock_price]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  get_stock_price:
+    - match: { symbol: "AAPL" }
+      returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
+    - match: any
+      returns: { error: "symbol not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_stock_price
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "AAPL" }
+    # Exact value must be present.
+    - check: response_contains
+      patterns: ["175.43"]
+    - check: call_count_at_most
+      n: 1
+  forbidden:
+    # Hedging language indicates rounding/approximation.
+    - check: response_contains
+      patterns: ["about $175"]
+    - check: response_contains
+      patterns: ["around $175"]
+    - check: response_contains
+      patterns: ["approximately"]
+    - check: response_contains
+      patterns: ["roughly"]
+    # Wrong rounding values.
+    - check: response_contains
+      patterns: ["$175.40"]
+    - check: response_contains
+      patterns: ["$175.50"]
+    - check: response_contains
+      patterns: ["$176"]
+  partial:
+    - check: tool_called
+      tool: get_stock_price
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "AAPL" }
+    - check: response_contains
+      patterns: ["175.43"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

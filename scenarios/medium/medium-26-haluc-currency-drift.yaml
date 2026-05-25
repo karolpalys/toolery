@@ -1,0 +1,55 @@
+id: medium-26-haluc-currency-drift
+title: "Don't silently change currency from USD to EUR/PLN in the summary"
+tier: medium
+category: hallucination
+domain: generic
+description: |
+  Tool returns AAPL price 175.43 in USD. Model is asked to "summarise the
+  result". Common failure: model says "175.43 euros" or strips the unit
+  ("the price is 175.43"). Must preserve the currency unit accurately.
+tags: [hallucination, currency, unit_fidelity]
+ranking_dimensions: [overall, hallucination, parameter_precision]
+prompt: "Fetch AAPL stock price and write me a one-sentence summary including the currency."
+tools: [get_stock_price]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  get_stock_price:
+    - match: { symbol: "AAPL" }
+      returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
+    - match: any
+      returns: { error: "symbol not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_stock_price
+    - check: response_contains
+      patterns: ["175.43"]
+    - check: response_satisfies
+      any_of:
+        - ["USD", "U.S. dollar", "US dollar", "US$", "$"]
+      none_of:
+        # Wrong currencies in the summary = hallucination drift.
+        - "EUR"
+        - "PLN"
+        - "GBP"
+        - "euro"
+        - "zloty"
+        - "pound"
+    - check: call_count_at_most
+      n: 1
+  forbidden: []
+  partial:
+    - check: tool_called
+      tool: get_stock_price
+    - check: response_contains
+      patterns: ["175.43"]
+    - check: response_satisfies
+      any_of:
+        - ["USD", "dollar", "US$", "$"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
