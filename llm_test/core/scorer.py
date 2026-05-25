@@ -136,6 +136,39 @@ def check_call_count_exactly(calls, chk, response):
     return _bad("call_count_exactly", f"{len(calls)} != {n}")
 
 
+def check_command_regex_match(calls, chk, response):
+    d = chk.model_dump()
+    tool = d.get("tool", "bash_exec")
+    pattern = d["pattern"]
+    call_index = d.get("call_index", "any")
+    pat = re.compile(pattern)
+
+    matching = [c for c in calls if c.name == tool]
+    if not matching:
+        return _bad("command_regex_match", f"no {tool} calls at all")
+
+    if call_index == "any":
+        for c in matching:
+            if pat.search(str(c.args.get("command", ""))):
+                return _ok("command_regex_match", f"{tool} command matched {pattern!r}")
+        return _bad("command_regex_match", f"no {tool} command matched {pattern!r}")
+
+    if call_index == "first":
+        target = matching[0]
+    elif call_index == "last":
+        target = matching[-1]
+    elif isinstance(call_index, int):
+        if call_index >= len(matching):
+            return _bad("command_regex_match", f"call_index {call_index} out of range")
+        target = matching[call_index]
+    else:
+        return _bad("command_regex_match", f"unknown call_index {call_index!r}")
+
+    if pat.search(str(target.args.get("command", ""))):
+        return _ok("command_regex_match", f"{tool}[{call_index}] command matched")
+    return _bad("command_regex_match", f"{tool}[{call_index}] command did not match {pattern!r}")
+
+
 REGISTRY.update({
     "tool_called_in_order": check_tool_called_in_order,
     "tool_called_in_parallel": check_tool_called_in_parallel,
@@ -143,6 +176,7 @@ REGISTRY.update({
     "tool_args_type": check_tool_args_type,
     "call_count_at_least": check_call_count_at_least,
     "call_count_exactly": check_call_count_exactly,
+    "command_regex_match": check_command_regex_match,
 })
 
 
@@ -380,9 +414,28 @@ def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
 
     if not forbidden_clean or not required_all_pass:
         kind = _classify_failure(required, forbidden_raw, budget_violated, hallucinated)
+        # Implicit partial gradient: if forbidden is clean and the failure is
+        # only that some — but not all — required checks failed, give partial
+        # credit proportional to how many required passed (capped at
+        # weights["partial"]). This restores a gradient signal for the ~49%
+        # of scenarios that have no explicit partial: [] list and would
+        # otherwise be strictly binary 0/1. Budget violations and hallucinated
+        # tool calls remain hard fails — those are systemic disqualifiers.
+        gradient_score = scenario.scoring.weights["fail"]
+        gradient_status = "fail"
+        if (forbidden_clean
+                and not budget_violated
+                and not hallucinated
+                and required):
+            n_req_pass = sum(1 for r in required if r.result == "pass")
+            if n_req_pass > 0:
+                ratio = n_req_pass / len(required)
+                partial_w = scenario.scoring.weights["partial"]
+                gradient_score = partial_w * ratio
+                gradient_status = "partial"
         return ScenarioResult(
             scenario_id=scenario.id, adapter=trace.adapter, trial_index=trace.trial_index,
-            status="fail", score=scenario.scoring.weights["fail"],
+            status=gradient_status, score=gradient_score,
             call_count=len(calls), budget_max=scenario.budget.max_tool_calls,
             latency_ms=trace.duration_ms, failure_kind=kind,
             checks=all_checks, trace=trace,

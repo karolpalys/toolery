@@ -258,3 +258,40 @@ def test_response_satisfies_no_response():
     from llm_test.core.scorer import check_response_satisfies
     chk = ScoringCheck.model_validate({"check": "response_satisfies", "all_of": ["x"]})
     assert check_response_satisfies([], chk, None).result == "fail"
+
+
+# ---- terminal_handling primitives ----
+
+from llm_test.core.scorer import (  # noqa: E402
+    check_command_regex_match,
+)
+
+
+def test_command_regex_match_pass_default_tool():
+    calls = _calls(("bash_exec", {"command": "du -sh /var/log"}))
+    chk = ScoringCheck.model_validate({
+        "check": "command_regex_match",
+        "pattern": r"^du\s+.*-s.*\s/var/log",
+    })
+    assert check_command_regex_match(calls, chk, response=None).result == "pass"
+
+
+def test_command_regex_match_fail_no_call():
+    calls = _calls(("read_file", {"path": "/etc/hosts"}))
+    chk = ScoringCheck.model_validate({
+        "check": "command_regex_match", "pattern": r"^du\s",
+    })
+    assert check_command_regex_match(calls, chk, response=None).result == "fail"
+
+
+def test_command_regex_match_call_index_last():
+    calls = _calls(
+        ("bash_exec", {"command": "echo hello"}),
+        ("bash_exec", {"command": "find /var/log -name *.log"}),
+    )
+    chk = ScoringCheck.model_validate({
+        "check": "command_regex_match",
+        "pattern": r"^find\s+/var/log",
+        "call_index": "last",
+    })
+    assert check_command_regex_match(calls, chk, response=None).result == "pass"
