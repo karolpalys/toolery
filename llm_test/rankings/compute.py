@@ -16,7 +16,9 @@ _env = Environment(loader=FileSystemLoader(_TEMPLATES_DIR))
 
 def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
                         history_window_runs: int = 5, half_life_days: float = 14.0,
-                        bootstrap_iters: int = 1000, min_runs: int = 1) -> None:
+                        bootstrap_iters: int = 1000, min_runs: int = 1,
+                        use_case_weights: dict[str, float] | None = None,
+                        use_case_key: str | None = None) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     now = datetime.now(UTC)
     runs = store.fetch_all_runs()
@@ -114,6 +116,89 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
             bootstrap_iters=bootstrap_iters,
         )
         (out_dir / f"{dim}.md").write_text(md)
+
+    # Emit an extra use_case_<key>.md when a persona is active.
+    if use_case_weights is not None and use_case_key is not None:
+        per_pair_runs_uc: dict[tuple[str, str], list[dict]] = defaultdict(list)
+        with store.conn() as c:
+            rows = c.execute("SELECT * FROM scenario_results").fetchall()
+            results_uc = [dict(r) for r in rows]
+        results_by_run_uc: dict[str, list[dict]] = defaultdict(list)
+        for r in results_uc:
+            # Use-case rolls up EVERY scenario (same as 'overall'); no dim filter.
+            results_by_run_uc[r["run_id"]].append(r)
+        for run_id, rs in results_by_run_uc.items():
+            meta = run_meta.get(run_id)
+            if not meta:
+                continue
+            model = meta["model"]
+            by_adapter_uc: dict[str, list[tuple[float, str, str]]] = defaultdict(list)
+            for r in rs:
+                by_adapter_uc[r["adapter"]].append(
+                    (r["score"], r["tier"], r["ranking_dims_json"] or "[]")
+                )
+            for adapter, scored in by_adapter_uc.items():
+                per_pair_runs_uc[(model, adapter)].append({
+                    "run_id": run_id, "scores": scored,
+                    "started_at": meta["started_at"],
+                })
+
+        pair_rows_uc: list[dict] = []
+        for (model, adapter), runs_list in per_pair_runs_uc.items():
+            if len(runs_list) < min_runs:
+                continue
+            runs_list.sort(key=lambda x: x["started_at"], reverse=True)
+            recent = runs_list[:history_window_runs]
+            pairs: list[tuple[float, float]] = []
+            for r in recent:
+                items = r["scores"]
+                weights_per_item = [
+                    _TIER_WEIGHTS.get(t, 1.0) * _scenario_dim_weight(
+                        json.loads(d), weights_override=use_case_weights
+                    )
+                    for _, t, d in items
+                ]
+                w_sum = sum(weights_per_item)
+                if w_sum <= 0:
+                    continue
+                run_mean = sum(
+                    s * w for (s, _, _), w in zip(items, weights_per_item)
+                ) / w_sum
+                age_days = max(
+                    (now - _parse_iso(r["started_at"])).total_seconds() / 86400, 0
+                )
+                pairs.append((run_mean, age_days))
+            pair_rows_uc.append({
+                "model": model, "adapter": adapter,
+                "score": decay_weighted_mean(pairs, half_life_days),
+                "runs": len(runs_list),
+            })
+
+        rows_out_uc: list[dict] = []
+        per_model_uc: dict[str, list[dict]] = defaultdict(list)
+        for pr in pair_rows_uc:
+            per_model_uc[pr["model"]].append(pr)
+        for model, prs in per_model_uc.items():
+            prs.sort(key=lambda p: -p["score"])
+            best = prs[0]
+            rows_out_uc.append({
+                "model": model, "score": best["score"],
+                "best_adapter": best["adapter"],
+                "runs": sum(p["runs"] for p in prs),
+                "adapter_breakdown": prs,
+            })
+        rows_out_uc.sort(key=lambda r: -r["score"])
+        breakdown_uc = sorted(pair_rows_uc, key=lambda p: -p["score"])
+        tmpl = _env.get_template("ranking.md.j2")
+        md = tmpl.render(
+            dimension=f"use_case_{use_case_key}",
+            updated_iso=now.isoformat(),
+            model_count=len(rows_out_uc), run_count=sum(r["runs"] for r in rows_out_uc),
+            rows=rows_out_uc, breakdown=breakdown_uc,
+            window=history_window_runs, half_life=half_life_days,
+            bootstrap_iters=bootstrap_iters,
+        )
+        (out_dir / f"use_case_{use_case_key}.md").write_text(md)
 
 
 def _parse_iso(s: str) -> datetime:
