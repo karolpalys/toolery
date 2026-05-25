@@ -36,46 +36,74 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
                 continue
             results_by_run[r["run_id"]].append(r)
 
+        # Group results per (model, adapter, run). Adapter is a first-class axis:
+        # the same model under hermes vs raw can score very differently, and
+        # averaging across adapters hides that signal. We rank by best-adapter
+        # score and report a per-adapter breakdown below.
+        per_pair_runs: dict[tuple[str, str], list[dict]] = defaultdict(list)
         for run_id, rs in results_by_run.items():
             meta = run_meta.get(run_id)
             if not meta:
                 continue
             model = meta["model"]
-            scores = [r["score"] for r in rs]
-            by_adapter: dict[str, list[float]] = defaultdict(list)
+            # Keep (score, tier) so we can apply tier weights downstream.
+            by_adapter: dict[str, list[tuple[float, str]]] = defaultdict(list)
             for r in rs:
-                by_adapter[r["adapter"]].append(r["score"])
-            best = max(by_adapter.items(), key=lambda kv: sum(kv[1]) / len(kv[1]))[0]
-            per_model_runs[model].append({
-                "run_id": run_id, "scores": scores,
-                "started_at": meta["started_at"], "best_adapter": best,
-            })
+                by_adapter[r["adapter"]].append((r["score"], r["tier"]))
+            for adapter, scored in by_adapter.items():
+                per_pair_runs[(model, adapter)].append({
+                    "run_id": run_id, "scores": scored,
+                    "started_at": meta["started_at"],
+                })
 
-        rows_out = []
-        for model, runs_list in per_model_runs.items():
+        pair_rows: list[dict] = []
+        for (model, adapter), runs_list in per_pair_runs.items():
             if len(runs_list) < min_runs:
                 continue
             runs_list.sort(key=lambda x: x["started_at"], reverse=True)
             recent = runs_list[:history_window_runs]
             pairs: list[tuple[float, float]] = []
             for r in recent:
-                run_mean = sum(r["scores"]) / max(len(r["scores"]), 1)
-                started = _parse_iso(r["started_at"])
-                age_days = max((now - started).total_seconds() / 86400, 0)
+                items = r["scores"]  # list of (score, tier) tuples
+                w_sum = sum(_TIER_WEIGHTS.get(t, 1.0) for _, t in items)
+                if w_sum <= 0:
+                    continue
+                run_mean = (
+                    sum(s * _TIER_WEIGHTS.get(t, 1.0) for s, t in items) / w_sum
+                )
+                age_days = max((now - _parse_iso(r["started_at"])).total_seconds() / 86400, 0)
                 pairs.append((run_mean, age_days))
-            weighted = decay_weighted_mean(pairs, half_life_days)
-            best = max(recent, key=lambda r: sum(r["scores"]) / max(len(r["scores"]), 1))["best_adapter"]
+            pair_rows.append({
+                "model": model, "adapter": adapter,
+                "score": decay_weighted_mean(pairs, half_life_days),
+                "runs": len(runs_list),
+            })
+
+        # Per-model summary: best adapter wins; lower-scoring adapters listed below.
+        rows_out: list[dict] = []
+        per_model: dict[str, list[dict]] = defaultdict(list)
+        for pr in pair_rows:
+            per_model[pr["model"]].append(pr)
+        for model, prs in per_model.items():
+            prs.sort(key=lambda p: -p["score"])
+            best = prs[0]
             rows_out.append({
-                "model": model, "score": weighted,
-                "best_adapter": best, "runs": len(runs_list),
+                "model": model,
+                "score": best["score"],
+                "best_adapter": best["adapter"],
+                "runs": sum(p["runs"] for p in prs),
+                "adapter_breakdown": prs,  # full list for the per-adapter sub-table
             })
 
         rows_out.sort(key=lambda r: -r["score"])
+        # Flat breakdown (model, adapter) sorted by score for the appendix.
+        breakdown = sorted(pair_rows, key=lambda p: -p["score"])
         tmpl = _env.get_template("ranking.md.j2")
         md = tmpl.render(
             dimension=dim, updated_iso=now.isoformat(),
             model_count=len(rows_out), run_count=sum(r["runs"] for r in rows_out),
-            rows=rows_out, window=history_window_runs, half_life=half_life_days,
+            rows=rows_out, breakdown=breakdown,
+            window=history_window_runs, half_life=half_life_days,
             bootstrap_iters=bootstrap_iters,
         )
         (out_dir / f"{dim}.md").write_text(md)
@@ -84,3 +112,109 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
 def _parse_iso(s: str) -> datetime:
     s = s.replace("Z", "+00:00")
     return datetime.fromisoformat(s)
+
+
+# Tier weights — harder scenarios count more in every dimension's run mean.
+# Without these, 11 easy tests dilute 7 very_hard tests at equal weight.
+_TIER_WEIGHTS = {"easy": 1.0, "medium": 2.0, "hard": 3.0, "very_hard": 4.0}
+
+# Per-dimension weights applied ONLY when computing the `overall` dimension —
+# every other column (Coding, Terminal, etc.) keeps the existing tier-only weighting
+# so that e.g. a model's `Coding` score reflects raw coding performance, not blend.
+# A scenario's overall weight is the MAX of the weights of its non-overall dims
+# (fallback 1.0 if none of its dims are in this map).
+_DIM_WEIGHTS: dict[str, float] = {
+    "coding": 2.0,
+    "terminal": 2.0,
+    "agentic": 2.0,
+    "localization": 0.5,
+    "long_context": 0.5,
+}
+
+
+def _scenario_dim_weight(ranking_dims: list[str]) -> float:
+    weights = [_DIM_WEIGHTS.get(d, 1.0) for d in ranking_dims if d != "overall"]
+    return max(weights) if weights else 1.0
+
+
+def compute_matrix(
+    *, store: Store, dimensions: list[str],
+    history_window_runs: int = 5, half_life_days: float = 14.0,
+) -> list[dict]:
+    """Compute per-(model, adapter) scores across all ranking dimensions.
+
+    Returns one row per (model, adapter) pair:
+      {"model": str, "adapter": str, "runs": int, "scores": {dim: float},
+       "scenarios_hashes": set[str]}
+
+    Within each dimension, items are tier-weighted (very_hard counts 4× easy)
+    when computing the per-run mean. Across runs, an exponential decay with
+    `half_life_days` is applied.
+
+    `scores` only contains dimensions where the pair has any data; callers
+    must handle missing keys.
+    """
+    now = datetime.now(UTC)
+    runs = store.fetch_all_runs()
+    run_meta = {r["run_id"]: r for r in runs}
+
+    with store.conn() as c:
+        all_results = [dict(r) for r in c.execute("SELECT * FROM scenario_results").fetchall()]
+
+    # (model, adapter) -> dim -> list of {run_id, started_at, score, tier}
+    pairs: dict[tuple[str, str], dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+    # (model, adapter) -> set of scenarios_hashes seen
+    pair_hashes: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for r in all_results:
+        meta = run_meta.get(r["run_id"])
+        if not meta:
+            continue
+        model = meta["model"]
+        adapter = r["adapter"]
+        dims_for_r = json.loads(r["ranking_dims_json"] or "[]")
+        sh = meta.get("scenarios_hash") or ""
+        if sh:
+            pair_hashes[(model, adapter)].add(sh)
+        for dim in dimensions:
+            if dim != "overall" and dim not in dims_for_r:
+                continue
+            pairs[(model, adapter)][dim].append({
+                "run_id": r["run_id"],
+                "started_at": meta["started_at"],
+                "score": r["score"],
+                "tier": r["tier"],
+            })
+
+    matrix: list[dict] = []
+    for (model, adapter), dim_results in pairs.items():
+        scores: dict[str, float] = {}
+        total_runs = 0
+        for dim, items in dim_results.items():
+            by_run: dict[str, list[tuple[float, str]]] = defaultdict(list)
+            run_started: dict[str, str] = {}
+            for it in items:
+                by_run[it["run_id"]].append((it["score"], it["tier"]))
+                run_started[it["run_id"]] = it["started_at"]
+            runs_sorted = sorted(by_run.keys(), key=lambda rid: run_started[rid], reverse=True)
+            recent = runs_sorted[:history_window_runs]
+            decay_pairs: list[tuple[float, float]] = []
+            for rid in recent:
+                items_in_run = by_run[rid]
+                w_sum = sum(_TIER_WEIGHTS.get(t, 1.0) for _, t in items_in_run)
+                if w_sum <= 0:
+                    continue
+                tier_weighted_mean = (
+                    sum(s * _TIER_WEIGHTS.get(t, 1.0) for s, t in items_in_run) / w_sum
+                )
+                age = max((now - _parse_iso(run_started[rid])).total_seconds() / 86400, 0)
+                decay_pairs.append((tier_weighted_mean, age))
+            if decay_pairs:
+                scores[dim] = decay_weighted_mean(decay_pairs, half_life_days)
+            total_runs = max(total_runs, len(runs_sorted))
+        if scores:
+            matrix.append({
+                "model": model, "adapter": adapter,
+                "runs": total_runs, "scores": scores,
+                "scenarios_hashes": pair_hashes[(model, adapter)],
+            })
+    return matrix
