@@ -185,6 +185,7 @@ def load_active_use_case(results_dir: Path) -> tuple[str | None, dict[str, float
 def compute_matrix(
     *, store: Store, dimensions: list[str],
     history_window_runs: int = 5, half_life_days: float = 14.0,
+    use_case_weights: dict[str, float] | None = None,
 ) -> list[dict]:
     """Compute per-(model, adapter) scores across all ranking dimensions.
 
@@ -198,6 +199,11 @@ def compute_matrix(
 
     `scores` only contains dimensions where the pair has any data; callers
     must handle missing keys.
+
+    When `use_case_weights` is provided, additionally emits `scores['use_case']`
+    per pair, computed with the same formula as `overall` but using the given
+    weights map (e.g. from a use-case persona) instead of the default
+    `_DIM_WEIGHTS`. The standard `overall` score remains unchanged.
     """
     now = datetime.now(UTC)
     runs = store.fetch_all_runs()
@@ -264,6 +270,31 @@ def compute_matrix(
             if decay_pairs:
                 scores[dim] = decay_weighted_mean(decay_pairs, half_life_days)
             total_runs = max(total_runs, len(runs_sorted))
+            # If a use-case is active AND we're processing the overall dim,
+            # compute an extra `use_case` score from the SAME per-run items
+            # but with use-case weights instead of the default _DIM_WEIGHTS.
+            if dim == "overall" and use_case_weights is not None:
+                uc_decay_pairs: list[tuple[float, float]] = []
+                for rid in recent:
+                    items_in_run = by_run[rid]
+                    uc_weights = [
+                        _TIER_WEIGHTS.get(t, 1.0) * _scenario_dim_weight(
+                            json.loads(d), weights_override=use_case_weights
+                        )
+                        for _, t, d in items_in_run
+                    ]
+                    uc_w_sum = sum(uc_weights)
+                    if uc_w_sum <= 0:
+                        continue
+                    uc_weighted_mean = sum(
+                        s * w for (s, _, _), w in zip(items_in_run, uc_weights)
+                    ) / uc_w_sum
+                    age = max(
+                        (now - _parse_iso(run_started[rid])).total_seconds() / 86400, 0
+                    )
+                    uc_decay_pairs.append((uc_weighted_mean, age))
+                if uc_decay_pairs:
+                    scores["use_case"] = decay_weighted_mean(uc_decay_pairs, half_life_days)
         if scores:
             matrix.append({
                 "model": model, "adapter": adapter,

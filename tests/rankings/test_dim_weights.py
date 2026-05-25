@@ -210,3 +210,67 @@ def test_scenario_dim_weight_override_unknown_dim_defaults_to_one():
     ) == 5.0
     # only restraint → no override match → 1.0
     assert _scenario_dim_weight(["overall", "restraint"], weights_override=override) == 1.0
+
+
+def test_compute_matrix_without_use_case_emits_no_use_case_score():
+    """Backward compat: no use_case_weights → no scores['use_case']."""
+    with tempfile.TemporaryDirectory() as td:
+        store = Store(Path(td) / "runs.db")
+        _seed_store(store, [
+            {"score": 0.5, "tier": "easy", "dims": ["overall", "coding"]},
+        ])
+        matrix = compute_matrix(store=store, dimensions=["overall"])
+        assert "use_case" not in matrix[0]["scores"]
+
+
+def test_compute_matrix_with_use_case_weights_emits_use_case_score():
+    """When use_case_weights is set, scores['use_case'] is populated."""
+    with tempfile.TemporaryDirectory() as td:
+        store = Store(Path(td) / "runs.db")
+        _seed_store(store, [
+            {"score": 0.0, "tier": "easy", "dims": ["overall", "coding"]},
+            {"score": 1.0, "tier": "easy", "dims": ["overall"]},
+        ])
+        uc_weights = {
+            "coding": 5.0, "terminal": 1.0, "agentic": 1.0, "safety": 1.0,
+            "restraint": 1.0, "error_recovery": 1.0, "parameter_precision": 1.0,
+            "context_state_tracking": 1.0, "structured_output": 1.0,
+            "tool_selection": 1.0, "long_context": 1.0, "localization": 1.0,
+            "budget_efficiency": 1.0, "hallucination": 1.0,
+        }
+        matrix = compute_matrix(
+            store=store, dimensions=["overall"],
+            use_case_weights=uc_weights,
+        )
+        assert "use_case" in matrix[0]["scores"]
+        # (0*1*5.0 + 1*1*1.0) / (1*5.0 + 1*1.0) = 1.0/6.0 ≈ 0.167
+        assert abs(matrix[0]["scores"]["use_case"] - 1.0/6.0) < 0.001
+
+
+def test_compute_matrix_use_case_score_differs_from_overall():
+    """With different weights, use_case and overall should differ."""
+    with tempfile.TemporaryDirectory() as td:
+        store = Store(Path(td) / "runs.db")
+        _seed_store(store, [
+            {"score": 0.0, "tier": "easy", "dims": ["overall", "coding"]},        # default coding weight 2.0
+            {"score": 1.0, "tier": "easy", "dims": ["overall", "localization"]},  # default loc weight 0.5
+        ])
+        # Persona that inverts: localization heavy, coding light.
+        uc_weights = {
+            "coding": 0.5, "terminal": 1.0, "agentic": 1.0, "safety": 1.0,
+            "restraint": 1.0, "error_recovery": 1.0, "parameter_precision": 1.0,
+            "context_state_tracking": 1.0, "structured_output": 1.0,
+            "tool_selection": 1.0, "long_context": 1.0, "localization": 5.0,
+            "budget_efficiency": 1.0, "hallucination": 1.0,
+        }
+        matrix = compute_matrix(
+            store=store, dimensions=["overall"],
+            use_case_weights=uc_weights,
+        )
+        overall = matrix[0]["scores"]["overall"]
+        use_case = matrix[0]["scores"]["use_case"]
+        # Default: (0*2 + 1*0.5)/(2+0.5) = 0.5/2.5 = 0.2
+        # Use-case: (0*0.5 + 1*5)/(0.5+5) = 5.0/5.5 ≈ 0.909
+        assert abs(overall - 0.2) < 0.001
+        assert abs(use_case - 5.0/5.5) < 0.001
+        assert use_case > overall  # localization-heavy persona favors this run
