@@ -47,9 +47,9 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
                 continue
             model = meta["model"]
             # Keep (score, tier) so we can apply tier weights downstream.
-            by_adapter: dict[str, list[tuple[float, str]]] = defaultdict(list)
+            by_adapter: dict[str, list[tuple[float, str, str]]] = defaultdict(list)
             for r in rs:
-                by_adapter[r["adapter"]].append((r["score"], r["tier"]))
+                by_adapter[r["adapter"]].append((r["score"], r["tier"], r["ranking_dims_json"] or "[]"))
             for adapter, scored in by_adapter.items():
                 per_pair_runs[(model, adapter)].append({
                     "run_id": run_id, "scores": scored,
@@ -64,13 +64,20 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
             recent = runs_list[:history_window_runs]
             pairs: list[tuple[float, float]] = []
             for r in recent:
-                items = r["scores"]  # list of (score, tier) tuples
-                w_sum = sum(_TIER_WEIGHTS.get(t, 1.0) for _, t in items)
+                items = r["scores"]  # list of (score, tier, ranking_dims_json) tuples
+                if dim == "overall":
+                    weights_per_item = [
+                        _TIER_WEIGHTS.get(t, 1.0) * _scenario_dim_weight(json.loads(d))
+                        for _, t, d in items
+                    ]
+                else:
+                    weights_per_item = [_TIER_WEIGHTS.get(t, 1.0) for _, t, _ in items]
+                w_sum = sum(weights_per_item)
                 if w_sum <= 0:
                     continue
-                run_mean = (
-                    sum(s * _TIER_WEIGHTS.get(t, 1.0) for s, t in items) / w_sum
-                )
+                run_mean = sum(
+                    s * w for (s, _, _), w in zip(items, weights_per_item)
+                ) / w_sum
                 age_days = max((now - _parse_iso(r["started_at"])).total_seconds() / 86400, 0)
                 pairs.append((run_mean, age_days))
             pair_rows.append({
