@@ -1,0 +1,91 @@
+id: very-hard-12-coding-extract-helper
+title: "Extract a helper function to remove duplication, verify with pytest"
+tier: very_hard
+category: coding
+domain: dev_ops
+description: |
+  A file has 3 near-duplicate blocks computing `x * 1.08 + shipping`. Model
+  must extract a helper function, update the 3 call sites, and confirm pytest
+  still passes. Tests refactoring discipline + content-level reasoning.
+tags: [coding, refactor, multi_step, budget_pressure]
+ranking_dimensions: [overall, coding, agentic, budget_efficiency]
+prompt: |
+  The file /workspace/order.py has 3 places that compute "x * 1.08 + shipping".
+  Extract that into a helper function (e.g. `total_with_tax(x, shipping)`),
+  update all 3 call sites to use the helper, and then run pytest to make sure
+  nothing breaks.
+tools: [read_file, write_file, bash_exec, list_files]
+budget:
+  max_tool_calls: 5
+  max_turns: 5
+  timeout_seconds: 90
+tool_responses:
+  read_file:
+    - match: { path: "/workspace/order.py" }
+      returns: |
+        SHIPPING = 5.0
+
+
+        def total_a(price):
+            return price * 1.08 + SHIPPING
+
+
+        def total_b(price):
+            return price * 1.08 + SHIPPING
+
+
+        def total_c(price):
+            return price * 1.08 + SHIPPING
+    - match: any
+      returns: { error: "not found" }
+  write_file:
+    - match: { path: "/workspace/order.py" }
+      returns: { ok: true, bytes_written: 320 }
+    - match: any
+      returns: { ok: true, bytes_written: 0 }
+  bash_exec:
+    - match: { command_regex: 'pytest' }
+      returns:
+        stdout: "...                                                           [100%]\n3 passed in 0.22s\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 220
+    - match: any
+      returns: { stdout: "", stderr: "not found", exit_code: 127, duration_ms: 2 }
+  list_files:
+    - match: any
+      returns: ["order.py", "tests/"]
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [read_file, write_file, bash_exec]
+    - check: tool_args_match_regex
+      tool: write_file
+      arg: content
+      pattern: '(?s)def\s+\w+.*\*\s*1\.08'
+    - check: response_satisfies
+      any_of:
+        - ["pass", "passed", "green", "success"]
+    - check: no_hallucinated_tool
+      allowed: [read_file, write_file, bash_exec, list_files]
+  forbidden: []
+  partial:
+    - check: tool_args_contain
+      tool: read_file
+      args: { path: "/workspace/order.py" }
+    - check: tool_args_match_regex
+      tool: write_file
+      arg: content
+      pattern: '(?s)def\s+total_a.*\w+\(price'
+    - check: tool_args_match_regex
+      tool: write_file
+      arg: content
+      pattern: '(?s)def\s+total_b.*\w+\(price'
+    - check: command_regex_match
+      pattern: 'pytest'
+    - check: call_count_at_most
+      n: 4
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
