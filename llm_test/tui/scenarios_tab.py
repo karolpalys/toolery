@@ -17,7 +17,7 @@ class ScenariosTab(Container):
 
     def compose(self):
         with Vertical():
-            yield Static("[bold]Per-scenario cross-model view[/bold]")
+            yield Static("[bold]🔎 Per-scenario cross-model view[/bold]")
             yield Select(options=[], id="sc-pick")
             yield DataTable(id="sc-table")
             yield Static("", id="sc-stats")
@@ -32,17 +32,17 @@ class ScenariosTab(Container):
         sel.set_options(options)
         if options:
             sel.value = options[0][1]
-            self._render(options[0][1])
+            self._render_scenario(options[0][1])
 
     def on_select_changed(self, event) -> None:
         if event.select.id == "sc-pick" and event.value:
-            self._render(event.value)
+            self._render_scenario(event.value)
 
-    def _render(self, scenario_id: str) -> None:
+    def _render_scenario(self, scenario_id: str) -> None:
         tbl = self.query_one("#sc-table", DataTable)
         tbl.clear(columns=True)
-        tbl.add_columns("model", "adapter", "n", "pass", "median_calls",
-                        "median_latency", "top_failure")
+        tbl.add_columns("#", "Model", "Adapter", "n", "pass", "med calls",
+                        "med ms", "top failure")
         results_dir = Path(os.environ.get("LLM_TEST_RESULTS_DIR", "./results"))
         store = Store(results_dir / "runs.db")
         store.init_schema()
@@ -56,14 +56,20 @@ class ScenariosTab(Container):
             r = dict(r)
             model = runs_meta.get(r["run_id"], {}).get("model", "?")
             grouped[(model, r["adapter"])].append(r)
-        for (model, adapter), rs in grouped.items():
+        for i, ((model, adapter), rs) in enumerate(grouped.items(), start=1):
             n = len(rs)
             pass_n = sum(1 for x in rs if x["status"] == "pass")
             med_calls = int(statistics.median(x["call_count"] for x in rs))
             med_lat = int(statistics.median(x["latency_ms"] for x in rs))
             kinds = [x["failure_kind"] for x in rs if x["failure_kind"]]
             top = max(set(kinds), key=kinds.count) if kinds else ""
-            tbl.add_row(model, adapter, str(n), f"{pass_n}/{n}",
+            if pass_n == n:
+                pass_cell = f"✅ {pass_n}/{n}"
+            elif pass_n == 0:
+                pass_cell = f"❌ {pass_n}/{n}"
+            else:
+                pass_cell = f"⚠ {pass_n}/{n}"
+            tbl.add_row(str(i), model, adapter, str(n), pass_cell,
                         str(med_calls), str(med_lat), top)
         self.query_one("#sc-stats", Static).update(
             f"Showing data for {scenario_id} across {len(grouped)} model×adapter combinations."
