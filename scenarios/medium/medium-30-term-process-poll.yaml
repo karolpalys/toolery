@@ -41,7 +41,16 @@ scoring:
     - check: no_hallucinated_tool
       allowed: [process_start, process_status]
   forbidden: []
-  partial: []
+  partial:
+    - check: tool_called
+      tool: process_start
+    - check: tool_called
+      tool: process_status
+    - check: response_satisfies
+      any_of:
+        - ["exit", "exited", "success", "completed", "finished", "done"]
+    - check: tool_called_in_order
+      order: [process_start, process_status]
   weights:
     pass: 1.0
     partial: 0.5

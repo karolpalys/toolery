@@ -38,6 +38,14 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 2
+    - check: ansi_stripped_in_response
+    - check: response_satisfies
+      any_of:
+        - ["14077"]
+        - ["stress-ng"]
+        - ["89"]
+    - check: response_satisfies
+      all_of: ["14077", "stress-ng"]
   weights:
     pass: 1.0
     partial: 0.5

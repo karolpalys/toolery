@@ -35,6 +35,11 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 1
+    - check: command_regex_match
+      pattern: 'du|df'
+    - check: response_satisfies
+      any_of:
+        - ["1.4", "G", "gigabyte"]
   weights:
     pass: 1.0
     partial: 0.5

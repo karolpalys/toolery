@@ -40,6 +40,13 @@ scoring:
   partial:
     - check: command_regex_match
       pattern: 'grep.*503.*\|\s*wc\s+-l'
+    - check: command_regex_match
+      pattern: 'grep.*503'
+    - check: response_satisfies
+      any_of:
+        - ["42"]
+    - check: call_count_at_most
+      n: 1
   weights:
     pass: 1.0
     partial: 0.5

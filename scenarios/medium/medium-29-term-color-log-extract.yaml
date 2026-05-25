@@ -34,7 +34,15 @@ scoring:
     - check: no_hallucinated_tool
       allowed: [read_tty_buffer]
   forbidden: []
-  partial: []
+  partial:
+    - check: ansi_stripped_in_response
+    - check: response_satisfies
+      any_of:
+        - ["5432"]
+        - ["connection refused"]
+        - ["postgres"]
+    - check: call_count_at_most
+      n: 1
   weights:
     pass: 1.0
     partial: 0.5

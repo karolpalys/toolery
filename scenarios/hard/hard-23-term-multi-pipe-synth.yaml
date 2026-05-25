@@ -53,6 +53,15 @@ scoring:
   partial:
     - check: command_regex_match
       pattern: 'find.*\.gz.*\|.*sort.*\|.*head'
+    - check: command_regex_match
+      pattern: 'find.*\.gz'
+    - check: response_satisfies
+      any_of:
+        - ["2026-04-snapshot.gz"]
+        - ["2026-03-snapshot.gz"]
+        - ["2026-02-snapshot.gz"]
+    - check: call_count_at_most
+      n: 1
   weights:
     pass: 1.0
     partial: 0.5

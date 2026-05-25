@@ -35,7 +35,16 @@ scoring:
     - check: no_hallucinated_tool
       allowed: [bash_exec]
   forbidden: []
-  partial: []
+  partial:
+    - check: command_regex_match
+      pattern: 'git\s+status.*porcelain'
+    - check: response_satisfies
+      any_of:
+        - ["main.py", "notes.txt"]
+        - ["modified"]
+        - ["untracked"]
+    - check: call_count_at_most
+      n: 1
   weights:
     pass: 1.0
     partial: 0.5

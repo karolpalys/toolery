@@ -37,6 +37,13 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 1
+    - check: command_regex_match
+      pattern: '(ls|find).*\/etc'
+    - check: response_satisfies
+      any_of:
+        - ["nginx.log"]
+        - ["auth.log"]
+        - ["kern.log"]
   weights:
     pass: 1.0
     partial: 0.5
