@@ -1,0 +1,41 @@
+id: medium-29-term-color-log-extract
+title: "Extract port from a colored ERROR log line"
+tier: medium
+category: terminal_handling
+domain: dev_ops
+description: |
+  TTY buffer contains a colored error message. Model must extract the
+  port number and error reason while NOT pasting the ANSI escape codes
+  back into its answer.
+tags: [term_ansi, term_parse]
+ranking_dimensions: [overall, terminal]
+prompt: "Read session 'app-stderr' and tell me what failure is being reported and on which port."
+tools: [read_tty_buffer]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  read_tty_buffer:
+    - match: { session_id: "app-stderr" }
+      returns:
+        raw: "[2026-05-25 09:13:02] \x1b[31mERROR\x1b[0m: connection refused on port 5432 (postgres)"
+        cols: 120
+        rows: 24
+    - match: any
+      returns: { raw: "", cols: 80, rows: 24 }
+scoring:
+  required:
+    - check: tool_called
+      tool: read_tty_buffer
+    - check: ansi_stripped_in_response
+    - check: response_satisfies
+      all_of: ["5432", "connection refused"]
+    - check: no_hallucinated_tool
+      allowed: [read_tty_buffer]
+  forbidden: []
+  partial: []
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

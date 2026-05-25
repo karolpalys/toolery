@@ -1,0 +1,46 @@
+id: medium-27-term-pipe-grep
+title: "Count 503 errors in nginx.log via grep | wc -l"
+tier: medium
+category: terminal_handling
+domain: dev_ops
+description: |
+  Model must construct a piped shell command that grep-counts a substring.
+  Awards full credit only when the model uses a pipe to `wc -l` rather than
+  asking bash_exec twice.
+tags: [term_shell]
+ranking_dimensions: [overall, terminal]
+prompt: "How many lines in /var/log/nginx.log contain '503'?"
+tools: [bash_exec]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  bash_exec:
+    - match: { command_regex: 'grep.*503.*\|\s*wc\s+-l' }
+      returns: { stdout: "42\n", stderr: "", exit_code: 0, duration_ms: 9 }
+    - match: { command_regex: '^grep.*503' }
+      returns:
+        stdout: "10.0.0.1 - - 503 ...\n10.0.0.2 - - 503 ...\n... (42 lines total)\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 22
+    - match: any
+      returns: { stdout: "", stderr: "syntax error", exit_code: 2, duration_ms: 1 }
+scoring:
+  required:
+    - check: tool_called
+      tool: bash_exec
+    - check: response_satisfies
+      all_of: ["42"]
+      none_of: ["error"]
+    - check: no_hallucinated_tool
+      allowed: [bash_exec]
+  forbidden: []
+  partial:
+    - check: command_regex_match
+      pattern: 'grep.*503.*\|\s*wc\s+-l'
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

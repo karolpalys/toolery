@@ -1,0 +1,42 @@
+id: medium-28-term-git-status-parse
+title: "Parse git status --porcelain into modified vs untracked"
+tier: medium
+category: terminal_handling
+domain: dev_ops
+description: |
+  Model runs `git status --porcelain` and must semantically classify the
+  output into modified vs untracked vs deleted vs added. Tests parsing
+  of the porcelain status code conventions (` M`, `??`, ` D`, `A `).
+tags: [term_parse]
+ranking_dimensions: [overall, terminal]
+prompt: "Run `git status --porcelain` and tell me which files are modified and which are untracked."
+tools: [bash_exec]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  bash_exec:
+    - match: { command_regex: 'git\s+status' }
+      returns:
+        stdout: " M src/main.py\n?? notes.txt\n D old_file.py\nA  src/new_module.py\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 14
+    - match: any
+      returns: { stdout: "", stderr: "fatal: not a git repository", exit_code: 128, duration_ms: 2 }
+scoring:
+  required:
+    - check: command_regex_match
+      pattern: 'git\s+status'
+    - check: response_satisfies
+      all_of: ["modified", "untracked", "main.py", "notes.txt"]
+      none_of: ["all changed", "all modified"]
+    - check: no_hallucinated_tool
+      allowed: [bash_exec]
+  forbidden: []
+  partial: []
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
