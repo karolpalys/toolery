@@ -75,21 +75,29 @@ class SetupTab(Container):
     """
 
     DEFAULT_CSS = """
-    SetupTab { padding: 1; }
-    SetupTab #setup-header { text-style: bold; margin-bottom: 1; }
-    SetupTab #persona-row { height: auto; margin-bottom: 1; }
+    SetupTab { padding: 0 1; }
+    SetupTab #setup-intro {
+        padding: 0 1; margin-bottom: 1; color: $text-muted;
+    }
+    SetupTab #selector-section {
+        height: auto; border: round $primary;
+        padding: 1 1; margin-bottom: 1;
+    }
+    SetupTab #persona-row { height: auto; }
     SetupTab #persona-row Button { margin-right: 1; min-width: 12; }
-    SetupTab #weights-block {
-        height: auto; padding: 1 2;
-        border: round $primary; margin-bottom: 1;
+    SetupTab #weights-section {
+        height: auto; border: round $primary;
+        padding: 1 2; margin-bottom: 1;
     }
-    SetupTab #apply-row { height: auto; margin-top: 1; margin-bottom: 1; }
+    SetupTab #weights-block { height: auto; }
+    SetupTab #apply-row { height: auto; margin-bottom: 1; }
     SetupTab #setup-status { padding-left: 1; margin-bottom: 1; }
-    SetupTab #uc-rank-title { text-style: bold; margin-top: 1; }
-    SetupTab #uc-rank-table {
-        height: auto; max-height: 18;
-        border: thick $primary;
+    SetupTab #ranking-section {
+        height: auto; border: round $primary;
+        padding: 1 1;
     }
+    SetupTab #uc-rank-title { text-style: bold; margin-bottom: 1; }
+    SetupTab #uc-rank-table { height: auto; max-height: 18; }
     """
 
     def __init__(self, id: str | None = None) -> None:
@@ -103,23 +111,23 @@ class SetupTab(Container):
     def compose(self) -> ComposeResult:
         self._active_key = self._read_active_use_case()
         self._previewed_key = self._active_key
-        with Vertical():
-            yield Static(
-                "Pick a use-case to preview its weights. Click [bold]Apply[/bold] to "
-                "compute the model ranking for that persona (shown below). "
-                "[dim]The global Rankings tab is never affected — that one always uses "
-                "the standard weights (coding/terminal/agentic ×2, localization/long_context ×0.5).[/dim]",
-                id="setup-header",
-            )
+        yield Static(
+            "Pick a use-case to preview its weights. Apply computes a model "
+            "ranking below — the global Rankings tab is never affected.",
+            id="setup-intro",
+        )
+        with Vertical(id="selector-section"):
             with Horizontal(id="persona-row"):
                 yield Button("None", id="uc-none", variant=self._variant_for("none"))
                 for uc in USE_CASES:
                     yield Button(uc.name, id=f"uc-{uc.key}",
                                  variant=self._variant_for(uc.key))
+        with Vertical(id="weights-section"):
             yield Static(self._render_weights(), id="weights-block")
-            with Horizontal(id="apply-row"):
-                yield Button("Apply", id="apply", variant="primary")
-            yield Static(self._status_text(), id="setup-status")
+        with Horizontal(id="apply-row"):
+            yield Button("Apply", id="apply", variant="primary")
+        yield Static(self._status_text(), id="setup-status")
+        with Vertical(id="ranking-section"):
             yield Static("[dim]Click Apply to compute the ranking for the previewed persona.[/dim]",
                          id="uc-rank-title")
             yield DataTable(
@@ -127,6 +135,14 @@ class SetupTab(Container):
                 zebra_stripes=True,
                 cursor_type="row",
             )
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#selector-section").border_title = "🎯 Use-case selector"
+            self.query_one("#weights-section").border_title = "📊 Persona weights"
+            self.query_one("#ranking-section").border_title = "🏁 Ranking for selected persona"
+        except Exception:
+            pass
 
     # ---- helpers ----
 
