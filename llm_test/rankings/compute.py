@@ -201,14 +201,21 @@ def compute_matrix(
             decay_pairs: list[tuple[float, float]] = []
             for rid in recent:
                 items_in_run = by_run[rid]
-                w_sum = sum(_TIER_WEIGHTS.get(t, 1.0) for _, t, _ in items_in_run)
+                if dim == "overall":
+                    weights = [
+                        _TIER_WEIGHTS.get(t, 1.0) * _scenario_dim_weight(json.loads(d))
+                        for _, t, d in items_in_run
+                    ]
+                else:
+                    weights = [_TIER_WEIGHTS.get(t, 1.0) for _, t, _ in items_in_run]
+                w_sum = sum(weights)
                 if w_sum <= 0:
                     continue
-                tier_weighted_mean = (
-                    sum(s * _TIER_WEIGHTS.get(t, 1.0) for s, t, _ in items_in_run) / w_sum
-                )
+                weighted_mean = sum(
+                    s * w for (s, _, _), w in zip(items_in_run, weights)
+                ) / w_sum
                 age = max((now - _parse_iso(run_started[rid])).total_seconds() / 86400, 0)
-                decay_pairs.append((tier_weighted_mean, age))
+                decay_pairs.append((weighted_mean, age))
             if decay_pairs:
                 scores[dim] = decay_weighted_mean(decay_pairs, half_life_days)
             total_runs = max(total_runs, len(runs_sorted))
