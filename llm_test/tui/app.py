@@ -17,6 +17,7 @@ from llm_test.tui.home_tab import HomeTab
 from llm_test.tui.launch_modal import LaunchModal
 from llm_test.tui.rankings_tab import RankingsTab
 from llm_test.tui.scenarios_tab import ScenariosTab
+from llm_test.tui.setup_tab import SetupTab
 
 
 class LLMTestApp(App):
@@ -48,6 +49,8 @@ class LLMTestApp(App):
                 yield ScenariosTab(id="scenarios-tab")
             with TabPane("History", id="history"):
                 yield HistoryTab(id="history-tab")
+            with TabPane("Setup", id="setup"):
+                yield SetupTab(id="setup-tab")
         yield Footer()
 
     def action_refresh(self) -> None:
