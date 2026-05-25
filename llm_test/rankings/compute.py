@@ -183,6 +183,7 @@ def compute_matrix(
                 "started_at": meta["started_at"],
                 "score": r["score"],
                 "tier": r["tier"],
+                "ranking_dims_json": r["ranking_dims_json"] or "[]",
             })
 
     matrix: list[dict] = []
@@ -190,21 +191,21 @@ def compute_matrix(
         scores: dict[str, float] = {}
         total_runs = 0
         for dim, items in dim_results.items():
-            by_run: dict[str, list[tuple[float, str]]] = defaultdict(list)
+            by_run: dict[str, list[tuple[float, str, str]]] = defaultdict(list)
             run_started: dict[str, str] = {}
             for it in items:
-                by_run[it["run_id"]].append((it["score"], it["tier"]))
+                by_run[it["run_id"]].append((it["score"], it["tier"], it["ranking_dims_json"]))
                 run_started[it["run_id"]] = it["started_at"]
             runs_sorted = sorted(by_run.keys(), key=lambda rid: run_started[rid], reverse=True)
             recent = runs_sorted[:history_window_runs]
             decay_pairs: list[tuple[float, float]] = []
             for rid in recent:
                 items_in_run = by_run[rid]
-                w_sum = sum(_TIER_WEIGHTS.get(t, 1.0) for _, t in items_in_run)
+                w_sum = sum(_TIER_WEIGHTS.get(t, 1.0) for _, t, _ in items_in_run)
                 if w_sum <= 0:
                     continue
                 tier_weighted_mean = (
-                    sum(s * _TIER_WEIGHTS.get(t, 1.0) for s, t in items_in_run) / w_sum
+                    sum(s * _TIER_WEIGHTS.get(t, 1.0) for s, t, _ in items_in_run) / w_sum
                 )
                 age = max((now - _parse_iso(run_started[rid])).total_seconds() / 86400, 0)
                 decay_pairs.append((tier_weighted_mean, age))
