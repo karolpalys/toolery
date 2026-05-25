@@ -31,6 +31,8 @@ class Category(StrEnum):
     CREATIVE_COMPOSITION = "creative_composition"
     STRUCTURED_OUTPUT = "structured_output"
     HARD_MODE = "hard_mode"
+    HALLUCINATION = "hallucination"
+    TERMINAL_HANDLING = "terminal_handling"
 
 
 class Budget(BaseModel):
