@@ -171,14 +171,28 @@ class RankingsTab(Container):
     """Rankings matrix — clickable headers sort by that column (desc)."""
 
     DEFAULT_CSS = """
-    RankingsTab { padding: 1; }
-    /* Cap at 10 data rows (each rendered with height=2) + 2-line header.
-       DataTable scrolls internally once rows exceed this height. */
+    RankingsTab { padding: 0 1; }
+    RankingsTab #rankings-intro {
+        padding: 0 1;
+        margin-bottom: 1;
+        color: $text-muted;
+    }
+    RankingsTab #matrix-section {
+        height: auto;
+        max-height: 25;
+        border: round $primary;
+        padding: 0 1;
+        margin-bottom: 1;
+    }
+    RankingsTab #legend-section {
+        height: 1fr;
+        border: round $primary;
+        padding: 1 2;
+    }
     RankingsTab #rank-matrix {
         height: auto;
         max-height: 23;
         text-style: bold;
-        border: thick $primary;
     }
     /* header_height=2 makes the header twice as tall (terminals can't scale
        fonts; this is the analogue). Bold + reverse + a strong background
@@ -187,16 +201,6 @@ class RankingsTab(Container):
         text-style: bold reverse;
         background: $accent;
         color: $text;
-    }
-    RankingsTab #rank-legend {
-        height: 1fr;
-        margin-top: 1;
-        padding: 1 2;
-        border: round $primary;
-    }
-    RankingsTab #rank-legend-title {
-        text-style: bold;
-        margin-bottom: 1;
     }
     """
 
@@ -209,12 +213,12 @@ class RankingsTab(Container):
         self._rows_cache: list[dict] = []
 
     def compose(self):
-        with Vertical():
-            yield Static(
-                "[bold]Rankings matrix[/bold]   "
-                "[dim](click a column header to sort by it)[/dim]   "
-                "Podium: 🥇 1st  🥈 2nd  🥉 3rd"
-            )
+        yield Static(
+            "Tier-weighted ranking across all scenarios. "
+            "Best adapter per model shown; click headers to sort.",
+            id="rankings-intro",
+        )
+        with Vertical(id="matrix-section"):
             yield Static("", id="rank-summary")
             yield DataTable(
                 id="rank-matrix",
@@ -223,10 +227,8 @@ class RankingsTab(Container):
                 header_height=2,
                 cell_padding=2,
             )
-            with VerticalScroll(id="rank-legend"):
-                yield Static("Column legend (what each test column measures)",
-                             id="rank-legend-title")
-                yield Static(self._legend_body(), id="rank-legend-body")
+        with VerticalScroll(id="legend-section"):
+            yield Static(self._legend_body(), id="rank-legend-body")
 
     @staticmethod
     def _legend_body() -> str:
@@ -239,6 +241,11 @@ class RankingsTab(Container):
 
     def on_mount(self) -> None:
         self.reload()
+        try:
+            self.query_one("#matrix-section").border_title = "🏆 Rankings matrix"
+            self.query_one("#legend-section").border_title = "📖 Column legend"
+        except Exception:
+            pass
         # Poll the DB so completed runs surface without needing the user to
         # restart the TUI. Cheap: one SELECT per dimension + perf join.
         self.set_interval(5.0, self.reload)
@@ -282,7 +289,7 @@ class RankingsTab(Container):
         results_dir = Path(os.environ.get("LLM_TEST_RESULTS_DIR", "./results"))
         db = results_dir / "runs.db"
         if not db.exists():
-            summary.update("[yellow]No runs database yet — run a test first.[/yellow]")
+            summary.update("[dim italic]💤 No runs recorded yet. Use the Home tab to start a benchmark, then return here.[/dim italic]")
             self._rows_cache = []
             return
         store = Store(db)
@@ -290,7 +297,7 @@ class RankingsTab(Container):
 
         matrix = compute_matrix(store=store, dimensions=_DIMENSIONS)
         if not matrix:
-            summary.update("[yellow]No results recorded yet — run a test first.[/yellow]")
+            summary.update("[dim italic]💤 Database is empty. Use the Home tab to start a benchmark.[/dim italic]")
             self._rows_cache = []
             return
 
