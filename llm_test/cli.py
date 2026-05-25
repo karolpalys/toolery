@@ -82,7 +82,7 @@ def run(
 ):
     """Run benchmark."""
     # Import tools to register them
-    from llm_test.tools import api_db, domain, generic  # noqa: F401
+    from llm_test.tools import api_db, domain, generic, terminal  # noqa: F401
 
     local_key = os.environ.get("OPENAI_API_KEY", "")
     adapters: dict[str, Adapter] = {}
