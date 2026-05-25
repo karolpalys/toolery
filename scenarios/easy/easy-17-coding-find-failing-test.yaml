@@ -1,0 +1,53 @@
+id: easy-17-coding-find-failing-test
+title: "Identify which pytest test failed"
+tier: easy
+category: coding
+domain: dev_ops
+description: |
+  Stretched easy. Model runs pytest, parses mixed PASS/FAIL output, and
+  identifies the specific test that failed (not just count). Requires
+  understanding pytest's "FAILED tests/X::Y" format, not just the summary.
+tags: [coding, parse_output, single_turn, stretched_easy]
+ranking_dimensions: [overall, coding]
+prompt: "Run the test suite. If anything failed, tell me which test."
+tools: [bash_exec]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  bash_exec:
+    - match: { command_regex: 'pytest' }
+      returns:
+        stdout: "tests/test_calc.py ......F                                       [100%]\n\n=========================== FAILURES ===========================\n____________________ test_divide_by_zero ____________________\n\nE   ZeroDivisionError: integer division or modulo by zero\n\n=========================== short test summary info ===========================\nFAILED tests/test_calc.py::test_divide_by_zero - ZeroDivisionError: integer division or modulo by zero\n7 passed, 1 failed in 0.61s\n"
+        stderr: ""
+        exit_code: 1
+        duration_ms: 610
+    - match: any
+      returns: { stdout: "", stderr: "", exit_code: 0, duration_ms: 5 }
+scoring:
+  required:
+    - check: tool_called
+      tool: bash_exec
+    - check: response_satisfies
+      all_of: ["test_divide_by_zero"]
+      any_of:
+        - ["test_calc", "tests/test_calc.py"]
+    - check: no_hallucinated_tool
+      allowed: [bash_exec]
+  forbidden: []
+  partial:
+    - check: command_regex_match
+      pattern: 'pytest'
+    - check: response_satisfies
+      any_of:
+        - ["fail", "FAIL", "failed"]
+    - check: response_satisfies
+      any_of:
+        - ["ZeroDivisionError", "zero division", "divide", "division by zero"]
+    - check: call_count_at_most
+      n: 1
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
