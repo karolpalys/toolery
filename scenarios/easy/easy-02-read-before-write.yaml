@@ -36,6 +36,13 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 2
+    - check: tool_args_contain
+      tool: read_file
+      args: { path: "/workspace/notes.md" }
+    - check: tool_args_match_regex
+      tool: write_file
+      arg: content
+      pattern: "Existing content"
   weights:
     pass: 1.0
     partial: 0.5
