@@ -144,6 +144,32 @@ def _scenario_dim_weight(ranking_dims: list[str]) -> float:
     return max(weights) if weights else 1.0
 
 
+def load_active_use_case(results_dir: Path) -> tuple[str | None, dict[str, float] | None]:
+    """Read results/setup.json and return the active use-case persona.
+
+    Returns (key, weights) on success, (None, None) when:
+      - setup.json doesn't exist
+      - the file is malformed JSON
+      - active_use_case is null or missing
+      - active_use_case key doesn't match any known persona
+    """
+    setup_path = results_dir / "setup.json"
+    if not setup_path.exists():
+        return (None, None)
+    try:
+        data = json.loads(setup_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return (None, None)
+    key = data.get("active_use_case")
+    if not key:
+        return (None, None)
+    from llm_test.rankings.presets import get_use_case
+    uc = get_use_case(key)
+    if uc is None:
+        return (None, None)
+    return (key, dict(uc.weights))
+
+
 def compute_matrix(
     *, store: Store, dimensions: list[str],
     history_window_runs: int = 5, half_life_days: float = 14.0,

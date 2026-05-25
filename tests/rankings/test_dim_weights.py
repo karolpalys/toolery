@@ -124,3 +124,58 @@ def test_coding_column_unaffected_by_dim_weights():
         # dim == "overall" — this test ensures we don't accidentally apply
         # weights to the per-dim column too.
         assert abs(matrix[0]["scores"]["coding"] - 0.5) < 0.001
+
+
+# --- Tests for load_active_use_case() loader ---
+
+from llm_test.rankings.compute import load_active_use_case
+
+
+def test_load_active_use_case_missing_file():
+    with tempfile.TemporaryDirectory() as td:
+        key, weights = load_active_use_case(Path(td))
+        assert key is None
+        assert weights is None
+
+
+def test_load_active_use_case_known_key():
+    with tempfile.TemporaryDirectory() as td:
+        results_dir = Path(td)
+        (results_dir / "setup.json").write_text(
+            '{"version": 1, "active_use_case": "coding_assistant"}'
+        )
+        key, weights = load_active_use_case(results_dir)
+        assert key == "coding_assistant"
+        assert weights is not None
+        assert weights["coding"] == 3.0
+
+
+def test_load_active_use_case_unknown_key_returns_none():
+    with tempfile.TemporaryDirectory() as td:
+        results_dir = Path(td)
+        (results_dir / "setup.json").write_text(
+            '{"version": 1, "active_use_case": "nonexistent_persona"}'
+        )
+        key, weights = load_active_use_case(results_dir)
+        assert key is None
+        assert weights is None
+
+
+def test_load_active_use_case_null_key_returns_none():
+    with tempfile.TemporaryDirectory() as td:
+        results_dir = Path(td)
+        (results_dir / "setup.json").write_text(
+            '{"version": 1, "active_use_case": null}'
+        )
+        key, weights = load_active_use_case(results_dir)
+        assert key is None
+        assert weights is None
+
+
+def test_load_active_use_case_malformed_json_returns_none():
+    with tempfile.TemporaryDirectory() as td:
+        results_dir = Path(td)
+        (results_dir / "setup.json").write_text("not valid json {{{")
+        key, weights = load_active_use_case(results_dir)
+        assert key is None
+        assert weights is None
