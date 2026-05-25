@@ -1,0 +1,50 @@
+id: easy-18-coding-import-error-module
+title: "Identify missing module from Python traceback"
+tier: easy
+category: coding
+domain: dev_ops
+description: |
+  Stretched easy. Model runs a Python script that fails with ModuleNotFoundError;
+  it must read the traceback and identify the specific module name that's missing.
+  Tests traceback comprehension, not just running the script.
+tags: [coding, parse_output, single_turn, stretched_easy]
+ranking_dimensions: [overall, coding]
+prompt: "Try running /workspace/script.py. If it fails to start, tell me what dependency is missing."
+tools: [bash_exec]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  bash_exec:
+    - match: { command_regex: 'python\s.*script\.py' }
+      returns:
+        stdout: ""
+        stderr: "Traceback (most recent call last):\n  File \"/workspace/script.py\", line 3, in <module>\n    import requests\nModuleNotFoundError: No module named 'requests'\n"
+        exit_code: 1
+        duration_ms: 90
+    - match: any
+      returns: { stdout: "", stderr: "no such file", exit_code: 2, duration_ms: 2 }
+scoring:
+  required:
+    - check: tool_called
+      tool: bash_exec
+    - check: response_satisfies
+      all_of: ["requests"]
+      none_of: ["syntax", "not a python", "permission denied"]
+    - check: no_hallucinated_tool
+      allowed: [bash_exec]
+  forbidden: []
+  partial:
+    - check: response_satisfies
+      any_of:
+        - ["import", "ImportError", "ModuleNotFoundError", "module"]
+    - check: response_satisfies
+      any_of:
+        - ["pip install", "install", "missing", "dependency"]
+    - check: call_count_at_most
+      n: 1
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
