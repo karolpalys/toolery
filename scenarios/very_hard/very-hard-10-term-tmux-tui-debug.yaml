@@ -1,0 +1,44 @@
+id: very-hard-10-term-tmux-tui-debug
+title: "Find 89% CPU process in a colored htop-like TTY buffer"
+tier: very_hard
+category: terminal_handling
+domain: dev_ops
+description: |
+  A long, ANSI-colored htop-style buffer is returned by read_tty_buffer.
+  Model must extract the specific row that shows 89.x% CPU usage and report
+  the PID and process name — without pasting any ANSI back into its answer.
+  Tests combined long-context parsing + ANSI handling + numeric extraction.
+tags: [term_ansi, term_parse, term_proc_sec, long_context_terminal]
+ranking_dimensions: [overall, terminal, long_context]
+prompt: "Look at the htop session 'sys-mon'. Which process is using around 89% CPU? Give me its PID and command name."
+tools: [read_tty_buffer]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  read_tty_buffer:
+    - match: { session_id: "sys-mon" }
+      returns:
+        raw: "\x1b[1;7m  PID USER      PRI  NI  VIRT   RES   SHR S CPU%▽MEM%   TIME+  Command            \x1b[0m\n  1234 root       20   0  154M  12.4M  3.1M S  0.2  0.3   1:02.33 systemd\n  8821 root       20   0  892M  21.0M  4.2M S  4.1  0.5   0:11.89 sshd\n 14077 alice      20   0  1.4G 124.0M 10.5M R \x1b[31m89.4\x1b[0m  3.1   2:48.12 stress-ng\n  2003 alice      20   0  321M  45.0M  6.3M S  1.0  1.1   0:08.55 bash\n  4499 alice      20   0  120M  10.0M  2.0M S  0.0  0.2   0:00.21 less\n  6700 root       20   0  88M   7.0M   1.8M S  0.0  0.1   0:00.99 cron\n  7321 alice      20   0  430M  60.0M  5.5M S  2.2  1.4   0:14.40 node\n"
+        cols: 132
+        rows: 24
+    - match: any
+      returns: { raw: "", cols: 80, rows: 24 }
+scoring:
+  required:
+    - check: tool_called
+      tool: read_tty_buffer
+    - check: ansi_stripped_in_response
+    - check: response_satisfies
+      all_of: ["14077", "stress-ng", "89"]
+    - check: no_hallucinated_tool
+      allowed: [read_tty_buffer]
+  forbidden: []
+  partial:
+    - check: call_count_at_most
+      n: 2
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
