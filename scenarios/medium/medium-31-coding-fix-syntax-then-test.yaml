@@ -55,7 +55,8 @@ scoring:
     - check: response_satisfies
       all_of: ["4"]
       any_of:
-        - ["pass", "passed", "green", "success"]
+        - ["passed", "green", "success"]
+      none_of: ["failed", "0 passed", "no test"]
     - check: no_hallucinated_tool
       allowed: [read_file, write_file, bash_exec, list_files]
   forbidden: []

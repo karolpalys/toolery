@@ -31,7 +31,7 @@ tool_responses:
     - match: any
       returns: { error: "file not found" }
   write_file:
-    - match: { command_regex: 'test_calculator\.py' }
+    - match: { path: "/workspace/tests/test_calculator.py" }
       returns: { ok: true, bytes_written: 256 }
     - match: any
       returns: { ok: true, bytes_written: 0 }
