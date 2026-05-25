@@ -43,6 +43,12 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 5
+    - check: command_regex_match
+      tool: run_bash
+      pattern: "backup_script\\.sh start"
+    - check: command_regex_match
+      tool: run_bash
+      pattern: "backup_script\\.sh status"
   weights:
     pass: 1.0
     partial: 0.5

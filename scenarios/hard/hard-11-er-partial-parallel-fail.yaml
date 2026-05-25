@@ -1,0 +1,70 @@
+id: hard-11-er-partial-parallel-fail
+title: "Continue with partial data when one parallel call fails"
+tier: hard
+category: error_recovery
+domain: generic
+description: |
+  Three parallel get_stock_price calls (TSLA, NVDA, AAPL). NVDA returns an
+  error; TSLA and AAPL succeed. Model must report the two successful prices
+  AND explicitly flag NVDA as unavailable — NOT silently drop it, NOT
+  hallucinate a price, NOT abort the entire response.
+tags: [error_recovery, parallel, partial_failure, transparency]
+ranking_dimensions: [overall, error_recovery, agentic]
+prompt: |
+  Fetch current prices for TSLA, NVDA, and AAPL in parallel and summarise.
+  Tell me which (if any) failed.
+tools: [get_stock_price, web_search]
+budget:
+  max_tool_calls: 3
+  max_turns: 3
+  timeout_seconds: 45
+tool_responses:
+  get_stock_price:
+    - match: { symbol: "TSLA" }
+      returns: { symbol: "TSLA", price: 245.30, currency: "USD" }
+    - match: { symbol: "NVDA" }
+      returns: { error: "upstream_unavailable", symbol: "NVDA" }
+    - match: { symbol: "AAPL" }
+      returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
+    - match: any
+      returns: { error: "symbol not found" }
+  web_search:
+    - match: any
+      returns: { results: [] }
+scoring:
+  required:
+    - check: tool_called_in_parallel
+      tools: [get_stock_price]
+    - check: call_count_exactly
+      n: 3
+    - check: response_satisfies
+      all_of: ["NVDA"]
+      any_of:
+        - ["unavailable", "failed", "error", "could not", "not retrieved",
+           "no data", "missing"]
+      none_of:
+        # If response mentions a concrete NVDA dollar figure, the model
+        # hallucinated; the tool only returned an error.
+        - "NVDA $1"
+        - "NVDA: $1"
+    - check: response_contains
+      patterns: ["245", "175"]
+  forbidden:
+    - check: tool_args_match_regex
+      tool: get_stock_price
+      arg: symbol
+      pattern: "GOOG|MSFT|AMZN"
+  partial:
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "TSLA" }
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "NVDA" }
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "AAPL" }
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

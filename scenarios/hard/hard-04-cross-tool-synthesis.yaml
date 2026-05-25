@@ -42,6 +42,14 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 3
+    - check: tool_called_in_order
+      sequence: [get_stock_price, get_exchange_rate]
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "AAPL" }
+    - check: tool_args_contain
+      tool: get_exchange_rate
+      args: { base: "USD", quote: "PLN" }
   weights:
     pass: 1.0
     partial: 0.5

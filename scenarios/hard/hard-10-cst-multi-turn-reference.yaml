@@ -1,0 +1,75 @@
+id: hard-10-cst-multi-turn-reference
+title: "Resolve a pronoun referring to a tool result from 2 turns ago"
+tier: hard
+category: context_state_tracking
+domain: generic
+description: |
+  Turn 1 user lists three stocks (TSLA, NVDA, AAPL) and asks for prices in
+  parallel. Turn 2 user says "send Bob the cheapest one" — model must resolve
+  "the cheapest one" against the prior parallel fetch (NVDA $128.10) and
+  compose the email accordingly. Tests cross-turn reference resolution.
+tags: [context_state_tracking, multi_turn, parallel, pronoun_resolution]
+ranking_dimensions: [overall, context_state_tracking, agentic]
+prompt: |
+  Step 1 — give me current prices for TSLA, NVDA, and AAPL (fetch in parallel).
+  Step 2 — once you have them, send Bob (bob@company.com) a one-line email
+  with subject "Cheapest pick" telling him which of those three is cheapest
+  and at what price.
+tools: [get_stock_price, send_email, web_search]
+budget:
+  max_tool_calls: 4
+  max_turns: 4
+  timeout_seconds: 60
+tool_responses:
+  get_stock_price:
+    - match: { symbol: "TSLA" }
+      returns: { symbol: "TSLA", price: 245.30, currency: "USD" }
+    - match: { symbol: "NVDA" }
+      returns: { symbol: "NVDA", price: 128.10, currency: "USD" }
+    - match: { symbol: "AAPL" }
+      returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
+    - match: any
+      returns: { error: "symbol not found" }
+  send_email:
+    - match: any
+      returns: { ok: true, message_id: "m-7" }
+  web_search:
+    - match: any
+      returns: { results: [] }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_stock_price
+    - check: tool_called_in_parallel
+      tools: [get_stock_price]
+    - check: tool_args_contain
+      tool: send_email
+      args: { to: "bob@company.com", subject: "Cheapest pick" }
+    - check: tool_args_match_regex
+      tool: send_email
+      arg: body
+      pattern: "(NVDA|nvidia).*128(\\.10)?|128(\\.10)?.*NVDA"
+    - check: call_count_at_most
+      n: 4
+  forbidden:
+    # If the model emails TSLA or AAPL it failed to resolve "cheapest".
+    - check: tool_args_match_regex
+      tool: send_email
+      arg: body
+      pattern: "TSLA|AAPL"
+  partial:
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "TSLA" }
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "NVDA" }
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "AAPL" }
+    - check: tool_called
+      tool: send_email
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

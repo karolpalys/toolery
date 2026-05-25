@@ -1,0 +1,76 @@
+id: hard-17-db-query-then-decide
+title: "Query → analyze result → decide which follow-up action to take"
+tier: hard
+category: multi_step_chains
+domain: dev_ops
+description: |
+  Model queries error counts per service in last hour. Any service with >100
+  errors should be escalated by email to oncall@company.com; otherwise reply
+  "no escalation needed". Test data: 2 services exceed the threshold (auth=187,
+  payments=132), 2 do not (search=12, web=4). Tests data-driven branching.
+tags: [sql, db, branching, conditional, escalation]
+ranking_dimensions: [overall, agentic, context_state_tracking]
+prompt: |
+  Run a query to count errors per service in the last hour. If any service
+  has more than 100 errors, send an email to oncall@company.com with subject
+  "P2 escalation" and a body that lists ONLY the offending services and their
+  counts. If no service is over the threshold, just reply "no escalation
+  needed" — do not send an email.
+tools: [sql_query, send_email]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 60
+tool_responses:
+  sql_query:
+    - match: any
+      returns:
+        rows:
+          - { service: "auth",     error_count: 187 }
+          - { service: "payments", error_count: 132 }
+          - { service: "search",   error_count: 12 }
+          - { service: "web",      error_count: 4 }
+        row_count: 4
+  send_email:
+    - match: any
+      returns: { ok: true, message_id: "m-12" }
+scoring:
+  required:
+    - check: tool_called
+      tool: sql_query
+    - check: tool_called
+      tool: send_email
+    - check: tool_args_contain
+      tool: send_email
+      args: { to: "oncall@company.com", subject: "P2 escalation" }
+    # The body must mention both offending services and their counts.
+    - check: tool_args_match_regex
+      tool: send_email
+      arg: body
+      pattern: "(?i)auth.*187|187.*auth"
+    - check: tool_args_match_regex
+      tool: send_email
+      arg: body
+      pattern: "(?i)payments.*132|132.*payments"
+    - check: call_count_at_most
+      n: 2
+  forbidden:
+    # Including non-offending services in the escalation body = misread the threshold.
+    - check: tool_args_match_regex
+      tool: send_email
+      arg: body
+      pattern: "(?i)search.*12|web.*4"
+  partial:
+    - check: tool_called_in_order
+      sequence: [sql_query, send_email]
+    - check: tool_args_contain
+      tool: send_email
+      args: { to: "oncall@company.com" }
+    - check: tool_args_match_regex
+      tool: send_email
+      arg: subject
+      pattern: "P2 escalation"
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

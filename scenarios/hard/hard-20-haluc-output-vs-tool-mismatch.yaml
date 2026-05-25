@@ -1,0 +1,84 @@
+id: hard-20-haluc-output-vs-tool-mismatch
+title: "Don't drift the tool result during multi-step synthesis"
+tier: hard
+category: hallucination
+domain: generic
+description: |
+  Two-step: get_stock_price returns AAPL @ 175.43 USD. get_exchange_rate
+  returns USD→PLN @ 4.0000 (chosen for an easy round number — exact answer
+  is 701.72 PLN). Model is asked for the PLN value AND to confirm the
+  original USD figure. Common drift: model reports "175 USD" or "702 PLN"
+  or invents an exchange rate close to the real-world value.
+tags: [hallucination, drift, multi_step, fidelity]
+ranking_dimensions: [overall, hallucination, parameter_precision, agentic]
+prompt: |
+  Get the current AAPL price, convert it to PLN, and report BOTH values
+  exactly: the USD figure (from get_stock_price) and the converted PLN
+  figure. Use calculator for the multiplication.
+tools: [get_stock_price, get_exchange_rate, calculator]
+budget:
+  max_tool_calls: 3
+  max_turns: 3
+  timeout_seconds: 60
+tool_responses:
+  get_stock_price:
+    - match: { symbol: "AAPL" }
+      returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
+    - match: any
+      returns: { error: "symbol not found" }
+  get_exchange_rate:
+    - match: { base: "USD", quote: "PLN" }
+      returns: { base: "USD", quote: "PLN", rate: 4.0000 }
+    - match: any
+      returns: { error: "unsupported currency" }
+  calculator:
+    - match: any
+      returns: { value: 701.72 }   # 175.43 * 4.0000 = 701.72
+scoring:
+  required:
+    - check: tool_called
+      tool: get_stock_price
+    - check: tool_called
+      tool: get_exchange_rate
+    - check: tool_args_contain
+      tool: get_exchange_rate
+      args: { base: "USD", quote: "PLN" }
+    # Both exact figures must appear in response.
+    - check: response_contains
+      patterns: ["175.43"]
+    - check: response_contains
+      patterns: ["701.72"]
+    - check: call_count_at_most
+      n: 3
+  forbidden:
+    # Common drifted values for USD figure.
+    - check: response_contains
+      patterns: ["175 USD"]
+    - check: response_contains
+      patterns: ["$175 "]
+    - check: response_contains
+      patterns: ["176 USD"]
+    # Common drifted PLN values (rounded / different rate).
+    - check: response_contains
+      patterns: ["702 PLN"]
+    - check: response_contains
+      patterns: ["700 PLN"]
+    - check: response_contains
+      patterns: ["701 PLN"]
+    # If the model wrote a different exchange rate it hallucinated one.
+    - check: response_contains
+      patterns: ["rate of 3.9"]
+    - check: response_contains
+      patterns: ["rate of 4.1"]
+  partial:
+    - check: tool_called_in_order
+      sequence: [get_stock_price, get_exchange_rate]
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "AAPL" }
+    - check: tool_called
+      tool: calculator
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

@@ -1,0 +1,105 @@
+id: hard-13-lc-multi-fact-extraction
+title: "Extract 5 distinct facts scattered across a long financial report"
+tier: hard
+category: context_state_tracking
+domain: generic
+description: |
+  Quarterly earnings call transcript fragment. Five distinct numbers/facts
+  are scattered across six sections. Model must extract all five WITHOUT
+  tool calls (everything is in context). Failure mode: extracting 3/5 still
+  counts as fail (all five are required).
+tags: [long_context, multi_fact, extraction, restraint]
+ranking_dimensions: [overall, long_context, agentic]
+prompt: |
+  Below is a transcript fragment from the Q3 earnings call. Without using any
+  tools, return a 5-line answer where each line states ONE of these figures:
+    (1) Q3 revenue in millions USD
+    (2) Year-over-year revenue growth (percent)
+    (3) Operating margin (percent)
+    (4) Headcount at end of quarter
+    (5) Cash & equivalents at end of quarter (millions USD)
+
+  === TRANSCRIPT BEGIN ===
+  CFO opening:
+  "Thanks Sarah. Q3 was a strong quarter operationally. We continued to
+  execute against the strategic plan we laid out at our investor day. Before
+  I get into the numbers, I want to acknowledge the team — we shipped four
+  major customer programs ahead of schedule and renewed our top three
+  enterprise contracts at expanded terms."
+
+  Revenue commentary:
+  "Total revenue for Q3 came in at $487M, slightly above the top end of our
+  guidance range. The composition continued to shift toward subscription:
+  recurring revenue was 78% of the total, up from 71% a year ago.
+  Geographically, EMEA outperformed, representing 34% of revenue."
+
+  Growth commentary:
+  "On a year-over-year basis, total revenue grew 22% — our seventh
+  consecutive quarter of 20%+ growth. Constant-currency growth was 24%, with
+  about two points of FX drag from the strong dollar. We continue to see
+  durable demand across all three product lines."
+
+  Margin commentary:
+  "Gross margin expanded 180 basis points to 73.4% as we continued to
+  optimize cloud spend and benefit from higher attach of premium SKUs.
+  Operating expenses were $228M, up 14% YoY. This produced an operating
+  margin of 26.6%, our highest in eight quarters."
+
+  Headcount commentary:
+  "We ended the quarter with 4,213 employees, roughly flat sequentially and
+  up 9% YoY. We continue to invest selectively in product and customer
+  success; backfills in non-strategic functions are paused."
+
+  Balance sheet:
+  "Cash, cash equivalents, and marketable securities at quarter-end were
+  $1,842M, up from $1,610M a year ago. We generated $156M of free cash
+  flow in the quarter, a 32% FCF margin. We repurchased $80M of stock
+  under the existing buyback authorization."
+
+  Closing:
+  "Looking ahead to Q4 we are raising our full-year revenue guidance to a
+  range of $1.95B to $1.97B, up from $1.90B to $1.93B previously. We expect
+  Q4 revenue of $512M to $522M and full-year operating margin to land near
+  the high end of our 25-27% range."
+  === TRANSCRIPT END ===
+
+  Format your answer as five short lines, one figure per line. No commentary.
+tools: [web_search, calculator, read_file]
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 30
+tool_responses: {}
+scoring:
+  required:
+    - check: tool_not_called
+      tool: web_search
+    - check: tool_not_called
+      tool: calculator
+    - check: tool_not_called
+      tool: read_file
+    - check: response_contains
+      patterns: ["487"]      # Q3 revenue
+    - check: response_contains
+      patterns: ["22"]       # YoY growth %
+    - check: response_contains
+      patterns: ["26.6"]     # Operating margin %
+    - check: response_contains
+      patterns: ["4,213"]    # Headcount
+    - check: response_contains
+      patterns: ["1,842"]    # Cash & equivalents
+    - check: call_count_at_most
+      n: 0
+  forbidden: []
+  partial:
+    - check: response_satisfies
+      any_of:
+        - ["487", "22", "26.6", "4,213", "1,842"]
+    - check: response_satisfies
+      all_of: ["487", "22"]
+    - check: call_count_at_most
+      n: 0
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

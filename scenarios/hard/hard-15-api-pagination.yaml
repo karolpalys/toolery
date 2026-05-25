@@ -1,0 +1,78 @@
+id: hard-15-api-pagination
+title: "Paginate until next_cursor is null and aggregate results"
+tier: hard
+category: multi_step_chains
+domain: dev_ops
+description: |
+  http_paginate returns one page at a time. Model must keep calling with the
+  returned next_cursor until it is null, then return the total item count.
+  Three pages total. Tests termination condition + cursor propagation.
+tags: [api, pagination, cursor, multi_step]
+ranking_dimensions: [overall, agentic, parameter_precision]
+prompt: |
+  Fetch ALL users from https://api.example.com/v1/users using http_paginate
+  with page_size=50. Walk through every page until there are no more, then
+  tell me the total number of users you retrieved.
+tools: [http_paginate]
+budget:
+  max_tool_calls: 4
+  max_turns: 5
+  timeout_seconds: 45
+tool_responses:
+  http_paginate:
+    - match: { url: "https://api.example.com/v1/users", cursor: "" }
+      returns:
+        items: [{ "id": 1 }, { "id": 2 }, { "id": 3 }]   # page 1: 3 items (shortened)
+        page_meta: { "size": 50, "count": 50 }
+        item_count: 50
+        next_cursor: "cur-page-2"
+    - match: { url: "https://api.example.com/v1/users", cursor: "cur-page-2" }
+      returns:
+        items: [{ "id": 51 }]
+        page_meta: { "size": 50, "count": 50 }
+        item_count: 50
+        next_cursor: "cur-page-3"
+    - match: { url: "https://api.example.com/v1/users", cursor: "cur-page-3" }
+      returns:
+        items: [{ "id": 101 }]
+        page_meta: { "size": 50, "count": 23 }
+        item_count: 23
+        next_cursor: null
+    # If the model calls again after null cursor, complain.
+    - match: any
+      returns: { error: "pagination_complete_already" }
+scoring:
+  required:
+    - check: tool_called
+      tool: http_paginate
+    # Must call exactly 3 times: page 1 (empty cursor), page 2, page 3 (terminates).
+    - check: call_count_exactly
+      n: 3
+    - check: tool_args_match_regex
+      tool: http_paginate
+      arg: cursor
+      pattern: "cur-page-2"
+    - check: tool_args_match_regex
+      tool: http_paginate
+      arg: cursor
+      pattern: "cur-page-3"
+    # Total = 50 + 50 + 23 = 123. Either spelling.
+    - check: response_contains
+      patterns: ["123"]
+  forbidden:
+    # If model gives up after one page.
+    - check: response_contains
+      patterns: ["only retrieved one page", "could not paginate"]
+  partial:
+    - check: tool_called
+      tool: http_paginate
+    - check: tool_args_match_regex
+      tool: http_paginate
+      arg: url
+      pattern: "api\\.example\\.com/v1/users"
+    - check: call_count_at_least
+      n: 2
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

@@ -1,0 +1,77 @@
+id: hard-16-api-status-handling
+title: "Differentiate 404 (give up) from 503 (retry once)"
+tier: hard
+category: error_recovery
+domain: dev_ops
+description: |
+  Model must hit two endpoints. /v1/projects/zzz returns 404 — model should
+  report "not found" and NOT retry. /v1/projects/main returns 503 once then
+  200 — model SHOULD retry once. Tests semantic interpretation of HTTP
+  status codes, not blanket retry-all.
+tags: [api, status_codes, error_recovery, retry_logic]
+ranking_dimensions: [overall, error_recovery, agentic]
+prompt: |
+  Look up two projects at https://api.example.com:
+    (a) /v1/projects/zzz — if it doesn't exist, just report that and move on.
+    (b) /v1/projects/main — fetch its description. Retry transient failures.
+  Then summarise both in one paragraph.
+tools: [http_get]
+budget:
+  max_tool_calls: 3
+  max_turns: 4
+  timeout_seconds: 30
+tool_responses:
+  http_get:
+    - match: { url: "https://api.example.com/v1/projects/zzz" }
+      returns:
+        status: 404
+        body: { error: "not_found", message: "project 'zzz' does not exist" }
+    - match: { url: "https://api.example.com/v1/projects/main" }
+      call_index: 0
+      returns:
+        status: 503
+        body: { error: "service_unavailable", message: "upstream timeout" }
+    - match: { url: "https://api.example.com/v1/projects/main" }
+      returns:
+        status: 200
+        body:
+          id: "main"
+          description: "core product line — primary backend"
+          owner: "platform-team"
+    - match: any
+      returns: { status: 404, body: { error: "unknown_url" } }
+scoring:
+  required:
+    - check: tool_called
+      tool: http_get
+    # 1 call to zzz (no retry on 404) + 2 calls to main (retry on 503) = 3 total.
+    - check: call_count_exactly
+      n: 3
+    - check: response_contains
+      patterns: ["zzz"]
+    - check: response_satisfies
+      any_of:
+        - ["not found", "does not exist", "missing", "no such project"]
+    - check: response_contains
+      patterns: ["main"]
+    - check: response_contains
+      patterns: ["core product line"]
+  forbidden:
+    # If the model retried 404 it doesn't understand status semantics.
+    - check: call_count_at_least
+      n: 4
+  partial:
+    - check: tool_args_match_regex
+      tool: http_get
+      arg: url
+      pattern: "/v1/projects/zzz"
+    - check: tool_args_match_regex
+      tool: http_get
+      arg: url
+      pattern: "/v1/projects/main"
+    - check: call_count_at_least
+      n: 2
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

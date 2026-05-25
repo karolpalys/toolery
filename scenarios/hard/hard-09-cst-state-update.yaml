@@ -1,0 +1,69 @@
+id: hard-09-cst-state-update
+title: "Update calendar event based on a prior lookup"
+tier: hard
+category: context_state_tracking
+domain: generic
+description: |
+  Two-step: (1) look up Alice's email, (2) create a calendar event with her as
+  attendee at the time SHE proposed. The proposed time is buried in
+  get_contacts metadata — model must extract it and use it as the start arg
+  rather than asking the user to repeat. Tests prior-output → next-tool-arg
+  propagation.
+tags: [context_state_tracking, multi_step, parameter_propagation]
+ranking_dimensions: [overall, context_state_tracking, agentic]
+prompt: |
+  Set up a 30-minute sync with Alice Nowak. Use the meeting slot SHE proposed.
+  Title it "Q3 review with Alice", timezone Europe/Warsaw.
+tools: [get_contacts, add_calendar_event, web_search]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 60
+tool_responses:
+  get_contacts:
+    - match: { name: "Alice" }
+      returns:
+        - name: "Alice Nowak"
+          email: "alice.nowak@company.com"
+          notes: "Prefers 14:00 Warsaw time on Thursdays."
+          proposed_slot: "2026-06-04T14:00:00+02:00"
+    - match: any
+      returns: []
+  add_calendar_event:
+    - match: any
+      returns: { ok: true, event_id: "evt-42" }
+  web_search:
+    - match: any
+      returns: { results: [] }
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [get_contacts, add_calendar_event]
+    - check: tool_args_contain
+      tool: add_calendar_event
+      args: { title: "Q3 review with Alice", timezone: "Europe/Warsaw" }
+    - check: tool_args_match_regex
+      tool: add_calendar_event
+      arg: start
+      pattern: "2026-06-04T14:00"
+    - check: tool_args_match_regex
+      tool: add_calendar_event
+      arg: attendees
+      pattern: "alice\\.nowak@company\\.com"
+    - check: call_count_at_most
+      n: 2
+  forbidden:
+    - check: tool_called
+      tool: web_search
+  partial:
+    - check: tool_called
+      tool: get_contacts
+    - check: tool_args_contain
+      tool: get_contacts
+      args: { name: "Alice" }
+    - check: tool_called
+      tool: add_calendar_event
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
