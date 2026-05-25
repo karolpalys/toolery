@@ -1,0 +1,65 @@
+id: medium-11-cst-prior-result-reuse
+title: "Reuse a prior tool result instead of recomputing"
+tier: medium
+category: context_state_tracking
+domain: generic
+description: |
+  After fetching AAPL price in turn 1, the user asks a follow-up that needs the
+  same price. Model must reuse the value from context rather than calling
+  get_stock_price again (call_count_at_most enforces this). Tests whether the
+  model tracks tool results as state across turns.
+tags: [context_state_tracking, multi_turn, restraint]
+ranking_dimensions: [overall, context_state_tracking, agentic]
+prompt: |
+  Step 1 — fetch the current AAPL price for me.
+  Step 2 (do NOT re-fetch): how much would 30 shares cost at that price?
+  Use the calculator for the multiplication; the price must come from step 1.
+tools: [get_stock_price, calculator, web_search]
+budget:
+  max_tool_calls: 2
+  max_turns: 4
+  timeout_seconds: 45
+tool_responses:
+  get_stock_price:
+    - match: { symbol: "AAPL" }
+      returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
+    - match: any
+      returns: { error: "symbol not found" }
+  calculator:
+    - match: any
+      returns: { value: 5262.90 }
+  web_search:
+    - match: any
+      returns: { results: [] }
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [get_stock_price, calculator]
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "AAPL" }
+    - check: tool_args_match_regex
+      tool: calculator
+      arg: expression
+      pattern: "175(\\.43)?\\s*\\*\\s*30|30\\s*\\*\\s*175(\\.43)?"
+    - check: response_contains
+      patterns: ["5262", "5,262"]
+    - check: call_count_at_most
+      n: 2
+  forbidden:
+    # Re-fetching the price = state-tracking failure.
+    - check: call_count_at_least
+      n: 3
+  partial:
+    - check: tool_called
+      tool: get_stock_price
+    - check: tool_called
+      tool: calculator
+    - check: response_satisfies
+      any_of:
+        - ["175.43", "175"]
+        - ["30 shares", "thirty shares"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

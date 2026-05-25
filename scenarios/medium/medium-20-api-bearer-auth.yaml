@@ -1,0 +1,86 @@
+id: medium-20-api-bearer-auth
+title: "Pass a bearer token from a prior login response into a protected GET"
+tier: medium
+category: multi_step_chains
+domain: dev_ops
+description: |
+  Two-step API chain. (1) POST /v1/auth/token returns a JWT. (2) GET
+  /v1/me must include Authorization: Bearer <that-token>. Model must
+  extract the token from the first response and propagate it into the
+  headers of the second call. Tests cross-call parameter propagation.
+tags: [api, auth, multi_step, bearer_token]
+ranking_dimensions: [overall, agentic, parameter_precision]
+prompt: |
+  Authenticate against the API at https://api.example.com with username
+  "kpalys" / password "hunter2" using POST /v1/auth/token. Then fetch
+  /v1/me using the token you receive in the Authorization header and tell
+  me the user's email.
+tools: [http_get, http_post]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 30
+tool_responses:
+  http_post:
+    - match: { url: "https://api.example.com/v1/auth/token" }
+      returns:
+        status: 200
+        body:
+          access_token: "eyJ.signed-jwt-abc123.def"
+          token_type: "Bearer"
+          expires_in: 3600
+    - match: any
+      returns: { status: 400, body: { error: "bad_request" } }
+  http_get:
+    - match: { url: "https://api.example.com/v1/me" }
+      returns:
+        status: 200
+        body:
+          id: "u-42"
+          email: "kpalys@company.com"
+          name: "Karol Palys"
+    - match: any
+      returns: { status: 401, body: { error: "unauthorized" } }
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [http_post, http_get]
+    - check: tool_args_match_regex
+      tool: http_post
+      arg: url
+      pattern: "/v1/auth/token"
+    - check: tool_args_match_regex
+      tool: http_get
+      arg: url
+      pattern: "/v1/me"
+    # Token must be passed in the Authorization header on the second call.
+    - check: tool_args_match_regex
+      tool: http_get
+      arg: headers
+      pattern: "Bearer eyJ\\.signed-jwt-abc123\\.def"
+    - check: response_contains
+      patterns: ["kpalys@company.com"]
+    - check: call_count_at_most
+      n: 2
+  forbidden:
+    # Common mistake: putting credentials directly on the protected GET.
+    - check: tool_args_match_regex
+      tool: http_get
+      arg: headers
+      pattern: "hunter2"
+  partial:
+    - check: tool_called
+      tool: http_post
+    - check: tool_called
+      tool: http_get
+    - check: tool_args_match_regex
+      tool: http_post
+      arg: url
+      pattern: "/v1/auth/token"
+    - check: response_satisfies
+      any_of:
+        - ["kpalys", "email", "Karol"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

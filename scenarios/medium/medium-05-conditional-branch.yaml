@@ -40,6 +40,13 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 2
+    - check: tool_called
+      tool: get_weather
+    - check: tool_args_contain
+      tool: get_weather
+      args: { location: "Warsaw" }
+    - check: tool_called
+      tool: add_calendar_event
   weights:
     pass: 1.0
     partial: 0.5

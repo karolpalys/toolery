@@ -1,0 +1,63 @@
+id: medium-12-er-tool-timeout
+title: "Retry on tool timeout — first call errors, second succeeds"
+tier: medium
+category: error_recovery
+domain: generic
+description: |
+  First get_weather call returns a transient timeout error. Model must
+  retry (one re-attempt is sufficient) rather than giving up or hallucinating
+  a weather figure. Tests basic error-recovery discipline.
+tags: [error_recovery, retry, transient_failure]
+ranking_dimensions: [overall, error_recovery, agentic]
+prompt: "What's the current weather in Berlin? Use the available tool."
+tools: [get_weather, web_search]
+budget:
+  max_tool_calls: 3
+  max_turns: 4
+  timeout_seconds: 30
+tool_responses:
+  get_weather:
+    - match: { location: "Berlin" }
+      call_index: 0
+      returns: { error: "upstream timeout — try again" }
+    - match: { location: "Berlin" }
+      returns: { temp_c: 14, condition: "rainy" }
+    - match: any
+      returns: { error: "city not found" }
+  web_search:
+    - match: any
+      returns:
+        results:
+          - { title: "Berlin weather", snippet: "Berlin: 14°C, rainy." }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_weather
+    - check: call_count_at_least
+      n: 2
+    - check: response_satisfies
+      all_of: ["Berlin"]
+      any_of:
+        - ["14", "fourteen"]
+        - ["rain"]
+      none_of: ["gave up", "could not retrieve", "no data available"]
+    - check: call_count_at_most
+      n: 3
+  forbidden:
+    # If the model gives up after the timeout without retrying, it fails.
+    - check: response_contains
+      patterns: ["timeout", "try again later"]
+  partial:
+    - check: tool_called
+      tool: get_weather
+    - check: tool_args_contain
+      tool: get_weather
+      args: { location: "Berlin" }
+    - check: response_satisfies
+      any_of:
+        - ["Berlin"]
+        - ["14", "rain"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

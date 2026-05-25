@@ -34,6 +34,15 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 3
+    - check: tool_called
+      tool: web_search
+    - check: tool_args_match_regex
+      tool: web_search
+      arg: query
+      pattern: "(?i)(sales|Q3|report|2026)"
+    - check: response_satisfies
+      any_of:
+        - ["sales", "Q3", "report", "4.2M", "12%"]
   weights:
     pass: 1.0
     partial: 0.5

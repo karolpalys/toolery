@@ -1,0 +1,64 @@
+id: medium-13-er-rate-limit
+title: "Handle HTTP 429 rate-limit by retrying with backoff"
+tier: medium
+category: error_recovery
+domain: dev_ops
+description: |
+  http_get returns 429 Too Many Requests on the first call. Model must
+  recognize the rate-limit signal and retry (Retry-After hint is in the
+  body) rather than surface the error to the user or hallucinate.
+tags: [error_recovery, http, rate_limit, backoff]
+ranking_dimensions: [overall, error_recovery, agentic]
+prompt: |
+  Fetch the contents of https://api.example.com/v1/health and tell me the
+  service status string. If you get rate-limited, retry once.
+tools: [http_get, web_search]
+budget:
+  max_tool_calls: 3
+  max_turns: 4
+  timeout_seconds: 30
+tool_responses:
+  http_get:
+    - match: { url: "https://api.example.com/v1/health" }
+      call_index: 0
+      returns:
+        status: 429
+        headers: { "Retry-After": "1" }
+        body: { error: "rate_limited", message: "Too Many Requests" }
+    - match: { url: "https://api.example.com/v1/health" }
+      returns:
+        status: 200
+        body: { service: "edge-router", status: "healthy", uptime_s: 1842 }
+    - match: any
+      returns: { status: 404, body: { error: "not_found" } }
+  web_search:
+    - match: any
+      returns: { results: [] }
+scoring:
+  required:
+    - check: tool_called
+      tool: http_get
+    - check: call_count_at_least
+      n: 2
+    - check: response_contains
+      patterns: ["healthy"]
+    - check: call_count_at_most
+      n: 3
+  forbidden:
+    - check: response_contains
+      patterns: ["429", "rate limit"]
+  partial:
+    - check: tool_called
+      tool: http_get
+    - check: tool_args_match_regex
+      tool: http_get
+      arg: url
+      pattern: "api\\.example\\.com/v1/health"
+    - check: response_satisfies
+      any_of:
+        - ["healthy"]
+        - ["edge-router", "service"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

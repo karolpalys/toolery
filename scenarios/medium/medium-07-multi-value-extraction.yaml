@@ -36,6 +36,10 @@ scoring:
   partial:
     - check: tool_called_in_parallel
       tools: [get_weather]
+    - check: tool_called
+      tool: get_weather
+    - check: response_satisfies
+      all_of: ["Warsaw", "Tokyo"]
   weights:
     pass: 1.0
     partial: 0.5

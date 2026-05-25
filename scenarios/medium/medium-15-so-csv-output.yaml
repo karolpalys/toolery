@@ -1,0 +1,68 @@
+id: medium-15-so-csv-output
+title: "Emit CSV with exact header and 3 data rows"
+tier: medium
+category: structured_output
+domain: generic
+description: |
+  Model must fetch prices for three symbols and return ONE response that is
+  valid CSV: header row + three data rows, comma-separated, no surrounding
+  prose. Tests non-JSON structured output.
+tags: [structured_output, csv, multi_tool]
+ranking_dimensions: [overall, structured_output, agentic]
+prompt: |
+  Fetch prices for TSLA, NVDA, and AAPL (in parallel if you can) and return a
+  CSV with EXACTLY this header:
+
+      symbol,price,currency
+
+  Followed by exactly three data rows, one per symbol, in the order asked.
+  Output the CSV as the entire reply — no prose, no markdown, no code fences.
+tools: [get_stock_price]
+budget:
+  max_tool_calls: 3
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  get_stock_price:
+    - match: { symbol: "TSLA" }
+      returns: { symbol: "TSLA", price: 245.30, currency: "USD" }
+    - match: { symbol: "NVDA" }
+      returns: { symbol: "NVDA", price: 128.10, currency: "USD" }
+    - match: { symbol: "AAPL" }
+      returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
+    - match: any
+      returns: { error: "symbol not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_stock_price
+    - check: call_count_exactly
+      n: 3
+    - check: response_contains
+      patterns: ["symbol,price,currency"]
+    - check: response_contains
+      patterns: ["TSLA,245.30,USD"]
+    - check: response_contains
+      patterns: ["NVDA,128.10,USD"]
+    - check: response_contains
+      patterns: ["AAPL,175.43,USD"]
+  forbidden:
+    # Models love to wrap CSV in code fences; we asked them not to.
+    - check: response_contains
+      patterns: ["```"]
+    # And love to add explanatory prose.
+    - check: response_contains
+      patterns: ["Here is", "Here's", "Below is"]
+  partial:
+    - check: tool_called
+      tool: get_stock_price
+    - check: response_satisfies
+      any_of:
+        - ["TSLA", "NVDA", "AAPL"]
+    - check: response_satisfies
+      any_of:
+        - ["245.30", "128.10", "175.43"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

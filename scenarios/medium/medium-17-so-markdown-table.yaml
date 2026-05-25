@@ -1,0 +1,84 @@
+id: medium-17-so-markdown-table
+title: "Emit a markdown table with header, separator, and data rows"
+tier: medium
+category: structured_output
+domain: generic
+description: |
+  After fetching weather for 3 cities, model must produce a GitHub-flavoured
+  markdown table with header, separator row, and 3 data rows in the asked
+  order. Tests markdown table syntax discipline.
+tags: [structured_output, markdown, multi_tool]
+ranking_dimensions: [overall, structured_output, agentic]
+prompt: |
+  Look up current weather for Warsaw, Berlin, and Tokyo (parallel is fine)
+  and return ONE markdown table with these columns, in this order:
+
+      | City | Temperature (°C) | Condition |
+
+  Below the header include a separator row (|---|---|---|) and three data
+  rows, one per city. No prose outside the table.
+tools: [get_weather, get_weather_global]
+budget:
+  max_tool_calls: 3
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  get_weather:
+    - match: { location: "Warsaw" }
+      returns: { temp_c: 7, condition: "cloudy" }
+    - match: { location: "Berlin" }
+      returns: { temp_c: 14, condition: "rainy" }
+    - match: { location: "Tokyo" }
+      returns: { temp_c: 22, condition: "sunny" }
+    - match: any
+      returns: { error: "city not found" }
+  get_weather_global:
+    - match: { location: "Tokyo" }
+      returns: { temp_c: 22, condition: "sunny" }
+    - match: any
+      returns: { error: "not supported" }
+scoring:
+  required:
+    - check: tool_called
+      tool: get_weather
+    - check: call_count_at_least
+      n: 3
+    # Markdown table syntax.
+    - check: response_contains
+      patterns: ["| City | Temperature"]
+    - check: response_contains
+      patterns: ["|---"]
+    # Each row present.
+    - check: response_contains
+      patterns: ["| Warsaw |"]
+    - check: response_contains
+      patterns: ["| Berlin |"]
+    - check: response_contains
+      patterns: ["| Tokyo |"]
+    # Values present.
+    - check: response_contains
+      patterns: ["7"]
+    - check: response_contains
+      patterns: ["14"]
+    - check: response_contains
+      patterns: ["22"]
+    - check: call_count_at_most
+      n: 3
+  forbidden:
+    # Common failure: HTML table instead of markdown.
+    - check: response_contains
+      patterns: ["<table"]
+    - check: response_contains
+      patterns: ["<tr>"]
+  partial:
+    - check: tool_called
+      tool: get_weather
+    - check: response_satisfies
+      any_of:
+        - ["Warsaw", "Berlin", "Tokyo"]
+    - check: response_contains
+      patterns: ["|"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

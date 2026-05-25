@@ -1,0 +1,95 @@
+id: medium-22-db-describe-then-query
+title: "Describe a table, then query it with the correct column names"
+tier: medium
+category: multi_step_chains
+domain: dev_ops
+description: |
+  User asks "give me the average order amount per customer for the last 30
+  days". Model doesn't know the column names — must first sql_describe the
+  orders table, THEN write a SELECT that uses the actual columns. Tests
+  schema-first SQL discipline.
+tags: [sql, db, multi_step, schema_aware]
+ranking_dimensions: [overall, agentic, parameter_precision]
+prompt: |
+  Tell me the average order amount per customer for the last 30 days. The
+  orders table lives in the analytics schema. Inspect the table first so
+  your query uses the right columns.
+tools: [sql_describe, sql_query, db_list_tables]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 30
+tool_responses:
+  sql_describe:
+    - match: { table: "orders" }
+      returns:
+        table: "orders"
+        columns:
+          - { name: "order_id", type: "uuid" }
+          - { name: "customer_id", type: "uuid" }
+          - { name: "amount_cents", type: "bigint" }
+          - { name: "currency", type: "varchar(3)" }
+          - { name: "created_at", type: "timestamptz" }
+          - { name: "status", type: "varchar(16)" }
+    - match: any
+      returns: { error: "table_not_found" }
+  sql_query:
+    - match: any
+      returns:
+        rows:
+          - { customer_id: "c-001", avg_amount_cents: 14250 }
+          - { customer_id: "c-002", avg_amount_cents: 8830 }
+          - { customer_id: "c-003", avg_amount_cents: 21900 }
+        row_count: 3
+  db_list_tables:
+    - match: any
+      returns: ["orders", "customers", "products", "shipments"]
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [sql_describe, sql_query]
+    - check: tool_args_contain
+      tool: sql_describe
+      args: { table: "orders" }
+    # The query must reference the real columns we just learned about.
+    - check: tool_args_match_regex
+      tool: sql_query
+      arg: sql
+      pattern: "(?i)customer_id"
+    - check: tool_args_match_regex
+      tool: sql_query
+      arg: sql
+      pattern: "(?i)amount_cents"
+    - check: tool_args_match_regex
+      tool: sql_query
+      arg: sql
+      pattern: "(?i)avg\\("
+    # Has a time window filter.
+    - check: tool_args_match_regex
+      tool: sql_query
+      arg: sql
+      pattern: "(?i)created_at.*(30|interval)"
+    - check: call_count_at_most
+      n: 2
+  forbidden:
+    # Guessed column names that don't exist.
+    - check: tool_args_match_regex
+      tool: sql_query
+      arg: sql
+      pattern: "(?i)order_total|total_amount|order_value|user_id"
+  partial:
+    - check: tool_called
+      tool: sql_describe
+    - check: tool_called
+      tool: sql_query
+    - check: tool_args_match_regex
+      tool: sql_query
+      arg: sql
+      pattern: "(?i)from\\s+\\w*orders"
+    - check: response_satisfies
+      any_of:
+        - ["average", "avg", "customer"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
