@@ -72,6 +72,14 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 4
+    - check: tool_called_in_order
+      sequence: [get_orderbook, get_positions, submit_order]
+    - check: tool_args_contain
+      tool: get_orderbook
+      args: { symbol: "AAPL" }
+    - check: tool_args_contain
+      tool: submit_order
+      args: { symbol: "AAPL", side: "buy" }
   weights:
     pass: 1.0
     partial: 0.5

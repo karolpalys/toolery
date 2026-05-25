@@ -1,0 +1,89 @@
+id: very-hard-08-multi-tool-discovery
+title: "Compose 4 tools the user did not name to answer one question"
+tier: very_hard
+category: hard_mode
+domain: generic
+description: |
+  User asks an underspecified composite question: "Will my AAPL position cover
+  next month's rent in EUR?" To answer the model must compose:
+    (1) get_positions     — how many AAPL shares we hold
+    (2) get_stock_price   — current AAPL price
+    (3) get_exchange_rate — USD→EUR
+    (4) calculator        — shares*price*rate, compared to rent threshold
+  No tool is named by the user. Tests autonomous tool composition.
+tags: [tool_discovery, multi_tool, composition, agentic, hard_mode]
+ranking_dimensions: [overall, agentic, budget_efficiency]
+prompt: |
+  Next month's rent is EUR 4,200. Will my current AAPL position cover it at
+  today's prices? Give me a yes/no plus the EUR value of the position.
+tools: [get_positions, get_stock_price, get_exchange_rate, calculator, web_search]
+budget:
+  max_tool_calls: 5
+  max_turns: 6
+  timeout_seconds: 90
+tool_responses:
+  get_positions:
+    - match: any
+      returns:
+        - { symbol: "AAPL", shares: 35 }
+        - { symbol: "NVDA", shares: 12 }
+  get_stock_price:
+    - match: { symbol: "AAPL" }
+      returns: { symbol: "AAPL", price: 175.43, currency: "USD" }
+    - match: any
+      returns: { error: "symbol not found" }
+  get_exchange_rate:
+    - match: { base: "USD", quote: "EUR" }
+      returns: { base: "USD", quote: "EUR", rate: 0.9234 }
+    - match: any
+      returns: { error: "unsupported currency" }
+  calculator:
+    - match: any
+      returns: { value: 5670.16 }   # 35 * 175.43 * 0.9234 ≈ 5670.16 EUR
+  web_search:
+    - match: any
+      returns: { results: [] }
+scoring:
+  required:
+    # All four required tools must be called at least once.
+    - check: tool_called
+      tool: get_positions
+    - check: tool_called
+      tool: get_stock_price
+    - check: tool_called
+      tool: get_exchange_rate
+    - check: tool_called
+      tool: calculator
+    - check: tool_args_contain
+      tool: get_stock_price
+      args: { symbol: "AAPL" }
+    - check: tool_args_contain
+      tool: get_exchange_rate
+      args: { base: "USD", quote: "EUR" }
+    # Final response must include the EUR value (≈ 5670) and a yes/no judgment.
+    - check: response_contains
+      patterns: ["5670", "5,670"]
+    - check: response_satisfies
+      any_of:
+        - ["yes", "covers", "enough", "sufficient", "more than"]
+        # We expect "yes" — 5670 > 4200. If model says no, it miscomputed.
+    - check: call_count_at_most
+      n: 5
+  forbidden:
+    # Common shortcut: model uses NVDA instead of AAPL because both are in positions.
+    - check: tool_args_match_regex
+      tool: get_stock_price
+      arg: symbol
+      pattern: "^NVDA$"
+  partial:
+    - check: call_count_at_most
+      n: 5
+    - check: tool_called_in_order
+      sequence: [get_positions, get_stock_price, get_exchange_rate, calculator]
+    - check: response_satisfies
+      any_of:
+        - ["yes", "covers", "enough", "sufficient", "5670", "AAPL"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

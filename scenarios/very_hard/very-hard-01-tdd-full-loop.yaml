@@ -105,6 +105,16 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 12
+    - check: tool_called_in_order
+      sequence: [grep, edit_file, run_tests, run_lint, git_branch, git_commit]
+    - check: tool_args_match_regex
+      tool: edit_file
+      arg: path
+      pattern: "src/(core/billing|api/handlers|cli)\\.py|tests/test_billing\\.py"
+    - check: tool_args_match_regex
+      tool: git_branch
+      arg: name
+      pattern: "^(feature|refactor)/.*rename|rename.*"
   weights:
     pass: 1.0
     partial: 0.5

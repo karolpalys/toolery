@@ -88,6 +88,14 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 6
+    - check: tool_called_in_order
+      sequence: [search_flights, get_exchange_rate, send_email, add_calendar_event]
+    - check: tool_args_contain
+      tool: get_exchange_rate
+      args: { base: "EUR", quote: "PLN" }
+    - check: response_satisfies
+      any_of:
+        - ["720", "3132", "PLN", "LO81"]
   weights:
     pass: 1.0
     partial: 0.5

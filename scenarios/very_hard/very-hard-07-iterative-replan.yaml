@@ -1,0 +1,76 @@
+id: very-hard-07-iterative-replan
+title: "Replan after the first approach fails — don't loop, don't give up"
+tier: very_hard
+category: hard_mode
+domain: dev_ops
+description: |
+  User wants the average response latency for the "checkout" service across
+  the last 7 days. Model tries the obvious approach first (read /var/log/...)
+  which fails (permission denied). Must pivot to sql_query on the metrics
+  database. Tests cross-tool backtracking — not just retry-same-thing.
+tags: [iterative_replan, backtracking, multi_step, hard_mode]
+ranking_dimensions: [overall, agentic, error_recovery, budget_efficiency]
+prompt: |
+  Tell me the average p95 response latency (ms) for the "checkout" service
+  over the last 7 days. The team usually shows this dashboard from
+  metrics.prod.internal, but you can use any tool available.
+tools: [read_file, sql_query, http_get, list_files]
+budget:
+  max_tool_calls: 4
+  max_turns: 5
+  timeout_seconds: 90
+tool_responses:
+  # First instinct: try to read access logs directly. Fails.
+  read_file:
+    - match: any
+      returns:
+        error: "permission_denied"
+        message: "/var/log/checkout/access.log: Permission denied"
+  list_files:
+    - match: any
+      returns:
+        error: "permission_denied"
+  # The HTTP endpoint exists but requires auth we don't have here.
+  http_get:
+    - match: any
+      returns:
+        status: 401
+        body: { error: "unauthorized", message: "missing X-Service-Auth header" }
+  # The metrics DB is reachable and has the answer.
+  sql_query:
+    - match: any
+      returns:
+        rows:
+          - { service: "checkout", avg_p95_ms: 143.7, n_samples: 60480 }
+        row_count: 1
+scoring:
+  required:
+    # Model must try at least 2 distinct approaches (showed it pivoted).
+    - check: call_count_at_least
+      n: 2
+    # It must reach the answer via sql_query.
+    - check: tool_called
+      tool: sql_query
+    - check: response_contains
+      patterns: ["143"]
+    - check: response_contains
+      patterns: ["checkout"]
+    # Stay within budget.
+    - check: call_count_at_most
+      n: 4
+  forbidden:
+    # Looping on the same failing tool >2x is not replanning.
+    - check: call_count_at_least
+      n: 5
+  partial:
+    - check: unique_tools_called
+      tools: [sql_query]
+    - check: response_satisfies
+      any_of:
+        - ["p95", "latency", "ms", "143.7"]
+    - check: call_count_at_most
+      n: 4
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
