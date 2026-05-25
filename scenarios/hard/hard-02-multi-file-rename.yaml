@@ -56,6 +56,14 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 7
+    - check: tool_args_match_regex
+      tool: edit_file
+      arg: path
+      pattern: "src/core/billing\\.py|src/api/handlers\\.py|src/cli\\.py|tests/test_billing\\.py"
+    - check: tool_args_match_regex
+      tool: edit_file
+      arg: content
+      pattern: "calculate_total"
   weights:
     pass: 1.0
     partial: 0.5
