@@ -1,0 +1,52 @@
+id: easy-15-coding-pyproject-name
+title: "Find project name in pyproject.toml"
+tier: easy
+category: coding
+domain: dev_ops
+description: |
+  Model reads pyproject.toml and reports the project name. Single tool call,
+  simple TOML structure — baseline easy.
+tags: [coding, file_ops, single_turn]
+ranking_dimensions: [overall, coding]
+prompt: "What is the project name declared in /workspace/pyproject.toml?"
+tools: [read_file, list_files]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  read_file:
+    - match: { path: "/workspace/pyproject.toml" }
+      returns: |
+        [build-system]
+        requires = ["setuptools", "wheel"]
+
+        [project]
+        name = "llm-test"
+        version = "0.3.0"
+        requires-python = ">=3.12"
+    - match: any
+      returns: { error: "file not found" }
+  list_files:
+    - match: any
+      returns: ["pyproject.toml", "src/", "tests/"]
+scoring:
+  required:
+    - check: tool_called
+      tool: read_file
+    - check: response_satisfies
+      all_of: ["llm-test"]
+      none_of: ["error", "not found"]
+    - check: no_hallucinated_tool
+      allowed: [read_file, list_files]
+  forbidden: []
+  partial:
+    - check: tool_args_contain
+      tool: read_file
+      args: { path: "/workspace/pyproject.toml" }
+    - check: call_count_at_most
+      n: 1
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
