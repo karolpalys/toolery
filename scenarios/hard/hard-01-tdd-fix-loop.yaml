@@ -61,6 +61,15 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 4
+    - check: tool_called
+      tool: run_tests
+    - check: tool_args_contain
+      tool: edit_file
+      args: { path: "src/parser.py" }
+    - check: tool_args_match_regex
+      tool: edit_file
+      arg: content
+      pattern: "(?s)(int\\(s\\)|abs.*neg|sign|startswith|s\\[0\\])"
   weights:
     pass: 1.0
     partial: 0.5
