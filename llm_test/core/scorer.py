@@ -169,6 +169,21 @@ def check_command_regex_match(calls, chk, response):
     return _bad("command_regex_match", f"{tool}[{call_index}] command did not match {pattern!r}")
 
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def check_ansi_stripped_in_response(calls, chk, response):
+    if response is None:
+        return _bad("ansi_stripped_in_response", "no response")
+    matches = list(_ANSI_RE.finditer(response))
+    if not matches:
+        return _ok("ansi_stripped_in_response", "no ANSI escape sequences in response")
+    return _bad(
+        "ansi_stripped_in_response",
+        f"found {len(matches)} ANSI escape(s) — first at offset {matches[0].start()}",
+    )
+
+
 REGISTRY.update({
     "tool_called_in_order": check_tool_called_in_order,
     "tool_called_in_parallel": check_tool_called_in_parallel,
@@ -177,6 +192,7 @@ REGISTRY.update({
     "call_count_at_least": check_call_count_at_least,
     "call_count_exactly": check_call_count_exactly,
     "command_regex_match": check_command_regex_match,
+    "ansi_stripped_in_response": check_ansi_stripped_in_response,
 })
 
 

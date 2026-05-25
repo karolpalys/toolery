@@ -263,6 +263,7 @@ def test_response_satisfies_no_response():
 # ---- terminal_handling primitives ----
 
 from llm_test.core.scorer import (  # noqa: E402
+    check_ansi_stripped_in_response,
     check_command_regex_match,
 )
 
@@ -295,3 +296,21 @@ def test_command_regex_match_call_index_last():
         "call_index": "last",
     })
     assert check_command_regex_match(calls, chk, response=None).result == "pass"
+
+
+def test_ansi_stripped_in_response_pass_clean():
+    chk = ScoringCheck.model_validate({"check": "ansi_stripped_in_response"})
+    assert check_ansi_stripped_in_response(
+        [], chk, response="The prompt says: ready"
+    ).result == "pass"
+
+
+def test_ansi_stripped_in_response_fail_color_codes():
+    chk = ScoringCheck.model_validate({"check": "ansi_stripped_in_response"})
+    raw = "user@host:~$ \x1b[32mready\x1b[0m"
+    assert check_ansi_stripped_in_response([], chk, response=raw).result == "fail"
+
+
+def test_ansi_stripped_in_response_no_response():
+    chk = ScoringCheck.model_validate({"check": "ansi_stripped_in_response"})
+    assert check_ansi_stripped_in_response([], chk, response=None).result == "fail"
