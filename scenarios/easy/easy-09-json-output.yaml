@@ -36,6 +36,12 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 1
+    - check: tool_called
+      tool: get_weather
+    - check: response_contains
+      patterns: ["{"]
+    - check: response_contains
+      patterns: ["temp_c"]
   weights:
     pass: 1.0
     partial: 0.5

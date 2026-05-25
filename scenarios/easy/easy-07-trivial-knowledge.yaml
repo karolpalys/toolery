@@ -25,6 +25,11 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 0
+    - check: tool_not_called
+      tool: web_search
+    - check: response_satisfies
+      any_of:
+        - ["Paris", "paris"]
   weights:
     pass: 1.0
     partial: 0.5
