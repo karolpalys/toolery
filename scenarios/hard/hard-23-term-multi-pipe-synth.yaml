@@ -1,0 +1,59 @@
+id: hard-23-term-multi-pipe-synth
+title: "Five largest .gz files in /backups via find | sort | head"
+tier: hard
+category: terminal_handling
+domain: dev_ops
+description: |
+  Model must compose a multi-stage pipeline:
+  find /backups -name "*.gz" -printf "%s\t%p\n" | sort -rn | head -5
+  Then parse the output and list the file names back to the user.
+tags: [term_shell, term_parse]
+ranking_dimensions: [overall, terminal]
+prompt: "Find the 5 largest .gz files in /backups and list their names."
+tools: [bash_exec]
+budget:
+  max_tool_calls: 3
+  max_turns: 3
+  timeout_seconds: 30
+tool_responses:
+  bash_exec:
+    - match: { command_regex: 'find.*\.gz.*\|.*sort.*\|.*head' }
+      returns:
+        stdout: |
+          17834522	/backups/2026-04-snapshot.gz
+          15211400	/backups/2026-03-snapshot.gz
+          12877301	/backups/2026-02-snapshot.gz
+           9871550	/backups/2026-01-snapshot.gz
+           7223009	/backups/2025-12-snapshot.gz
+        stderr: ""
+        exit_code: 0
+        duration_ms: 88
+    - match: { command_regex: 'find.*\.gz' }
+      returns:
+        stdout: "/backups/2026-04-snapshot.gz\n/backups/2026-03-snapshot.gz\n/backups/2026-02-snapshot.gz\n/backups/2026-01-snapshot.gz\n/backups/2025-12-snapshot.gz\n/backups/other.gz\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 40
+    - match: any
+      returns: { stdout: "", stderr: "no match", exit_code: 1, duration_ms: 1 }
+scoring:
+  required:
+    - check: tool_called
+      tool: bash_exec
+    - check: response_satisfies
+      all_of:
+        - "2026-04-snapshot.gz"
+        - "2026-03-snapshot.gz"
+        - "2026-02-snapshot.gz"
+        - "2026-01-snapshot.gz"
+        - "2025-12-snapshot.gz"
+    - check: no_hallucinated_tool
+      allowed: [bash_exec]
+  forbidden: []
+  partial:
+    - check: command_regex_match
+      pattern: 'find.*\.gz.*\|.*sort.*\|.*head'
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
