@@ -54,6 +54,12 @@ scoring:
   partial:
     - check: call_count_at_most
       n: 3
+    - check: tool_called
+      tool: git_status
+    - check: tool_args_match_regex
+      tool: git_commit
+      arg: message
+      pattern: "(util|helper|add).*[a-zA-Z]"
   weights:
     pass: 1.0
     partial: 0.5
