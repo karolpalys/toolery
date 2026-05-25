@@ -21,7 +21,7 @@ llm-test run --model deepseek-v4-flash --adapter raw --tier easy --trials 3
 llm-test run --model deepseek-v4-flash --adapter raw,hermes,claude_code,codex \
              --tier all --trials 5 --with-perf
 
-# TUI dashboard (4 tabs: Live / History / Rankings / Scenarios)
+# TUI dashboard (6 tabs: Home / Rankings / Compare / Scenarios / History / Setup)
 llm-test tui
 
 # compare two runs
@@ -56,11 +56,12 @@ llm-test scenarios --tier easy    # available scenarios
   ports (8000/8080/8081/8888/8889/5000/5001/11434), with an optional deep
   scan of 8000–9000. Pick a row to open a launch modal with pre-filled
   flags and a harness picker; the modal spawns `llm-test run` as a
-  subprocess and switches focus to Live.
-- **Live** — current run, polled every 2 s from `runs.db`. Progress bar, current scenario, phase (scenarios/perf/done).
-- **History** — past runs.
+  subprocess. Also shows the live progress bar of the currently-running run
+  (polled every 2 s from `runs.db`) — current scenario, phase, completed/total units.
 - **Rankings** — 14-dimension scoring matrix + 2 perf cols + cluster/set meta. Click headers to sort. See "Rankings matrix" section below.
+- **Compare** — side-by-side diff of two runs with McNemar significance.
 - **Scenarios** — scenario catalog.
+- **History** — past runs.
 - **Setup** — pick a use-case persona (Coding Assistant, Reasoning, Agentic Orchestrator, Safety/RAG, Customer Support, Data Analyst, Local Coding Agent). The chosen persona creates an additional `UC:<Name>` ranking column in Rankings, computed with persona-specific dimension weights. The global Overall column is unaffected. Selection persists in `results/setup.json`.
 
 Harnesses are gated on host availability: `raw` is always selectable;
@@ -152,7 +153,7 @@ LLM-test/
 │   ├── charts/         # ascii.py + png.py (7 matplotlib renderers)
 │   ├── rankings/       # regenerate_rankings — 8 dimensions
 │   ├── compare.py      # cross-run diff with McNemar
-│   ├── tui/            # Textual TUI (Live/History/Rankings/Scenarios tabs)
+│   ├── tui/            # Textual TUI (Home/Rankings/Compare/Scenarios/History/Setup tabs)
 │   └── cli.py          # typer entrypoint
 ├── scenarios/          # 83 scenarios across easy/medium/hard/very_hard
 ├── results/            # SQLite + .md + JSON traces + PNG charts (gitignored)
