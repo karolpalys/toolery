@@ -50,7 +50,7 @@ llm-test scenarios --tier easy    # available scenarios
 
 ## TUI workflow
 
-`llm-test tui` opens a 5-tab terminal dashboard:
+`llm-test tui` opens a 6-tab terminal dashboard:
 
 - **Home** — discover local OpenAI-compatible endpoints by probing common
   ports (8000/8080/8081/8888/8889/5000/5001/11434), with an optional deep
@@ -61,6 +61,7 @@ llm-test scenarios --tier easy    # available scenarios
 - **History** — past runs.
 - **Rankings** — 14-dimension scoring matrix + 2 perf cols + cluster/set meta. Click headers to sort. See "Rankings matrix" section below.
 - **Scenarios** — scenario catalog.
+- **Setup** — pick a use-case persona (Coding Assistant, Reasoning, Agentic Orchestrator, Safety/RAG, Customer Support, Data Analyst, Local Coding Agent). The chosen persona creates an additional `UC:<Name>` ranking column in Rankings, computed with persona-specific dimension weights. The global Overall column is unaffected. Selection persists in `results/setup.json`.
 
 Harnesses are gated on host availability: `raw` is always selectable;
 `hermes`, `claude_code`, and `codex` are disabled with a reason hint if
