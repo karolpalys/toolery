@@ -33,7 +33,14 @@ class MockToolRuntime:
                 if call_idx < int(ci[2:]):
                     return False
         if isinstance(rule.match, dict):
-            return all(args.get(k) == v for k, v in rule.match.items())
+            for k, v in rule.match.items():
+                if k == "command_regex":
+                    import re
+                    if not re.search(str(v), str(args.get("command", ""))):
+                        return False
+                elif args.get(k) != v:
+                    return False
+            return True
         return False
 
     def _render(self, rule: ToolResponseRule) -> tuple[Any, str]:
