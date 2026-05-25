@@ -65,7 +65,10 @@ def scenarios(tier: str = typer.Option("all", help="easy|medium|hard|very_hard|a
 
 @app.command()
 def run(
-    model: str = typer.Option(..., "--model"),
+    model: str = typer.Option(..., "--model",
+                              help="friendly display name (run_id, DB column)"),
+    served_model: str = typer.Option("", "--served-model",
+                                     help="name to send in API model= (default: --model)"),
     adapter: str = typer.Option("raw", help="comma-separated: raw,hermes,claude_code,codex"),
     tier: str = typer.Option("all", help="easy|medium|hard|very_hard|all"),
     trials: int = typer.Option(5, "--trials"),
@@ -74,17 +77,19 @@ def run(
     concurrency: int = typer.Option(4),
     no_tui: bool = typer.Option(True, "--no-tui/--tui", help="MVP: --no-tui only"),
     with_perf: bool = typer.Option(False, "--with-perf"),
+    cluster: str = typer.Option("single", "--cluster",
+                                help="single | dual (DGX Spark deployment topology)"),
 ):
     """Run benchmark."""
     # Import tools to register them
-    from llm_test.tools import domain, generic  # noqa: F401
+    from llm_test.tools import api_db, domain, generic  # noqa: F401
 
-    api_key = os.environ.get("OPENAI_API_KEY", "")
+    local_key = os.environ.get("OPENAI_API_KEY", "")
     adapters: dict[str, Adapter] = {}
     for a in adapter.split(","):
         a = a.strip()
         if a == "raw":
-            adapters[a] = OpenAIRawAdapter(base_url=base_url, api_key=api_key)
+            adapters[a] = OpenAIRawAdapter(base_url=base_url, api_key=local_key)
         elif a == "hermes":
             from llm_test.adapters.hermes import HermesAdapter
             adapters[a] = HermesAdapter(
@@ -119,30 +124,52 @@ def run(
         console.print("[red]No scenarios match filter.[/red]")
         raise typer.Exit(2)
 
-    run_id = f"{datetime.now(UTC).strftime('%Y-%m-%dT%H-%M')}_{model}"
+    api_model = served_model or model
+    # NIM model IDs use `<org>/<name>` — strip the slash so we don't create
+    # nested directories under results/runs/.
+    safe_model = model.replace("/", "_")
+    run_id = f"{datetime.now(UTC).strftime('%Y-%m-%dT%H-%M')}_{safe_model}"
     run_dir = _results_dir() / "runs" / run_id
     (run_dir / "scenarios").mkdir(parents=True, exist_ok=True)
     (run_dir / "traces").mkdir(parents=True, exist_ok=True)
 
+    # Hash of (sorted) scenario IDs that participated in this run. Lets
+    # downstream rankings flag runs that were taken on a different scenario
+    # set (e.g. before vs after adding the hallucination suite).
+    import hashlib as _hashlib
+    scenarios_hash = _hashlib.sha256(
+        ",".join(sorted(s.id for s in xs)).encode("utf-8")
+    ).hexdigest()[:16]
+
     store = _store()
-    cfg = {"model": model, "adapter": list(adapters), "tier": tier, "trials": trials,
-           "base_url": base_url, "concurrency": concurrency}
+    total_units = len(xs) * len(adapters) * trials
+    if cluster not in ("single", "dual"):
+        console.print(f"[yellow]Unknown --cluster {cluster!r}, falling back to 'single'.[/yellow]")
+        cluster = "single"
+    cfg = {"model": model, "served_model": api_model, "adapter": list(adapters),
+           "tier": tier, "trials": trials, "base_url": base_url,
+           "concurrency": concurrency, "total_units": total_units,
+           "scenarios_count": len(xs), "with_perf": bool(with_perf),
+           "cluster": cluster}
     store.create_run(run_id=run_id, model=model, base_url=base_url,
                      started_at=datetime.now(UTC).isoformat(),
                      config_json=json.dumps(cfg),
-                     scenarios_hash="")
+                     scenarios_hash=scenarios_hash,
+                     cluster=cluster,
+                     total_units=total_units)
     for name, ad in adapters.items():
         store.upsert_adapter(run_id, name, ad.version)
 
     started = datetime.now(UTC)
-    runner = Runner(adapters=adapters, trials=trials, model=model, concurrency=concurrency)
+    runner = Runner(adapters=adapters, trials=trials, model=api_model, concurrency=concurrency)
     console.print(f"[bold]Running {len(xs)} scenarios × {len(adapters)} adapters × {trials} trials"
-                  f" = {len(xs)*len(adapters)*trials} runs[/bold]")
-    results = asyncio.run(runner.run(xs))
+                  f" = {total_units} units[/bold]")
 
     sc_by_id = {s.id: s for s in xs}
     tier_lookup = {s.id: s.tier.value for s in xs}
-    for r in results:
+
+    def _on_result(r) -> None:
+        # Incremental: persist trace + DB row immediately so the Live tab sees progress.
         s = sc_by_id[r.scenario_id]
         trace_filename = f"{r.scenario_id}__{r.adapter}__t{r.trial_index}.json"
         (run_dir / "traces" / trace_filename).write_text(r.trace.model_dump_json(indent=2))
@@ -152,6 +179,10 @@ def run(
             scenario_hash="", category=s.category.value, tier=s.tier.value,
             trace_path=f"traces/{trace_filename}",
         )
+        store.update_phase(run_id, "scenarios", current_scenario=r.scenario_id)
+
+    results = asyncio.run(runner.run(xs, on_result=_on_result))
+
     for s in xs:
         md = render_scenario(scenario_id=s.id, results=results, title=s.title,
                              tier=s.tier.value, category=s.category.value)
@@ -163,13 +194,13 @@ def run(
         tier_lookup=tier_lookup,
     )
     (run_dir / "summary.md").write_text(md)
-    store.finish_run(run_id, finished_at=datetime.now(UTC).isoformat(),
-                     duration_s=duration, status="done")
 
     if with_perf:
         from llm_test.perf.benchy import run_benchy
+        store.update_phase(run_id, "perf", current_scenario="llama-bench")
         try:
-            perf = run_benchy(model=model, base_url=base_url, depth=[0, 16384, 131072], runs=3)
+            perf = run_benchy(model=api_model, base_url=base_url,
+                              depth=[0, 16384, 65536], runs=3)
             for row in perf.rows:
                 store.write_perf(run_id, depth=row["depth"],
                                  pp_tps=row.get("pp_tps"), tg_tps=row.get("tg_tps"),
@@ -181,6 +212,26 @@ def run(
         except Exception as e:
             console.print(f"[yellow]perf collection failed: {e}[/yellow]")
 
+    store.finish_run(run_id, finished_at=datetime.now(UTC).isoformat(),
+                     duration_s=(datetime.now(UTC) - started).total_seconds(),
+                     status="done")
+
+    # Auto-regenerate rankings so the new run is reflected in TUI Rankings tab.
+    try:
+        from llm_test.rankings.compute import regenerate_rankings
+        regenerate_rankings(
+            store=store,
+            dimensions=["overall", "coding", "agentic", "safety", "restraint",
+                        "long_context", "budget_efficiency", "hallucination",
+                        "error_recovery", "parameter_precision",
+                        "context_state_tracking", "structured_output",
+                        "tool_selection", "localization", "terminal"],
+            out_dir=_results_dir() / "rankings",
+        )
+        console.print("[green]✓ Rankings regenerated[/green]")
+    except Exception as e:
+        console.print(f"[yellow]rankings regen skipped: {e}[/yellow]")
+
     console.print(f"[green]✓ Run finished: {run_dir}[/green]")
     console.print(f"  [bold]summary.md[/bold]: {run_dir/'summary.md'}")
 
@@ -189,7 +240,7 @@ def run(
 def perf(model: str = typer.Option(..., "--model"),
          base_url: str = typer.Option("http://localhost:8000", "--base-url"),
          pp: int = 4096, tg: int = 512,
-         depth: str = "0,16384,131072", runs: int = 3):
+         depth: str = "0,16384,65536", runs: int = 3):
     """Run llama-benchy only (no scoring)."""
     from llm_test.perf.benchy import run_benchy
     res = run_benchy(model=model, base_url=base_url, pp=pp, tg=tg,
@@ -225,7 +276,9 @@ def rankings(
     from llm_test.rankings.compute import regenerate_rankings
     out = _results_dir() / "rankings"
     dims = ["overall", "coding", "agentic", "safety", "restraint", "long_context",
-            "budget_efficiency"] if dimension == "all" else [dimension]
+            "budget_efficiency", "hallucination", "error_recovery",
+            "parameter_precision", "context_state_tracking", "structured_output",
+            "tool_selection", "localization", "terminal"] if dimension == "all" else [dimension]
     if regen:
         regenerate_rankings(store=_store(), dimensions=dims, out_dir=out)
         console.print(f"[green]✓ Regenerated rankings: {out}[/green]")
