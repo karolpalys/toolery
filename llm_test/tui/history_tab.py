@@ -15,6 +15,7 @@ from textual.widgets import Button, DataTable, Input, Label, Markdown, Static
 
 from llm_test.compare import compare_runs
 from llm_test.core.store import Store
+from llm_test.tui.home_tab import _profile_run
 
 
 class ConfirmRemoveModal(ModalScreen[bool]):
@@ -145,7 +146,12 @@ class MarkdownModal(ModalScreen[None]):
 
 def _build_details_md(run: dict, results: list[dict],
                       perf_rows: list[dict], adapters: list[str]) -> str:
-    """Render a Markdown summary of one run for the details modal."""
+    """Render a Markdown summary of one run for the details modal.
+
+    Starts with the same `_profile_run` block the Home tab shows after a
+    run finishes (overall / per-tier / strong-weak / recommend-avoid),
+    then continues with the full breakdown.
+    """
     by_tier: dict[str, list[float]] = {}
     by_status: Counter[str] = Counter()
     fail_kinds: Counter[str] = Counter()
@@ -161,6 +167,12 @@ def _build_details_md(run: dict, results: list[dict],
         cfg = run.get("config_json") or ""
 
     lines: list[str] = []
+    profile_plain = _profile_run(results).plain.rstrip()
+    if profile_plain:
+        lines.append("```")
+        lines.append(profile_plain)
+        lines.append("```")
+        lines.append("")
     lines.append(f"## {run['run_id']}")
     lines.append("")
     lines.append(f"- **Model:** `{run.get('model','?')}`")
