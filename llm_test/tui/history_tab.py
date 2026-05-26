@@ -15,7 +15,6 @@ from textual.widgets import Button, DataTable, Input, Label, Markdown, Static
 
 from llm_test.compare import compare_runs
 from llm_test.core.store import Store
-from llm_test.tui.home_tab import _profile_run
 
 
 class ConfirmRemoveModal(ModalScreen[bool]):
@@ -242,21 +241,12 @@ class HistoryTab(Container):
     }
     HistoryTab DataTable { height: 1fr; }
     HistoryTab #hist-banner.has-anchor { color: $warning; text-style: bold; }
-    HistoryTab #summary-strip {
-        height: auto; max-height: 14;
-        border: round $success;
-        border-title-color: $success;
-        padding: 0 1;
-        margin-top: 1;
-    }
-    HistoryTab #summary-strip.hidden { display: none; }
     """
 
     BINDINGS = [
         Binding("delete", "remove_run", "Remove selected run"),
         Binding("backspace", "remove_run", "Remove selected run", show=False),
         Binding("d", "diff_run", "Diff: 1st press = mark, 2nd press = compare"),
-        Binding("v", "view_details", "Full run details modal"),
     ]
 
     def __init__(self, id: str | None = None) -> None:
@@ -267,23 +257,20 @@ class HistoryTab(Container):
 
     def compose(self) -> ComposeResult:
         yield Static(
-            "Past runs: click a row to see summary at the bottom. "
-            "v = full details modal · d = diff · Del = remove.",
+            "Past runs: click a row to view summary, compare, or remove. "
+            "Removal deletes traces and DB rows permanently.",
             id="history-intro",
         )
         with Vertical(id="runs-section"):
             yield Static(
                 "[bold]All runs[/bold]  —  ↑↓ navigate  ·  "
-                "Enter = summary below  ·  v = full details  ·  "
-                "d = diff (press on 2 rows)  ·  Del = remove",
+                "Enter = details  ·  d = diff (press on 2 rows)  ·  "
+                "Del = remove",
                 id="hist-banner",
             )
             yield Input(placeholder="filter (model name or run_id substring)",
                         id="hist-filter")
             yield DataTable(id="history-table", cursor_type="row")
-
-        with VerticalScroll(id="summary-strip", classes="hidden"):
-            yield Static("", id="summary-content")
 
     def on_mount(self) -> None:
         tbl = self.query_one("#history-table", DataTable)
@@ -291,7 +278,6 @@ class HistoryTab(Container):
                         "duration (s)", "adapters")
         try:
             self.query_one("#runs-section").border_title = "📜 Past runs"
-            self.query_one("#summary-strip").border_title = "✓ Run summary"
         except Exception:
             pass
         self.refresh_data()
@@ -325,7 +311,7 @@ class HistoryTab(Container):
         if event.input.id == "hist-filter":
             self.refresh_data(event.value)
 
-    # --------------------------------------------------------- enter → summary
+    # --------------------------------------------------------- enter → details
 
     def on_data_table_row_selected(
         self, event: DataTable.RowSelected
@@ -335,30 +321,10 @@ class HistoryTab(Container):
         run_id = self._row_run_id(event.cursor_row)
         if not run_id:
             return
-        self._show_summary(run_id)
-
-    def _show_summary(self, run_id: str) -> None:
-        store = self._store()
-        results = store.fetch_results_for_run(run_id)
-        summary_w = self.query_one("#summary-strip", VerticalScroll)
-        summary_content = self.query_one("#summary-content", Static)
-        try:
-            summary_w.border_title = f"✓ Run summary — {run_id}"
-        except Exception:
-            pass
-        summary_content.update(_profile_run(results))
-        summary_w.remove_class("hidden")
+        self._open_details(run_id)
 
     @work
-    async def action_view_details(self) -> None:
-        tbl = self.query_one("#history-table", DataTable)
-        if tbl.row_count == 0 or tbl.cursor_row is None:
-            self.app.notify("No row selected", severity="warning",
-                            markup=False)
-            return
-        run_id = self._row_run_id(tbl.cursor_row)
-        if not run_id:
-            return
+    async def _open_details(self, run_id: str) -> None:
         store = self._store()
         runs = [r for r in store.fetch_all_runs() if r["run_id"] == run_id]
         if not runs:
@@ -478,11 +444,6 @@ class HistoryTab(Container):
         if self._diff_anchor == run_id:
             self._diff_anchor = None
             self._set_anchor_banner(None)
-        # Hide the bottom summary — it may be showing the deleted run.
-        try:
-            self.query_one("#summary-strip", VerticalScroll).add_class("hidden")
-        except Exception:
-            pass
         self.app.notify(f"Removed run: {run_id}", markup=False)
         self.refresh_data()
 
