@@ -81,7 +81,7 @@ scoring:
     - check: response_contains
       patterns: ["487"]      # Q3 revenue
     - check: response_contains
-      patterns: ["22"]       # YoY growth %
+      patterns: ["22%"]       # YoY growth %
     - check: response_contains
       patterns: ["26.6"]     # Operating margin %
     - check: response_contains

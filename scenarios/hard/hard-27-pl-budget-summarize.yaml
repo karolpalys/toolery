@@ -1,7 +1,7 @@
 id: hard-27-pl-budget-summarize
 title: "PL: streść 3 dokumenty w 1 toolcall (parallel fan-out)"
 tier: hard
-category: hard_mode
+category: localization
 domain: generic
 description: |
   Polish: summarize three different documents in ONE assistant turn — model
@@ -37,8 +37,7 @@ scoring:
     - check: call_count_at_most
       n: 3
     - check: response_satisfies
-      any_of: [["Q1"], ["Q2"], ["Q3"]]
-      all_of: ["wzrost"]
+      all_of: ["wzrost", "Q1", "Q2", "Q3"]
   forbidden: []
   partial:
     - check: response_satisfies

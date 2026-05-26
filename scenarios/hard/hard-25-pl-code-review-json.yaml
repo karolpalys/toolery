@@ -35,6 +35,7 @@ scoring:
     - check: response_satisfies
       all_of: ["issues", "line", "severity", "msg"]
     - check: response_satisfies
+      all_of: ["discount"]
       any_of: [["-10"], ["ujemn"], ["negative"], ["<0"], ["less than 0"]]
   forbidden:
     - check: response_satisfies

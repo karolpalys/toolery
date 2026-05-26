@@ -20,7 +20,7 @@ budget:
   timeout_seconds: 45
 tool_responses:
   http_paginate:
-    - match: { url: "https://api.example.com/v1/users", cursor: "" }
+    - match: { url: "https://api.example.com/v1/users" }
       returns:
         items: [{ "id": 1 }, { "id": 2 }, { "id": 3 }]   # page 1: 3 items (shortened)
         page_meta: { "size": 50, "count": 50 }

@@ -33,7 +33,7 @@ scoring:
       tool: http_get
       args: { url: "https://api-backup.acme.com/health/auth" }
     - check: response_satisfies
-      all_of: ["service", "status", "version"]
+      all_of: ["service", "auth", "status", "version"]
       any_of: [["3.1.0"], ["ok"]]
     - check: call_count_at_most
       n: 3

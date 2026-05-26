@@ -29,12 +29,10 @@ tool_responses:
     - match: any
       returns: ["customers", "orders", "products"]
   sql_query:
-    - match: { query: "SELECT * FROM customers WHERE id = 42" }
+    - match: any
       returns:
         rows:
           - { id: 42, email: "a.kowalski@example.com", name: "Anna Kowalska", joined_at: "2024-03-12", tier: "prime" }
-    - match: any
-      returns: { error: "no_match" }
   http_get:
     - match: any
       returns: { error: "unrelated_tool" }

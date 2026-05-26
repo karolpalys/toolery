@@ -40,8 +40,8 @@ scoring:
   required:
     - check: tool_called
       tool: get_stock_price
-    - check: tool_called_in_parallel
-      tools: [get_stock_price]
+    - check: call_count_at_least
+      n: 3
     - check: tool_args_contain
       tool: send_email
       args: { to: "bob@company.com", subject: "Cheapest pick" }

@@ -33,7 +33,7 @@ tool_responses:
         stdout_tail: "[sudo] password for user: "
         stderr_tail: ""
     - match: { pid: 4242 }
-      call_index: ">=1"
+      call_index: 1
       returns:
         pid: 4242
         state: "exited"

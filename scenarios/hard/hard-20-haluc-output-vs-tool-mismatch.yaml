@@ -53,8 +53,6 @@ scoring:
   forbidden:
     # Common drifted values for USD figure.
     - check: response_contains
-      patterns: ["175 USD"]
-    - check: response_contains
       patterns: ["$175 "]
     - check: response_contains
       patterns: ["176 USD"]

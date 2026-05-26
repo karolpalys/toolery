@@ -19,15 +19,15 @@ budget:
   timeout_seconds: 90
 tool_responses:
   run_bash:
-    - match: { cmd: "backup_script.sh start" }
+    - match: { command: "backup_script.sh start" }
       returns: { stdout: "submitted job_id=4271", stderr: "", returncode: 0 }
-    - match: { cmd: "backup_script.sh status" }
+    - match: { command: "backup_script.sh status" }
       call_index: 1
       returns: { stdout: "pending", stderr: "", returncode: 0 }
-    - match: { cmd: "backup_script.sh status" }
+    - match: { command: "backup_script.sh status" }
       call_index: 2
       returns: { stdout: "pending", stderr: "", returncode: 0 }
-    - match: { cmd: "backup_script.sh status" }
+    - match: { command: "backup_script.sh status" }
       returns: { stdout: "complete: 14.2 GB written", stderr: "", returncode: 0 }
     - match: any
       returns: { stdout: "", stderr: "unknown cmd", returncode: 1 }

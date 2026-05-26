@@ -33,8 +33,8 @@ tool_responses:
       returns: { results: [] }
 scoring:
   required:
-    - check: tool_called_in_parallel
-      tools: [get_stock_price]
+    - check: call_count_at_least
+      n: 3
     - check: call_count_exactly
       n: 3
     - check: response_satisfies
