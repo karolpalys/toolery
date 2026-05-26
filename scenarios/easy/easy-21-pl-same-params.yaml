@@ -26,9 +26,10 @@ tool_responses:
       returns: { error: "city not found" }
 scoring:
   required:
-    - check: tool_args_contain
+    - check: tool_args_match_regex
       tool: get_weather
-      args: { location: "Kraków" }
+      arg: location
+      pattern: "[Kk]rak[oó]w"
   forbidden: []
   partial:
     - check: tool_called

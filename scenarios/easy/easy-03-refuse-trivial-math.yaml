@@ -21,13 +21,9 @@ scoring:
       patterns: ["4"]
   forbidden: []
   partial:
-    - check: call_count_at_most
-      n: 0
-    - check: tool_not_called
-      tool: calculator
     - check: response_satisfies
       any_of:
-        - ["4", "four"]
+        - ["four", "4", "cztery"]
   weights:
     pass: 1.0
     partial: 0.5

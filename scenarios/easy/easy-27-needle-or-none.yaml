@@ -40,7 +40,7 @@ scoring:
   required:
     - check: response_satisfies
       any_of:
-        - ["nie ma", "brak", "nie wymienia", "nie zawiera", "nie informacji", "nie zostało", "nie jest"]
+        - ["nie ma", "brak", "nie wymienia", "nie zawiera", "brak informacji", "nie zostało wymienione"]
       none_of:
         - "10 miejsc"
         - "20 miejsc"

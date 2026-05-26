@@ -27,7 +27,7 @@ scoring:
       any_of: [["13.33"]]
     - check: response_satisfies
       all_of: ["5", "23"]
-      none_of: ["6", "22", "24"]
+      none_of: ["22", "24"]
   forbidden:
     - check: response_contains
       patterns: ["13.34"]

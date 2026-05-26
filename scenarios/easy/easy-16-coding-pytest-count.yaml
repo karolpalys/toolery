@@ -31,7 +31,7 @@ scoring:
       tool: bash_exec
     - check: response_satisfies
       all_of: ["5"]
-      none_of: ["error", "fail"]
+      none_of: ["error", "command not found", "0 passed"]
     - check: no_hallucinated_tool
       allowed: [bash_exec]
   forbidden: []

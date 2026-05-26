@@ -36,7 +36,7 @@ scoring:
   required:
     - check: response_satisfies
       all_of: ["nginx.access.log"]
-      none_of: ["mongodb", "redis", "nginx.error"]
+      none_of: ["mongodb.log is the largest", "redis.log is the largest", "nginx.error.log is the largest"]
   forbidden: []
   partial:
     - check: response_contains

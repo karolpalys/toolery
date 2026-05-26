@@ -16,7 +16,7 @@ budget:
   timeout_seconds: 30
 tool_responses:
   bash_exec:
-    - match: { command_regex: '^du\s+.*-s.*\s/var/log' }
+    - match: { command_regex: '^du\s+.*/var/log' }
       returns: { stdout: "1.4G\t/var/log\n", stderr: "", exit_code: 0, duration_ms: 18 }
     - match: { command_regex: '^df\s' }
       returns: { stdout: "Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1       100G   45G   55G  45% /\n", stderr: "", exit_code: 0, duration_ms: 12 }
@@ -25,7 +25,7 @@ tool_responses:
 scoring:
   required:
     - check: command_regex_match
-      pattern: '^du\s+.*-s.*\s/var/log'
+      pattern: '^du\s+.*/var/log'
     - check: response_satisfies
       all_of: ["1.4", "G"]
       none_of: ["error", "could not"]

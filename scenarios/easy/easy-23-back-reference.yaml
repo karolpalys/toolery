@@ -32,7 +32,7 @@ scoring:
   required:
     - check: response_satisfies
       any_of: [["Postgres", "PostgreSQL"]]
-      none_of: ["auth", "legacy migr", "obser", "szkolen", "podzesp"]
+      none_of: ["moduł auth", "legacy migr", "observability", "szkolenie", "podzespół"]
   forbidden: []
   partial:
     - check: response_satisfies

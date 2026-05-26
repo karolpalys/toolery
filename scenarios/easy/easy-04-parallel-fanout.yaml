@@ -36,7 +36,9 @@ scoring:
       tool: get_weather
     - check: response_satisfies
       any_of:
-        - ["Warsaw", "Berlin", "Tokyo"]
+        - ["Warsaw"]
+        - ["Berlin"]
+        - ["Tokyo"]
   weights:
     pass: 1.0
     partial: 0.5
