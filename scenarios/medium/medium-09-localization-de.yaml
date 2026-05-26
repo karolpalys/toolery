@@ -36,6 +36,9 @@ scoring:
     - check: response_satisfies
       any_of:
         - ["Wetter", "Berlin", "Grad", "Celsius", "bewölkt", "bewoelkt"]
+    - check: response_satisfies
+      any_of:
+        - ["bewölkt", "Berlin", "Grad", "Wetter"]
   weights:
     pass: 1.0
     partial: 0.5

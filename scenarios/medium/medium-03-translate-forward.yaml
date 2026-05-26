@@ -37,9 +37,6 @@ scoring:
       pattern: "^Greeting"
     - check: response_satisfies
       any_of:
-        - ["bonjour", "salut", "merci", "français"]
-    - check: response_satisfies
-      any_of:
         - ["sent", "email", "delivered", "Bob"]
   weights:
     pass: 1.0

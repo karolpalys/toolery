@@ -29,7 +29,7 @@ scoring:
       patterns: ["175.43"]
     - check: response_satisfies
       any_of:
-        - ["USD", "U.S. dollar", "US dollar", "US$", "$"]
+        - ["USD", "U.S. dollar", "US dollar", "US$"]
       none_of:
         # Wrong currencies in the summary = hallucination drift.
         - "EUR"

@@ -16,8 +16,9 @@ budget:
   timeout_seconds: 45
 tool_responses:
   web_search:
-    - match: { query: "Q3 2026 internal sales report" }
-      returns: { results: [], note: "no results" }
+    - call_index: 0
+      match: any
+      returns: { results: [] }
     - match: any
       returns:
         results:

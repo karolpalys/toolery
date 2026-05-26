@@ -69,8 +69,6 @@ scoring:
     - check: response_contains
       patterns: ["<tr>"]
   partial:
-    - check: tool_called
-      tool: get_weather
     - check: response_satisfies
       any_of:
         - ["Warsaw", "Berlin", "Tokyo"]

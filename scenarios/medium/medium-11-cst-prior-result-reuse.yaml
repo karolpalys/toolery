@@ -1,13 +1,13 @@
 id: medium-11-cst-prior-result-reuse
 title: "Reuse a prior tool result instead of recomputing"
 tier: medium
-category: context_state_tracking
+category: instruction_following
 domain: generic
 description: |
-  After fetching AAPL price in turn 1, the user asks a follow-up that needs the
-  same price. Model must reuse the value from context rather than calling
-  get_stock_price again (call_count_at_most enforces this). Tests whether the
-  model tracks tool results as state across turns.
+  Tests single-turn restraint: model receives both 'Step 1' and 'Step 2: do NOT
+  re-fetch' inline; must heed the inline instruction rather than calling
+  get_stock_price again. The price from step 1 must flow into the calculator
+  for step 2 (call_count_at_most enforces this).
 tags: [context_state_tracking, multi_turn, restraint]
 ranking_dimensions: [overall, context_state_tracking, agentic]
 prompt: |
@@ -46,10 +46,7 @@ scoring:
       patterns: ["5262", "5,262"]
     - check: call_count_at_most
       n: 2
-  forbidden:
-    # Re-fetching the price = state-tracking failure.
-    - check: call_count_at_least
-      n: 3
+  forbidden: []
   partial:
     - check: tool_called
       tool: get_stock_price

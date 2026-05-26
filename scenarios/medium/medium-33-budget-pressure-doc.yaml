@@ -4,9 +4,10 @@ tier: medium
 category: context_state_tracking
 domain: generic
 description: |
-  Multi-turn over a ~2k-token policy document. Turn 1 asks about section X.
-  Turn 2 asks for a different fact from the SAME section. Model must reuse
-  in-context content rather than re-fetch. Budget = 2 total toolcalls.
+  Single-turn over a ~2k-token policy document containing both questions
+  inline (Turn 1 + Turn 2 framing in one prompt). Both answers depend on the
+  same section; model must reuse the in-context document rather than re-fetch
+  via read_file. Budget = 2 total toolcalls but ideally zero.
 tags: [multi_turn, long_context, budget]
 ranking_dimensions: [overall, budget_efficiency, long_context, context_state_tracking]
 prompt: |

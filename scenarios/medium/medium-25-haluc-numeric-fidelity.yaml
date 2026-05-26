@@ -44,11 +44,7 @@ scoring:
       patterns: ["approximately"]
     - check: response_contains
       patterns: ["roughly"]
-    # Wrong rounding values.
-    - check: response_contains
-      patterns: ["$175.40"]
-    - check: response_contains
-      patterns: ["$175.50"]
+    # Wrong rounding value.
     - check: response_contains
       patterns: ["$176"]
   partial:

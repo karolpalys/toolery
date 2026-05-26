@@ -31,7 +31,7 @@ tool_responses:
       returns:
         status: 200
         headers: { "Content-Type": "text/html" }
-        body: "<html><body><h1>API v4.7.0 (HTML default)</h1></body></html>"
+        body: "<html><body><h1>API v4.7.0-html (HTML default)</h1></body></html>"
 scoring:
   required:
     - check: tool_called

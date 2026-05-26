@@ -36,6 +36,10 @@ scoring:
     - check: tool_args_contain
       tool: send_email
       args: { to: "bob@company.com" }
+    - check: tool_args_match_regex
+      tool: send_email
+      arg: body
+      pattern: "(1\\.?2M|800k|2M|infrastructure|headcount|budget)"
   forbidden: []
   partial:
     - check: call_count_at_most

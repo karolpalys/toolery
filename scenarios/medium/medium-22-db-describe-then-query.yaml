@@ -31,6 +31,16 @@ tool_responses:
           - { name: "currency", type: "varchar(3)" }
           - { name: "created_at", type: "timestamptz" }
           - { name: "status", type: "varchar(16)" }
+    - match: { table: "analytics.orders" }
+      returns:
+        table: "analytics.orders"
+        columns:
+          - { name: "order_id", type: "uuid" }
+          - { name: "customer_id", type: "uuid" }
+          - { name: "amount_cents", type: "bigint" }
+          - { name: "currency", type: "varchar(3)" }
+          - { name: "created_at", type: "timestamptz" }
+          - { name: "status", type: "varchar(16)" }
     - match: any
       returns: { error: "table_not_found" }
   sql_query:

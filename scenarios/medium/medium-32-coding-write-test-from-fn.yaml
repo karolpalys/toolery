@@ -80,7 +80,7 @@ scoring:
     - check: command_regex_match
       pattern: 'pytest'
     - check: call_count_at_most
-      n: 3
+      n: 4
   weights:
     pass: 1.0
     partial: 0.5

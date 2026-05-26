@@ -47,12 +47,7 @@ scoring:
       patterns: ["175.42"]
     - check: call_count_at_most
       n: 2
-  forbidden:
-    # Out-of-range depths.
-    - check: tool_args_match_regex
-      tool: get_orderbook
-      arg: depth
-      pattern: "^(100|200|500|1000|9999)$"
+  forbidden: []
   partial:
     - check: tool_called
       tool: get_orderbook

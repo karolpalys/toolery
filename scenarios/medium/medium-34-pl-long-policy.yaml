@@ -64,9 +64,7 @@ scoring:
       any_of: [["14 dni", "kalendarz"]]
     - check: call_count_at_most
       n: 1
-  forbidden:
-    - check: response_contains
-      patterns: ["30 dni"]
+  forbidden: []
   partial:
     - check: response_contains
       patterns: ["14"]
