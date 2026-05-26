@@ -1,12 +1,14 @@
 id: very-hard-20-near-twin-tools
-title: "get_weather_global (current) vs get_weather_global (forecast)"
+title: "Parameter precision: model must include date arg for forecast call"
 tier: very_hard
-category: tool_selection
+category: parameter_precision
 domain: generic
 description: |
-  Two near-identical signatures: `get_weather_global(location)` for current
-  and `get_weather_global(location, date)` for forecast. Question asks for
-  forecast — model must include date arg (precise selection).
+  One tool with two valid call shapes: `get_weather_global(location)` for
+  current and `get_weather_global(location, date)` for forecast. Question
+  asks for a forecast (Friday 2026-08-14), so the model must include the
+  date arg. Tests parameter precision — not tool selection per se, since
+  only one tool is registered.
 tags: [near_twin, parameter_choice]
 ranking_dimensions: [overall, parameter_precision, tool_selection]
 prompt: "Jaka będzie pogoda w Berlinie w piątek 2026-08-14?"

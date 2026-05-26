@@ -61,8 +61,9 @@ scoring:
       tool: get_exchange_rate
       args: { base: "USD", quote: "EUR" }
     # Final response must include the EUR value (≈ 5670) and a yes/no judgment.
-    - check: response_contains
-      patterns: ["5670", "5,670"]
+    - check: response_satisfies
+      any_of:
+        - ["5670", "5,670", "5 670"]
     - check: response_satisfies
       any_of:
         - ["yes", "covers", "enough", "sufficient", "more than"]

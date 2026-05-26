@@ -34,6 +34,11 @@ scoring:
       pattern: "user-42"
     - check: call_count_at_most
       n: 2
+    # Must have made at least 2 calls — i.e. actually exercised the
+    # 400-recovery path. A model that includes id correctly on the first
+    # call never tests validation-fix and should not pass this scenario.
+    - check: call_count_at_least
+      n: 2
     - check: response_satisfies
       any_of: [["ok"], ["user-42"]]
   forbidden: []

@@ -68,7 +68,13 @@ scoring:
         - ["pass", "passed", "green", "success"]
     - check: no_hallucinated_tool
       allowed: [read_file, write_file, bash_exec, list_files]
-  forbidden: []
+  forbidden:
+    # Catch the lazy unchanged write — original function body containing
+    # `def total_a(price): return price * 1.08 + SHIPPING` must not survive.
+    - check: tool_args_match_regex
+      tool: write_file
+      arg: content
+      pattern: 'def\s+total_a\s*\([^)]*\):\s*\n\s*return\s+price\s*\*\s*1\.08\s*\+\s*SHIPPING'
   partial:
     - check: tool_args_contain
       tool: read_file

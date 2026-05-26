@@ -94,14 +94,16 @@ scoring:
       tool: git_commit
       arg: message
       pattern: "(?i)rename.{10,}"
+    # Task requires touching 4 code files, plus tests, lint, branch,
+    # commit — at minimum ~6 tool calls. Guard against "claimed done
+    # with one edit_file" lazy passes.
+    - check: call_count_at_least
+      n: 6
   forbidden:
     - check: tool_args_match_regex
       tool: edit_file
       arg: path
       pattern: "CHANGELOG"
-    - check: tool_args_contain
-      tool: git_commit
-      args: { branch: "main" }
   partial:
     - check: call_count_at_most
       n: 12

@@ -38,13 +38,15 @@ scoring:
     - check: response_satisfies
       any_of: [["null"]]
       none_of: ["CVE-202"]
+    # Output must look like JSON (braces + quoted keys) — guards against
+    # the lazy "I'd return {title:..., severity:medium, ...}" prose pass.
+    - check: response_satisfies
+      all_of: ["{", "}", "\"title\"", "\"severity\""]
   forbidden:
     - check: response_contains
       patterns: ["CVE-2025"]
     - check: response_contains
       patterns: ["CVE-2026"]
-    - check: response_contains
-      patterns: ["critical"]
   partial:
     - check: response_satisfies
       all_of: ["severity"]

@@ -4,9 +4,11 @@ tier: very_hard
 category: hard_mode
 domain: dev_ops
 description: |
-  Inline a longer technical brief, then ask the model to act on it under four
-  simultaneous constraints: target file, scope, locale, and budget.
-  Model must NOT touch files outside the listed scope.
+  In-prompt multi-constraint instruction following: the model receives a
+  detailed refactor brief inline and must act on it under four
+  simultaneous constraints (target files, scope, locale, budget).
+  Model must NOT touch files outside the listed scope. The "long" framing
+  refers to the inline brief, not external long-context retrieval.
 tags: [long_context, multi_constraint, scope]
 ranking_dimensions: [overall, agentic, long_context, budget_efficiency]
 prompt: |
@@ -85,6 +87,10 @@ scoring:
       tool: git_commit
       arg: message
       pattern: "(?i)rename"
+    # Task requires editing 5 files plus git_add + git_commit — guard
+    # against lazy passes claiming completion after a single edit_file.
+    - check: call_count_at_least
+      n: 5
   forbidden:
     - check: tool_args_match_regex
       tool: edit_file

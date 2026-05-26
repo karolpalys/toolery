@@ -19,6 +19,8 @@ tool_responses:
   http_get:
     - match: { url: "https://api.acme.com/weather?city=%C5%81%C3%B3d%C5%BA" }
       returns: { status: 200, body: "{\"temp\": 11, \"condition\": \"cloudy\"}" }
+    - match: { url: "https://api.acme.com/weather?city=%c5%81%c3%b3d%c5%ba" }
+      returns: { status: 200, body: "{\"temp\": 11, \"condition\": \"cloudy\"}" }
     - match: { url: "https://api.acme.com/weather?city=%C5%81%C3%B3%64%C5%BA" }
       returns: { status: 200, body: "{\"temp\": 11, \"condition\": \"cloudy\"}" }
     - match: { url: "https://api.acme.com/weather?city=Lodz" }
@@ -30,6 +32,11 @@ scoring:
     - check: tool_called
       tool: http_get
     - check: call_count_at_most
+      n: 2
+    # Ensure the recovery path was actually exercised — a model that
+    # nails URL-encoding or ASCII fallback on the FIRST attempt never
+    # encountered the encoding error this scenario is supposed to test.
+    - check: call_count_at_least
       n: 2
     - check: response_contains
       patterns: ["11"]

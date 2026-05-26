@@ -4,9 +4,10 @@ tier: very_hard
 category: structured_output
 domain: generic
 description: |
-  Polish 3-turn conversation. Turn 1: produce JSON {name}. Turn 2: add
-  field {age}. Turn 3: add field {city}. Each turn must preserve prior
-  values and only extend the schema.
+  Single-turn accumulating JSON construction (model receives all 3 turns
+  at once). Must produce a final JSON containing all three fields
+  (name, age, city) — i.e. carry the earlier "turns" forward and extend
+  rather than overwrite.
 tags: [polish, json, multi_turn]
 ranking_dimensions: [overall, localization, structured_output, context_state_tracking]
 prompt: |

@@ -4,10 +4,11 @@ tier: very_hard
 category: parameter_precision
 domain: generic
 description: |
-  3-turn conversation. Each turn adds a constraint to the next get_weather
-  call. Turn 1: just location. Turn 2: also a future date. Turn 3: also
-  units in F. Model must carry forward all constraints and call with the
-  full set in turn 3.
+  Single-turn accumulating constraints on tool arguments. The model
+  receives 3 sub-instructions in one prompt: location (Tokio), then
+  date (2026-07-04), then units (F). Expected behavior: ONE call to
+  get_weather_global that carries forward all three constraints
+  together — not one call per constraint.
 tags: [multi_turn, parameter_carryover]
 ranking_dimensions: [overall, parameter_precision, context_state_tracking]
 prompt: |
@@ -37,12 +38,12 @@ tool_responses:
       returns: { error: "missing_required_args" }
 scoring:
   required:
+    # Single call must carry forward date AND units together (the key
+    # accumulation evidence). Location spelling Tokyo/Tokio handled by
+    # mock fallbacks, but the date+units pair must coexist in ONE call.
     - check: tool_args_contain
       tool: get_weather_global
-      args: { units: "F" }
-    - check: tool_args_contain
-      tool: get_weather_global
-      args: { date: "2026-07-04" }
+      args: { date: "2026-07-04", units: "F" }
     - check: response_contains
       patterns: ["86"]
   forbidden: []

@@ -58,10 +58,7 @@ scoring:
     # Stay within budget.
     - check: call_count_at_most
       n: 4
-  forbidden:
-    # Looping on the same failing tool >2x is not replanning.
-    - check: call_count_at_least
-      n: 5
+  forbidden: []
   partial:
     - check: unique_tools_called
       tools: [sql_query]
