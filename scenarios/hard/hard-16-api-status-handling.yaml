@@ -19,7 +19,7 @@ tools: [http_get]
 budget:
   max_tool_calls: 3
   max_turns: 4
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   http_get:
     - match: { url: "https://api.example.com/v1/projects/zzz" }

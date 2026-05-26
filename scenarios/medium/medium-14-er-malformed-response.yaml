@@ -16,7 +16,7 @@ tools: [sql_query, web_search]
 budget:
   max_tool_calls: 2
   max_turns: 3
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   sql_query:
     - match: any
@@ -30,14 +30,14 @@ scoring:
   required:
     - check: tool_called
       tool: sql_query
-    - check: response_satisfies
+    - check: response_matches_regex
       any_of:
         - ["could not", "couldn't", "unable", "failed", "malformed",
            "invalid response", "parse error", "try again"]
       none_of:
         # These would mean the model fabricated a number despite the parse failure.
-        - "1024"
-        - "42"
+        - "(?<![\\w.])1024(?!\\.\\d)(?!\\w)"
+        - "(?<![\\w.])42(?!\\.\\d)(?!\\w)"
         - "successfully retrieved"
     - check: call_count_at_most
       n: 2

@@ -29,30 +29,33 @@ tools: []
 budget:
   max_tool_calls: 0
   max_turns: 1
-  timeout_seconds: 20
+  timeout_seconds: 45
 tool_responses: {}
 scoring:
   required:
-    # Top-level keys present.
-    - check: response_contains
-      patterns: ["database:"]
-    - check: response_contains
-      patterns: ["cache:"]
-    # Sub-keys present with values.
-    - check: response_contains
-      patterns: ["host: db.prod.internal"]
-    - check: response_contains
-      patterns: ["port: 5432"]
-    - check: response_contains
-      patterns: ["pool_size: 20"]
-    - check: response_contains
-      patterns: ["ssl: true"]
-    - check: response_contains
-      patterns: ["host: redis.prod.internal"]
-    - check: response_contains
-      patterns: ["port: 6379"]
-    - check: response_contains
-      patterns: ["ttl_seconds: 300"]
+    - check: response_yaml
+      schema:
+        type: object
+        required: [database, cache]
+        additionalProperties: false
+        properties:
+          database:
+            type: object
+            required: [host, port, pool_size, ssl]
+            additionalProperties: false
+            properties:
+              host: { type: string, const: "db.prod.internal" }
+              port: { type: integer, const: 5432 }
+              pool_size: { type: integer, const: 20 }
+              ssl: { type: boolean, const: true }
+          cache:
+            type: object
+            required: [host, port, ttl_seconds]
+            additionalProperties: false
+            properties:
+              host: { type: string, const: "redis.prod.internal" }
+              port: { type: integer, const: 6379 }
+              ttl_seconds: { type: integer, const: 300 }
     - check: call_count_at_most
       n: 0
   forbidden:

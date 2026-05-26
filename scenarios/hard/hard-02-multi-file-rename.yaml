@@ -42,6 +42,8 @@ tool_responses:
       returns: ["src/core/billing.py", "src/api/handlers.py", "src/cli.py", "tests/test_billing.py", "docs/CHANGELOG.md"]
 scoring:
   required:
+    - check: tool_called_in_order
+      sequence: [grep, edit_file]
     - check: tool_called
       tool: grep
     - check: tool_called

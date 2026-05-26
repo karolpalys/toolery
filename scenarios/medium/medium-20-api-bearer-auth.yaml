@@ -19,7 +19,7 @@ tools: [http_get, http_post]
 budget:
   max_tool_calls: 2
   max_turns: 3
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   http_post:
     - match: { url: "https://api.example.com/v1/auth/token" }

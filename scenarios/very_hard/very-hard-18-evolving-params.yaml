@@ -44,8 +44,8 @@ scoring:
     - check: tool_args_contain
       tool: get_weather_global
       args: { date: "2026-07-04", units: "F" }
-    - check: response_contains
-      patterns: ["86"]
+    - check: response_number
+      equals: 86
   forbidden: []
   partial:
     - check: tool_called

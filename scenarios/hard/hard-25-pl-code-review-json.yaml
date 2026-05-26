@@ -28,24 +28,40 @@ tools: []
 budget:
   max_tool_calls: 0
   max_turns: 1
-  timeout_seconds: 30
+  timeout_seconds: 60
 tool_responses: {}
 scoring:
   required:
-    - check: response_satisfies
-      all_of: ["issues", "line", "severity", "msg"]
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [issues]
+        additionalProperties: false
+        properties:
+          issues:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required: [line, severity, msg]
+              additionalProperties: false
+              properties:
+                line: { type: integer, minimum: 1 }
+                severity: { type: string, enum: ["low", "medium", "high"] }
+                msg: { type: string, minLength: 1 }
     - check: response_satisfies
       all_of: ["discount"]
-      any_of: [["-10"], ["ujemn"], ["negative"], ["<0"], ["less than 0"]]
-    - check: response_satisfies
-      all_of: ["{", "}", "[", "]", "\"issues\""]
+      any_of: [["-10"], ["ujemn"], ["negative"], ["less than 0"]]
   forbidden:
     - check: response_satisfies
       any_of: [["nie znalezion"], ["brak problemów"], ["wszystko ok"], ["no issues"]]
   partial:
-    - check: response_satisfies
-      all_of: ["{"]
-      any_of: [["issues"]]
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [issues]
+        properties:
+          issues: { type: array }
   weights:
     pass: 1.0
     partial: 0.5

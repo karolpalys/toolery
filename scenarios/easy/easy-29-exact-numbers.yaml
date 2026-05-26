@@ -18,22 +18,29 @@ tools: []
 budget:
   max_tool_calls: 0
   max_turns: 1
-  timeout_seconds: 15
+  timeout_seconds: 45
 tool_responses: {}
 scoring:
   required:
-    - check: response_satisfies
-      all_of: ["min", "max", "avg"]
-      any_of: [["13.33"]]
-    - check: response_satisfies
-      all_of: ["5", "23"]
-      none_of: ["22", "24"]
-  forbidden:
-    - check: response_contains
-      patterns: ["13.34"]
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [min, max, avg]
+        additionalProperties: false
+        properties:
+          min: { type: number, const: 5 }
+          max: { type: number, const: 23 }
+          avg: { type: number, const: 13.33 }
+  forbidden: []
   partial:
-    - check: response_satisfies
-      any_of: [["13.33", "13,33"]]
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [min, max, avg]
+        properties:
+          min: { type: number }
+          max: { type: number }
+          avg: { type: number }
   weights:
     pass: 1.0
     partial: 0.5

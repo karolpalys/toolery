@@ -38,22 +38,34 @@ tool_responses:
       returns: { error: "unrelated_tool" }
 scoring:
   required:
+    - check: tool_called_in_order
+      sequence: [db_list_tables, sql_query]
     - check: tool_called
       tool: sql_query
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [id, email, name, joined_at, tier]
+        additionalProperties: false
+        properties:
+          id: { type: integer, const: 42 }
+          email: { type: string, const: "a.kowalski@example.com" }
+          name: { type: string, const: "Anna Kowalska" }
+          joined_at: { type: string, const: "2024-03-12" }
+          tier: { type: string, enum: ["free", "prime"], const: "prime" }
     - check: response_satisfies
-      all_of: ["id", "email", "name", "joined_at", "tier"]
-      any_of: [["42"]]
       none_of: ["unrelated"]
-    - check: response_satisfies
-      any_of: [["a.kowalski@example.com"], ["Anna Kowalska"]]
-    - check: response_satisfies
-      all_of: ["{", "}", "\"id\"", "\"email\""]
   forbidden:
     - check: tool_called
       tool: http_get
   partial:
-    - check: response_satisfies
-      all_of: ["{", "}"]
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [id, email]
+        properties:
+          id: { type: integer }
+          email: { type: string }
   weights:
     pass: 1.0
     partial: 0.5

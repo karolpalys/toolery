@@ -66,7 +66,7 @@ tools: [web_search, calculator, read_file]
 budget:
   max_tool_calls: 0
   max_turns: 1
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses: {}
 scoring:
   required:

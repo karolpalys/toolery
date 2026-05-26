@@ -35,17 +35,28 @@ scoring:
     - check: tool_args_contain
       tool: http_get
       args: { url: "https://api-backup.acme.com/health/auth" }
-    - check: response_satisfies
-      all_of: ["service", "auth", "status", "version"]
-      any_of: [["3.1.0"], ["ok"]]
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [service, status, version]
+        additionalProperties: false
+        properties:
+          service: { type: string, const: "auth" }
+          status: { type: string, const: "ok" }
+          version: { type: string, const: "3.1.0" }
     - check: call_count_at_most
       n: 3
   forbidden: []
   partial:
     - check: tool_called
       tool: http_get
-    - check: response_contains
-      patterns: ["3.1.0"]
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [status, version]
+        properties:
+          status: { type: string }
+          version: { type: string }
   weights:
     pass: 1.0
     partial: 0.5

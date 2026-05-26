@@ -51,8 +51,9 @@ scoring:
       arg: cursor
       pattern: "cur-page-3"
     # Total = 3 + 1 + 1 = 5. Faithful counter sums actual items returned.
+    - check: response_number
+      equals: 5
     - check: response_satisfies
-      all_of: ["5"]
       any_of: [["users", "items", "results", "total", "rows", "records"]]
   forbidden:
     # If model gives up after one page.

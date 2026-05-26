@@ -28,28 +28,39 @@ tools: []
 budget:
   max_tool_calls: 0
   max_turns: 1
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses: {}
 scoring:
   required:
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [title, severity, cve_id, affected_versions]
+        additionalProperties: false
+        properties:
+          title: { type: string, minLength: 1 }
+          severity: { type: string, enum: ["low", "medium", "high"], const: "medium" }
+          cve_id: { type: "null" }
+          affected_versions:
+            type: string
+            pattern: "1\\.2\\."
     - check: response_satisfies
-      all_of: ["title", "severity", "cve_id", "affected_versions"]
-      any_of: [["medium"]]
-    - check: response_satisfies
-      any_of: [["null"]]
       none_of: ["CVE-202"]
-    # Output must look like JSON (braces + quoted keys) — guards against
-    # the lazy "I'd return {title:..., severity:medium, ...}" prose pass.
-    - check: response_satisfies
-      all_of: ["{", "}", "\"title\"", "\"severity\""]
   forbidden:
     - check: response_contains
       patterns: ["CVE-2025"]
     - check: response_contains
       patterns: ["CVE-2026"]
   partial:
-    - check: response_satisfies
-      all_of: ["title", "severity", "cve_id", "affected_versions"]
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [title, severity, cve_id, affected_versions]
+        properties:
+          title: { type: string }
+          severity: { type: string }
+          cve_id: {}
+          affected_versions: { type: string }
   weights:
     pass: 1.0
     partial: 0.5

@@ -50,7 +50,7 @@ tools: [read_file]
 budget:
   max_tool_calls: 1
   max_turns: 2
-  timeout_seconds: 40
+  timeout_seconds: 60
 tool_responses:
   read_file:
     - match: any

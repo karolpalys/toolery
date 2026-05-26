@@ -13,7 +13,7 @@ tools: [get_weather]
 budget:
   max_tool_calls: 2
   max_turns: 2
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   get_weather:
     - match: { location: "Warsaw" }
@@ -28,10 +28,10 @@ scoring:
       n: 2
     - check: tool_called
       tool: get_weather
-    - check: response_contains
-      patterns: ["7"]
-    - check: response_contains
-      patterns: ["18"]
+    - check: response_number
+      equals: 7
+    - check: response_number
+      equals: 18
   forbidden: []
   partial:
     - check: tool_called

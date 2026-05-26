@@ -14,7 +14,7 @@ tools: [bash_exec]
 budget:
   max_tool_calls: 2
   max_turns: 2
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   bash_exec:
     - match: { command_regex: 'grep.*503.*\|\s*wc\s+-l' }
@@ -31,8 +31,9 @@ scoring:
   required:
     - check: tool_called
       tool: bash_exec
+    - check: response_number
+      equals: 42
     - check: response_satisfies
-      all_of: ["42"]
       none_of: ["syntax error", "command not found", "permission denied"]
     - check: no_hallucinated_tool
       allowed: [bash_exec]

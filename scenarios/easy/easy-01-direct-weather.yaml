@@ -17,7 +17,7 @@ tools:
 budget:
   max_tool_calls: 1
   max_turns: 2
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   get_weather:
     - match: { location: "Warsaw" }
@@ -31,10 +31,10 @@ tool_responses:
           - { title: "Warsaw weather", snippet: "Currently 7°C and cloudy in Warsaw." }
 scoring:
   required:
-    - check: response_satisfies
-      all_of: ["Warsaw"]
+    - check: response_matches_regex
+      all_of: ["\\bWarsaw\\b"]
       any_of:
-        - ["7", "seven"]
+        - ["(?<![\\w.])7(?!\\.\\d)(?!\\w)", "\\bseven\\b"]
         - ["cloud", "overcast", "grey", "gray"]
       none_of: ["error", "could not", "couldn't"]
   forbidden: []

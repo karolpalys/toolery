@@ -20,7 +20,7 @@ tools: [get_weather, web_search]
 budget:
   max_tool_calls: 2
   max_turns: 2
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   get_weather:
     - match: { location: "Warsaw" }

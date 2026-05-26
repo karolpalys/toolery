@@ -17,7 +17,7 @@ tools: [http_get]
 budget:
   max_tool_calls: 1
   max_turns: 2
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   http_get:
     - match:

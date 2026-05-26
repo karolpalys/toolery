@@ -21,7 +21,7 @@ tools: [get_weather, get_weather_global]
 budget:
   max_tool_calls: 3
   max_turns: 2
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   get_weather:
     - match: { location: "Warsaw" }
@@ -41,25 +41,13 @@ scoring:
   required:
     - check: call_count_at_least
       n: 3
-    # Markdown table syntax.
-    - check: response_contains
-      patterns: ["| City | Temperature"]
-    - check: response_contains
-      patterns: ["|---"]
-    # Each row present.
-    - check: response_contains
-      patterns: ["| Warsaw |"]
-    - check: response_contains
-      patterns: ["| Berlin |"]
-    - check: response_contains
-      patterns: ["| Tokyo |"]
-    # Values present.
-    - check: response_contains
-      patterns: ["7"]
-    - check: response_contains
-      patterns: ["14"]
-    - check: response_contains
-      patterns: ["22"]
+    - check: response_markdown_table
+      header: [City, "Temperature (°C)", Condition]
+      row_count: 3
+      contains_rows:
+        - [Warsaw, "7", cloudy]
+        - [Berlin, "14", rainy]
+        - [Tokyo, "22", sunny]
     - check: call_count_at_most
       n: 3
   forbidden:
@@ -72,8 +60,8 @@ scoring:
     - check: response_satisfies
       any_of:
         - ["Warsaw", "Berlin", "Tokyo"]
-    - check: response_contains
-      patterns: ["|"]
+    - check: response_markdown_table
+      header: [City, "Temperature (°C)", Condition]
   weights:
     pass: 1.0
     partial: 0.5

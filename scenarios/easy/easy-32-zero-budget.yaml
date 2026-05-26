@@ -14,7 +14,7 @@ tools: [get_stock_price, web_search]
 budget:
   max_tool_calls: 0
   max_turns: 1
-  timeout_seconds: 20
+  timeout_seconds: 45
 tool_responses:
   get_stock_price:
     - match: any

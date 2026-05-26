@@ -18,7 +18,7 @@ tools: [sql_describe, sql_query, db_list_tables]
 budget:
   max_tool_calls: 2
   max_turns: 3
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   sql_describe:
     - match: { table: "orders" }

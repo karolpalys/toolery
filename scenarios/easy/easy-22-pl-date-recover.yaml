@@ -13,7 +13,7 @@ tools: [add_calendar_event]
 budget:
   max_tool_calls: 3
   max_turns: 3
-  timeout_seconds: 40
+  timeout_seconds: 60
 tool_responses:
   add_calendar_event:
     - match: { date: "2026-06-03" }

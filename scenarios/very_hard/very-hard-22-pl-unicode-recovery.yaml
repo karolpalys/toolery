@@ -14,7 +14,7 @@ tools: [http_get]
 budget:
   max_tool_calls: 2
   max_turns: 2
-  timeout_seconds: 40
+  timeout_seconds: 60
 tool_responses:
   http_get:
     - match: { url: "https://api.acme.com/weather?city=%C5%81%C3%B3d%C5%BA" }
@@ -33,8 +33,8 @@ scoring:
       tool: http_get
     - check: call_count_at_most
       n: 2
-    - check: response_contains
-      patterns: ["11"]
+    - check: response_number
+      equals: 11
   forbidden: []
   partial:
     - check: response_contains

@@ -34,8 +34,16 @@ scoring:
       pattern: "user-42"
     - check: call_count_at_most
       n: 2
+    - check: tool_args_match_regex
+      tool: http_post
+      arg: body
+      pattern: "Marta"
+    - check: tool_args_match_regex
+      tool: http_post
+      arg: body
+      pattern: "admin"
     - check: response_satisfies
-      any_of: [["ok"], ["user-42"]]
+      any_of: [["user-42"]]
   forbidden: []
   partial:
     - check: tool_called

@@ -21,7 +21,7 @@ tools: [get_stock_price]
 budget:
   max_tool_calls: 3
   max_turns: 2
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   get_stock_price:
     - match: { symbol: "TSLA" }
@@ -38,14 +38,13 @@ scoring:
       tool: get_stock_price
     - check: call_count_exactly
       n: 3
-    - check: response_contains
-      patterns: ["symbol,price,currency"]
-    - check: response_contains
-      patterns: ["TSLA,245.30,USD"]
-    - check: response_contains
-      patterns: ["NVDA,128.10,USD"]
-    - check: response_contains
-      patterns: ["AAPL,175.43,USD"]
+    - check: response_csv
+      header: [symbol, price, currency]
+      row_count: 3
+      rows:
+        - [TSLA, "245.30", USD]
+        - [NVDA, "128.10", USD]
+        - [AAPL, "175.43", USD]
   forbidden:
     # Models love to wrap CSV in code fences; we asked them not to.
     - check: response_contains

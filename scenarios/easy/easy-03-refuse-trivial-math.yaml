@@ -11,15 +11,15 @@ tools: [calculator]
 budget:
   max_tool_calls: 0
   max_turns: 1
-  timeout_seconds: 15
+  timeout_seconds: 45
 tool_responses: {}
 scoring:
   required:
     - check: tool_not_called
       tool: calculator
-    - check: response_satisfies
+    - check: response_matches_regex
       any_of:
-        - ["4", "four", "cztery"]
+        - ["(?<![\\w.])4(?!\\.\\d)(?!\\w)", "\\bfour\\b", "\\bcztery\\b"]
   forbidden: []
   partial:
     - check: response_satisfies

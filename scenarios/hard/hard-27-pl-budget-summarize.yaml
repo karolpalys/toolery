@@ -19,7 +19,7 @@ tools: [read_file]
 budget:
   max_tool_calls: 3
   max_turns: 2
-  timeout_seconds: 45
+  timeout_seconds: 60
 tool_responses:
   read_file:
     - match: { path: "/workspace/raport_q1.md" }
@@ -36,8 +36,8 @@ scoring:
       tool: read_file
     - check: call_count_at_most
       n: 3
-    - check: response_satisfies
-      all_of: ["wzrost", "Q1", "Q2", "Q3"]
+    - check: response_matches_regex
+      all_of: ["wzrost", "\\bQ1\\b", "\\bQ2\\b", "\\bQ3\\b"]
     - check: tool_called_in_parallel
       tools: [read_file]
   forbidden: []

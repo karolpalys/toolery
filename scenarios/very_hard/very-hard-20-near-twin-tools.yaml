@@ -16,7 +16,7 @@ tools: [get_weather_global]
 budget:
   max_tool_calls: 1
   max_turns: 2
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   get_weather_global:
     - match: { location: "Berlin", date: "2026-08-14" }
@@ -30,8 +30,8 @@ scoring:
     - check: tool_args_contain
       tool: get_weather_global
       args: { date: "2026-08-14" }
-    - check: response_contains
-      patterns: ["24"]
+    - check: response_number
+      equals: 24
   forbidden: []
   partial:
     - check: tool_called

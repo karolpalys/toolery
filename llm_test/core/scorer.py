@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import csv
+import io
 import json
+import math
 import re
 from collections.abc import Callable
 
 import jsonschema
+import yaml
 
 from llm_test.core.models import CheckResult, ScoringCheck, ToolCall
 
@@ -229,11 +233,32 @@ REGISTRY.update({
 })
 
 
+def _pattern_found(text: str, pattern: object) -> bool:
+    """Case-insensitive literal match with safer handling for tiny tokens.
+
+    Historical scenarios often used short expected values like ``"7"`` or
+    ``"rm"``. Plain substring matching makes those pass inside unrelated
+    tokens (``17``, ``storm``). Keep literal matching for normal phrases, but
+    require numeric and short word-like tokens to be token-bounded.
+    """
+    pat = str(pattern)
+    lowered = text.lower()
+    needle = pat.lower()
+
+    if re.fullmatch(r"[+-]?\d+(?:\.\d+)?", pat):
+        return re.search(rf"(?<![\w.]){re.escape(pat)}(?!\.\d)(?!\w)", text, re.IGNORECASE) is not None
+
+    if len(pat) <= 2 and re.search(r"[A-Za-z]", pat):
+        return re.search(rf"(?<![A-Za-z]){re.escape(pat)}(?![A-Za-z])", text, re.IGNORECASE) is not None
+
+    return needle in lowered
+
+
 def check_response_contains(calls, chk, response):
     if response is None:
         return _bad("response_contains", "no response")
     patterns = chk.model_dump()["patterns"]
-    if all(p.lower() in response.lower() for p in patterns):
+    if all(_pattern_found(response, p) for p in patterns):
         return _ok("response_contains", f"all of {patterns} found")
     return _bad("response_contains", f"missing some of {patterns}")
 
@@ -242,7 +267,7 @@ def check_response_not_contains(calls, chk, response):
     if response is None:
         return _ok("response_not_contains", "no response → vacuously ok")
     patterns = chk.model_dump()["patterns"]
-    bad = [p for p in patterns if p.lower() in response.lower()]
+    bad = [p for p in patterns if _pattern_found(response, p)]
     if bad:
         return _bad("response_not_contains", f"contains forbidden: {bad}")
     return _ok("response_not_contains", "none of forbidden patterns present")
@@ -261,6 +286,120 @@ def check_response_matches_schema(calls, chk, response):
         return _ok("response_matches_schema", "schema satisfied")
     except jsonschema.ValidationError as e:
         return _bad("response_matches_schema", f"schema violation: {e.message}")
+
+
+def _coerce_number(value: object) -> float | None:
+    try:
+        return float(str(value).strip().replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+
+
+def check_response_number(calls, chk, response):
+    if response is None:
+        return _bad("response_number", "no response")
+    d = chk.model_dump()
+    pattern = d.get("pattern", r"[+-]?\d+(?:[.,]\d+)?")
+    matches = re.findall(pattern, response)
+    nums: list[float] = []
+    for m in matches:
+        token = m[0] if isinstance(m, tuple) else m
+        n = _coerce_number(token)
+        if n is not None:
+            nums.append(n)
+    if not nums:
+        return _bad("response_number", "no numeric value found")
+
+    tol = float(d.get("tolerance", 0.0))
+    if "equals" in d:
+        expected = float(d["equals"])
+        if any(math.isclose(n, expected, abs_tol=tol) for n in nums):
+            return _ok("response_number", f"found {expected} within tolerance {tol}")
+        return _bad("response_number", f"no value matched {expected}; found {nums}")
+    if "min" in d or "max" in d:
+        lo = float(d.get("min", "-inf"))
+        hi = float(d.get("max", "inf"))
+        if any(lo <= n <= hi for n in nums):
+            return _ok("response_number", f"found value in range [{lo}, {hi}]")
+        return _bad("response_number", f"no value in range [{lo}, {hi}]; found {nums}")
+    return _ok("response_number", f"found numbers {nums}")
+
+
+def check_response_csv(calls, chk, response):
+    if response is None:
+        return _bad("response_csv", "no response")
+    d = chk.model_dump()
+    try:
+        rows = list(csv.reader(io.StringIO(response.strip())))
+    except csv.Error as e:
+        return _bad("response_csv", f"invalid CSV: {e}")
+    if not rows:
+        return _bad("response_csv", "empty CSV")
+    expected_header = d.get("header")
+    if expected_header is not None and rows[0] != expected_header:
+        return _bad("response_csv", f"header {rows[0]} != {expected_header}")
+    row_count = d.get("row_count")
+    if row_count is not None and len(rows) - 1 != int(row_count):
+        return _bad("response_csv", f"data row count {len(rows)-1} != {row_count}")
+    expected_rows = d.get("rows") or []
+    data_rows = rows[1:] if expected_header is not None else rows
+    for expected in expected_rows:
+        if expected not in data_rows:
+            return _bad("response_csv", f"missing row {expected}")
+    return _ok("response_csv", "CSV matched")
+
+
+def check_response_yaml(calls, chk, response):
+    if response is None:
+        return _bad("response_yaml", "no response")
+    d = chk.model_dump()
+    try:
+        data = yaml.safe_load(response)
+    except yaml.YAMLError as e:
+        return _bad("response_yaml", f"invalid YAML: {e}")
+    schema = d.get("schema")
+    if schema is not None:
+        try:
+            jsonschema.validate(data, schema)
+        except jsonschema.ValidationError as e:
+            return _bad("response_yaml", f"schema violation: {e.message}")
+    return _ok("response_yaml", "YAML matched")
+
+
+def _parse_markdown_table(response: str) -> tuple[list[str], list[list[str]]] | None:
+    lines = [ln.strip() for ln in response.strip().splitlines() if ln.strip()]
+    table_lines = [ln for ln in lines if ln.startswith("|") and ln.endswith("|")]
+    if len(table_lines) < 2:
+        return None
+    def split(line: str) -> list[str]:
+        return [cell.strip() for cell in line.strip("|").split("|")]
+    header = split(table_lines[0])
+    sep = split(table_lines[1])
+    if not all(re.fullmatch(r":?-{3,}:?", cell.replace(" ", "")) for cell in sep):
+        return None
+    rows = [split(ln) for ln in table_lines[2:]]
+    return header, rows
+
+
+def check_response_markdown_table(calls, chk, response):
+    if response is None:
+        return _bad("response_markdown_table", "no response")
+    d = chk.model_dump()
+    parsed = _parse_markdown_table(response)
+    if parsed is None:
+        return _bad("response_markdown_table", "no markdown table found")
+    header, rows = parsed
+    expected_header = d.get("header")
+    if expected_header is not None and header != expected_header:
+        return _bad("response_markdown_table", f"header {header} != {expected_header}")
+    row_count = d.get("row_count")
+    if row_count is not None and len(rows) != int(row_count):
+        return _bad("response_markdown_table", f"row count {len(rows)} != {row_count}")
+    contains_rows = d.get("contains_rows") or []
+    for expected in contains_rows:
+        if not any(all(str(cell).lower() in row_cell.lower() for cell, row_cell in zip(expected, row)) for row in rows):
+            return _bad("response_markdown_table", f"missing row like {expected}")
+    return _ok("response_markdown_table", "markdown table matched")
 
 
 _LANG_MARKERS = {
@@ -344,45 +483,84 @@ def check_response_satisfies(calls, chk, response):
     """Tool-agnostic semantic check on the final response.
 
     Three composable sub-checks (all optional, evaluated as logical AND):
-      - all_of:  list of substrings, every one must appear (case-insensitive)
+      - all_of:  list of literal patterns, every one must appear
       - any_of:  list of groups; each group is a list of synonyms — at least one
-                 substring from EACH group must appear
-      - none_of: list of forbidden substrings — none may appear
+                 literal pattern from EACH group must appear
+      - none_of: list of forbidden literal patterns — none may appear
 
-    Lets us assert "model produced the right semantic outcome" without binding
-    the assertion to a specific tool name. Useful when the same task can be
-    completed by different toolings (raw mock tools vs. Hermes web_search etc.).
+    Matching is case-insensitive. Numeric and very short word-like patterns are
+    token-bounded to avoid accidental passes inside unrelated words/numbers.
     """
     if response is None:
         return _bad("response_satisfies", "no response")
-    text = response.lower()
     d = chk.model_dump()
 
     all_of = d.get("all_of") or []
-    missing = [p for p in all_of if str(p).lower() not in text]
+    missing = [p for p in all_of if not _pattern_found(response, p)]
     if missing:
         return _bad("response_satisfies", f"missing all_of: {missing}")
 
     any_of = d.get("any_of") or []
     for group in any_of:
         group_list = group if isinstance(group, list) else [group]
-        if not any(str(p).lower() in text for p in group_list):
+        if not any(_pattern_found(response, p) for p in group_list):
             return _bad("response_satisfies", f"missing any_of group: {group_list}")
 
     none_of = d.get("none_of") or []
-    found_forbidden = [p for p in none_of if str(p).lower() in text]
+    found_forbidden = [p for p in none_of if _pattern_found(response, p)]
     if found_forbidden:
         return _bad("response_satisfies", f"forbidden present: {found_forbidden}")
 
     return _ok("response_satisfies", "all semantic conditions met")
 
 
+def check_response_matches_regex(calls, chk, response):
+    """Regex variant for precise response assertions.
+
+    Supports the same all_of / any_of / none_of shape as response_satisfies,
+    but treats entries as regular expressions. Regexes are case-insensitive by
+    default; set case_sensitive: true to override.
+    """
+    if response is None:
+        return _bad("response_matches_regex", "no response")
+    d = chk.model_dump()
+    flags = re.MULTILINE
+    if not d.get("case_sensitive", False):
+        flags |= re.IGNORECASE
+
+    def found(pattern: object) -> bool:
+        return re.search(str(pattern), response, flags) is not None
+
+    all_of = d.get("all_of") or []
+    missing = [p for p in all_of if not found(p)]
+    if missing:
+        return _bad("response_matches_regex", f"missing all_of regex: {missing}")
+
+    any_of = d.get("any_of") or []
+    for group in any_of:
+        group_list = group if isinstance(group, list) else [group]
+        if not any(found(p) for p in group_list):
+            return _bad("response_matches_regex", f"missing any_of regex group: {group_list}")
+
+    none_of = d.get("none_of") or []
+    found_forbidden = [p for p in none_of if found(p)]
+    if found_forbidden:
+        return _bad("response_matches_regex", f"forbidden regex present: {found_forbidden}")
+
+    return _ok("response_matches_regex", "all regex conditions met")
+
+
 REGISTRY.update({
     "response_contains": check_response_contains,
     "response_not_contains": check_response_not_contains,
     "response_matches_schema": check_response_matches_schema,
+    "response_number": check_response_number,
+    "response_csv": check_response_csv,
+    "response_yaml": check_response_yaml,
+    "response_markdown_table": check_response_markdown_table,
     "response_language": check_response_language,
     "response_satisfies": check_response_satisfies,
+    "response_matches_regex": check_response_matches_regex,
     "unique_tools_called": check_unique_tools_called,
     "no_hallucinated_tool": check_no_hallucinated_tool,
     "budget_respected": check_budget_respected,

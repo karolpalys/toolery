@@ -15,7 +15,7 @@ tools: [get_stock_price, calculator, web_search, get_weather]
 budget:
   max_tool_calls: 1
   max_turns: 2
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   get_stock_price:
     - match: { symbol: "AAPL" }
@@ -29,11 +29,11 @@ tool_responses:
           - { title: "AAPL quote", snippet: "Apple (AAPL) trading at $175.43 USD." }
 scoring:
   required:
-    - check: response_satisfies
-      all_of: ["175"]
+    - check: response_matches_regex
+      all_of: ["(?<![\\w.])175(?:\\.43)?(?!\\.\\d)(?!\\w)"]
       any_of:
-        - ["AAPL", "Apple"]
-        - ["$", "USD", "dollar"]
+        - ["\\bAAPL\\b", "\\bApple\\b"]
+        - ["\\$", "\\bUSD\\b", "dollar"]
       none_of: ["error", "couldn't", "could not find"]
   forbidden:
     - check: tool_called

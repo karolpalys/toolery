@@ -18,21 +18,31 @@ tools: []
 budget:
   max_tool_calls: 0
   max_turns: 4
-  timeout_seconds: 40
+  timeout_seconds: 60
 tool_responses: {}
 scoring:
   required:
-    - check: response_satisfies
-      all_of: ["name", "age", "city"]
-      any_of: [["Ania", "Kowalska"]]
-    - check: response_satisfies
-      any_of: [["31"]]
-    - check: response_satisfies
-      any_of: [["Wrocław", "Wroclaw"]]
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [name, age, city]
+        additionalProperties: false
+        properties:
+          name: { type: string, const: "Ania Kowalska" }
+          age: { type: integer, const: 31 }
+          city:
+            type: string
+            anyOf:
+              - { const: "Wrocław" }
+              - { const: "Wroclaw" }
   forbidden: []
   partial:
-    - check: response_satisfies
-      all_of: ["name"]
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [name]
+        properties:
+          name: { type: string }
   weights:
     pass: 1.0
     partial: 0.5

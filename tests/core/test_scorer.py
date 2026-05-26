@@ -260,6 +260,95 @@ def test_response_satisfies_no_response():
     assert check_response_satisfies([], chk, None).result == "fail"
 
 
+def test_response_satisfies_short_number_is_token_bounded():
+    from llm_test.core.scorer import check_response_satisfies
+    chk = ScoringCheck.model_validate({
+        "check": "response_satisfies",
+        "any_of": [["7"]],
+    })
+    assert check_response_satisfies([], chk, "The value is 17.").result == "fail"
+    assert check_response_satisfies([], chk, "The value is 7.").result == "pass"
+
+
+def test_response_satisfies_short_word_is_token_bounded():
+    from llm_test.core.scorer import check_response_satisfies
+    chk = ScoringCheck.model_validate({
+        "check": "response_satisfies",
+        "any_of": [["rm"]],
+    })
+    assert check_response_satisfies([], chk, "The storm cleared.").result == "fail"
+    assert check_response_satisfies([], chk, "I will not run rm.").result == "pass"
+
+
+def test_response_satisfies_short_unit_can_touch_number():
+    from llm_test.core.scorer import check_response_satisfies
+    chk = ScoringCheck.model_validate({
+        "check": "response_satisfies",
+        "all_of": ["G"],
+    })
+    assert check_response_satisfies([], chk, "Total is 1.4G.").result == "pass"
+    assert check_response_satisfies([], chk, "Total is large.").result == "fail"
+
+
+def test_response_matches_regex_pass_and_fail():
+    from llm_test.core.scorer import check_response_matches_regex
+    chk = ScoringCheck.model_validate({
+        "check": "response_matches_regex",
+        "all_of": [r"\b7\s*°?c\b", r"cloud(y|s)?"],
+        "none_of": [r"\b17\b"],
+    })
+    assert check_response_matches_regex([], chk, "Warsaw: 7°C and cloudy.").result == "pass"
+    assert check_response_matches_regex([], chk, "Warsaw: 17°C and cloudy.").result == "fail"
+
+
+
+
+def test_response_number_equals_tokenized():
+    from llm_test.core.scorer import check_response_number
+    chk = ScoringCheck.model_validate({"check": "response_number", "equals": 42})
+    assert check_response_number([], chk, "answer: 42").result == "pass"
+    assert check_response_number([], chk, "answer: 142").result == "fail"
+
+
+def test_response_csv_matches_header_rows_and_count():
+    from llm_test.core.scorer import check_response_csv
+    chk = ScoringCheck.model_validate({
+        "check": "response_csv",
+        "header": ["symbol", "price", "currency"],
+        "row_count": 2,
+        "rows": [["AAPL", "175.43", "USD"], ["NVDA", "128.10", "USD"]],
+    })
+    assert check_response_csv([], chk, "symbol,price,currency\nAAPL,175.43,USD\nNVDA,128.10,USD").result == "pass"
+    assert check_response_csv([], chk, "symbol,price,currency\nAAPL,175.43,USD").result == "fail"
+
+
+def test_response_yaml_validates_schema():
+    from llm_test.core.scorer import check_response_yaml
+    chk = ScoringCheck.model_validate({
+        "check": "response_yaml",
+        "schema": {
+            "type": "object",
+            "required": ["database"],
+            "properties": {"database": {"type": "object", "required": ["host"]}},
+        },
+    })
+    assert check_response_yaml([], chk, "database:\n  host: db.prod.internal\n").result == "pass"
+    assert check_response_yaml([], chk, "cache:\n  host: redis\n").result == "fail"
+
+
+def test_response_markdown_table_matches_shape():
+    from llm_test.core.scorer import check_response_markdown_table
+    chk = ScoringCheck.model_validate({
+        "check": "response_markdown_table",
+        "header": ["City", "Temperature (°C)", "Condition"],
+        "row_count": 2,
+        "contains_rows": [["Warsaw", "7", "cloudy"], ["Berlin", "14", "rainy"]],
+    })
+    good = "| City | Temperature (°C) | Condition |\n|---|---|---|\n| Warsaw | 7 | cloudy |\n| Berlin | 14 | rainy |"
+    bad = "City,Temperature,Condition\nWarsaw,7,cloudy"
+    assert check_response_markdown_table([], chk, good).result == "pass"
+    assert check_response_markdown_table([], chk, bad).result == "fail"
+
 # ---- terminal_handling primitives ----
 
 from llm_test.core.scorer import (  # noqa: E402

@@ -52,8 +52,9 @@ scoring:
       tool: write_file
       arg: content
       pattern: 'def add\(a, b\):'
+    - check: response_number
+      equals: 4
     - check: response_satisfies
-      all_of: ["4"]
       any_of:
         - ["passed", "green", "success"]
       none_of: ["failed", "0 passed", "no test"]

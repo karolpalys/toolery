@@ -26,18 +26,31 @@ tools: []
 budget:
   max_tool_calls: 0
   max_turns: 1
-  timeout_seconds: 25
+  timeout_seconds: 45
 tool_responses: {}
 scoring:
   required:
-    - check: response_satisfies
-      all_of: ["price"]
-      any_of: [["79.00", "79"]]
-      none_of: ["149", "69", "49"]
-  forbidden:
-    - check: response_contains
-      patterns: ['"price": 149']
-  partial: []
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [price]
+        additionalProperties: false
+        properties:
+          price:
+            oneOf:
+              - { type: number, const: 79.0 }
+              - { type: string, pattern: "^79(\\.00)?\\s*(PLN)?$" }
+  forbidden: []
+  partial:
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [price]
+        properties:
+          price:
+            oneOf:
+              - { type: number }
+              - { type: string }
   weights:
     pass: 1.0
     partial: 0.5

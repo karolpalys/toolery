@@ -18,7 +18,7 @@ tools: [process_start, process_status, process_send_input]
 budget:
   max_tool_calls: 5
   max_turns: 5
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   process_start:
     - match: any

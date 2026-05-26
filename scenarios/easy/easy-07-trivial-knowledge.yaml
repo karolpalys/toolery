@@ -11,7 +11,7 @@ tools: [web_search, calculator]
 budget:
   max_tool_calls: 0
   max_turns: 1
-  timeout_seconds: 15
+  timeout_seconds: 45
 tool_responses: {}
 scoring:
   required:

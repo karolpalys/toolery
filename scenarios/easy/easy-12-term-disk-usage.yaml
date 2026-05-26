@@ -13,7 +13,7 @@ tools: [bash_exec]
 budget:
   max_tool_calls: 2
   max_turns: 2
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   bash_exec:
     - match: { command_regex: '^du\s+.*/var/log' }
@@ -26,8 +26,8 @@ scoring:
   required:
     - check: command_regex_match
       pattern: '^du\s+.*/var/log'
-    - check: response_satisfies
-      all_of: ["1.4", "G"]
+    - check: response_matches_regex
+      all_of: ["(?<![\\w.])1\\.4\\s*G(?![A-Za-z])"]
       none_of: ["error:", "command not found", "permission denied"]
   forbidden: []
   partial:

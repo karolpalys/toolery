@@ -13,7 +13,7 @@ tools: [list_files, bash_exec]
 budget:
   max_tool_calls: 2
   max_turns: 2
-  timeout_seconds: 30
+  timeout_seconds: 40
 tool_responses:
   list_files:
     - match: any
