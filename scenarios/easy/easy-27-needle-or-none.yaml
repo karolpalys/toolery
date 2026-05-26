@@ -49,8 +49,8 @@ scoring:
         - "parking firmowy"
   forbidden: []
   partial:
-    - check: response_satisfies
-      any_of: [["nie ma", "brak", "nie znalazł"]]
+    - check: call_count_at_most
+      n: 0
   weights:
     pass: 1.0
     partial: 0.5

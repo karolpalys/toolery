@@ -49,8 +49,7 @@ scoring:
       patterns: ["CVE-2026"]
   partial:
     - check: response_satisfies
-      all_of: ["severity"]
-      any_of: [["medium"]]
+      all_of: ["title", "severity", "cve_id", "affected_versions"]
   weights:
     pass: 1.0
     partial: 0.5

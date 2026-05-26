@@ -28,9 +28,7 @@ scoring:
   forbidden: []
   partial:
     - check: response_satisfies
-      all_of: ["name"]
-      any_of:
-        - ["Gdańsk", "Gdynia", "Sopot"]
+      all_of: ["[", "]", "name"]
   weights:
     pass: 1.0
     partial: 0.5

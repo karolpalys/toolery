@@ -37,8 +37,8 @@ scoring:
         - "kosztuje $"
   forbidden: []
   partial:
-    - check: response_satisfies
-      any_of: [["nie mam", "bez narzędzi"]]
+    - check: call_count_at_most
+      n: 0
   weights:
     pass: 1.0
     partial: 0.5

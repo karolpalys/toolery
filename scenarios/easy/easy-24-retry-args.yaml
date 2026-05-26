@@ -33,8 +33,8 @@ scoring:
       any_of: [["FRA", "Frankfurt"], ["4200", "4,200", "FL1"]]
   forbidden: []
   partial:
-    - check: response_satisfies
-      any_of: [["FRA"], ["4200"]]
+    - check: call_count_at_most
+      n: 2
   weights:
     pass: 1.0
     partial: 0.5
