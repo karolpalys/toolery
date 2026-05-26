@@ -29,7 +29,7 @@ scoring:
     - check: call_count_at_least
       n: 2
     - check: response_contains
-      patterns: ["4"]
+      patterns: ["4.2M"]
   forbidden: []
   partial:
     - check: call_count_at_most

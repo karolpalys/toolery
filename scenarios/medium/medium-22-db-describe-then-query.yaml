@@ -76,7 +76,7 @@ scoring:
     - check: tool_args_match_regex
       tool: sql_query
       arg: sql
-      pattern: "(?i)order_total|total_amount|order_value|user_id"
+      pattern: "(?i)\\border_total\\b|\\btotal_amount\\b|\\border_value\\b|\\buser_id\\b"
   partial:
     - check: tool_called
       tool: sql_describe

@@ -1,7 +1,7 @@
 id: medium-33-budget-pressure-doc
 title: "Dwa zapytania do tej samej sekcji 2k-tokenowego dokumentu"
 tier: medium
-category: hard_mode
+category: context_state_tracking
 domain: generic
 description: |
   Multi-turn over a ~2k-token policy document. Turn 1 asks about section X.

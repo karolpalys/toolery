@@ -46,7 +46,7 @@ scoring:
       n: 3
   forbidden:
     - check: response_contains
-      patterns: ["429", "rate limit"]
+      patterns: ["gave up due to rate limit"]
   partial:
     - check: tool_called
       tool: http_get

@@ -57,7 +57,7 @@ scoring:
     - check: tool_args_match_regex
       tool: http_get
       arg: headers
-      pattern: "Bearer eyJ\\.signed-jwt-abc123\\.def"
+      pattern: "Bearer\\s+eyJ[^\"'\\s]*abc123"
     - check: response_contains
       patterns: ["pkarol@company.com"]
     - check: call_count_at_most

@@ -35,7 +35,9 @@ scoring:
     - check: call_count_at_least
       n: 3
     - check: response_satisfies
-      all_of: ["0"]
+      any_of:
+        - ["exit code 0", "exit 0", "code: 0", "exit_code: 0", "zakończ", "exited 0"]
+    - check: response_satisfies
       any_of:
         - ["exit", "exited", "success", "completed"]
     - check: no_hallucinated_tool

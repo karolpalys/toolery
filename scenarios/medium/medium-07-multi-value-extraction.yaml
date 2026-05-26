@@ -34,8 +34,8 @@ scoring:
       patterns: ["18"]
   forbidden: []
   partial:
-    - check: tool_called_in_parallel
-      tools: [get_weather]
+    - check: call_count_at_least
+      n: 3
     - check: tool_called
       tool: get_weather
     - check: response_satisfies

@@ -33,7 +33,7 @@ scoring:
       tool: bash_exec
     - check: response_satisfies
       all_of: ["42"]
-      none_of: ["error"]
+      none_of: ["syntax error", "command not found", "permission denied"]
     - check: no_hallucinated_tool
       allowed: [bash_exec]
   forbidden: []

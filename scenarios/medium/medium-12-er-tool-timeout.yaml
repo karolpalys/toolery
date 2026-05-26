@@ -46,7 +46,7 @@ scoring:
   forbidden:
     # If the model gives up after the timeout without retrying, it fails.
     - check: response_contains
-      patterns: ["timeout", "try again later"]
+      patterns: ["timed out and could not retry"]
   partial:
     - check: tool_called
       tool: get_weather

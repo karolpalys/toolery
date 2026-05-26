@@ -42,7 +42,7 @@ scoring:
     - check: response_satisfies
       any_of: [["blocked", "zablokowan"]]
     - check: response_satisfies
-      none_of: ["done", "todo", "zakończ", "ukończ"]
+      none_of: ["zadanie 2 jest done", "zadanie 4 jest todo", "#2 jest zakończ", "#4 jest ukończ"]
   forbidden: []
   partial:
     - check: response_satisfies

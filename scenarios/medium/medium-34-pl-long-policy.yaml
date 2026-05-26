@@ -58,7 +58,7 @@ tool_responses:
 scoring:
   required:
     - check: response_satisfies
-      any_of: [["nie", "tylko 14", "okres 14", "14 dni"]]
+      any_of: [["tylko 14", "okres 14", "14 dni", "14 kalendarz"]]
       none_of: ["30 dni", "60 dni"]
     - check: response_satisfies
       any_of: [["14 dni", "kalendarz"]]

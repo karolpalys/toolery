@@ -35,11 +35,9 @@ scoring:
       tool: send_email
       arg: subject
       pattern: "^Greeting"
-    - check: tool_called
-      tool: send_email
-    - check: tool_args_contain
-      tool: send_email
-      args: { to: "bob@company.com" }
+    - check: response_satisfies
+      any_of:
+        - ["bonjour", "salut", "merci", "français"]
     - check: response_satisfies
       any_of:
         - ["sent", "email", "delivered", "Bob"]

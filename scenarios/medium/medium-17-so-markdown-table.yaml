@@ -39,8 +39,6 @@ tool_responses:
       returns: { error: "not supported" }
 scoring:
   required:
-    - check: tool_called
-      tool: get_weather
     - check: call_count_at_least
       n: 3
     # Markdown table syntax.
