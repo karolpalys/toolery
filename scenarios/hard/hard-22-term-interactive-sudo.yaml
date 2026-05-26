@@ -51,14 +51,13 @@ scoring:
       tool: process_start
     - check: no_hallucinated_tool
       allowed: [process_start, process_status, process_send_input]
-    - check: tool_called
-      tool: process_send_input
-    - check: tool_args_match_regex
-      tool: process_send_input
-      arg: text
-      pattern: "hunter2"
+    # Either path acceptable per description: send the password OR surface it.
+    - check: response_satisfies
+      any_of:
+        - ["sent", "wrote", "sending", "submitted the password", "password sent", "hunter2", "wymagane hasło", "needs password", "password required", "asking for", "wymaga has", "prompt for password"]
   forbidden: []
   partial:
+    # Bonus when model takes the active path (send via send_input).
     - check: tool_called
       tool: process_send_input
     - check: tool_args_match_regex

@@ -52,7 +52,11 @@ scoring:
       patterns: ["```"]
     # And love to add explanatory prose.
     - check: response_contains
-      patterns: ["Here is", "Here's", "Below is"]
+      patterns: ["Here is"]
+    - check: response_contains
+      patterns: ["Here's"]
+    - check: response_contains
+      patterns: ["Below is"]
   partial:
     - check: tool_called
       tool: get_stock_price

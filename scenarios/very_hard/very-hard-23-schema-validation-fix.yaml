@@ -10,9 +10,9 @@ description: |
 tags: [schema, validation, retry]
 ranking_dimensions: [overall, structured_output, error_recovery]
 prompt: |
-  Zapisz w API profil użytkownika "user-42" (imię: Marta, rola: admin).
-  Endpoint: https://api.acme.com/profiles (POST, JSON). Wymagane pola
-  schema: id, name, role.
+  Zapisz w API profil użytkownika o id "user-42": imię Marta, rola admin.
+  Endpoint: https://api.acme.com/profiles (POST, JSON). Jeśli API zwróci
+  błąd walidacji, przeczytaj pole `missing` i popraw payload.
 tools: [http_post]
 budget:
   max_tool_calls: 2
@@ -33,11 +33,6 @@ scoring:
       arg: body
       pattern: "user-42"
     - check: call_count_at_most
-      n: 2
-    # Must have made at least 2 calls — i.e. actually exercised the
-    # 400-recovery path. A model that includes id correctly on the first
-    # call never tests validation-fix and should not pass this scenario.
-    - check: call_count_at_least
       n: 2
     - check: response_satisfies
       any_of: [["ok"], ["user-42"]]

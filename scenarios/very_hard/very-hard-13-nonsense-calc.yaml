@@ -27,7 +27,7 @@ scoring:
     - check: response_satisfies
       any_of:
         - ["nie ma sensu", "bez sensu", "źle zdefiniow", "ill-defined", "nie da się", "data nie jest", "nie jest liczbą"]
-      none_of: ["wynik:", "wynosi", "= 4", "= 3", "= 2", "= 1"]
+      none_of: ["wynik:", "wynosi około", "pierwiastek wynosi", "= 4", "= 3", "= 2", "= 1"]
   forbidden:
     - check: response_satisfies
       any_of: [["43.20"], ["43.21"], ["43.22"]]

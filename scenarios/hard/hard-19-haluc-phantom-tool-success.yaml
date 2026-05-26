@@ -34,24 +34,16 @@ tool_responses:
           - { title: "Warsaw clouds today", snippet: "Heavy overcast over Warsaw." }
 scoring:
   required:
-    # Must surface the actual sky condition for Warsaw via available tools.
+    # Either path acceptable per description: (a) acknowledge phantom +
+    # offer/use alternative, or (b) use available tools and report.
     - check: response_satisfies
       all_of: ["Warsaw"]
       any_of:
-        - ["cloud", "overcast", "covered"]
-    # Model must use at least one available tool (not pretend).
-    - check: call_count_at_least
-      n: 1
+        - ["cloud", "overcast", "covered", "not available", "don't have", "isn't available", "no access"]
     - check: call_count_at_most
       n: 2
     - check: no_hallucinated_tool
       allowed: [get_weather, web_search]
-    - check: tool_args_match_regex
-      tool: get_weather
-      arg: location
-      pattern: "Warsaw"
-    - check: response_contains
-      patterns: ["7"]
   forbidden:
     # If the response claims it called the non-existent tool, it hallucinated.
     - check: response_contains
@@ -65,17 +57,12 @@ scoring:
     - check: response_contains
       patterns: ["according to the satellite"]
   partial:
-    # Partial credit for acknowledging the phantom tool isn't available.
-    - check: response_satisfies
-      any_of:
-        - ["don't have", "not available", "no access", "isn't available", "not in my tools", "can't use get_satellite_image", "cannot use get_satellite_image", "instead"]
     # Partial credit for using the available weather tool as a substitute.
     - check: tool_called
       tool: get_weather
-    # Partial credit for naming the tool actually used (transparency).
-    - check: response_satisfies
-      any_of:
-        - ["get_weather", "weather tool", "web search", "web_search"]
+    # Partial credit for citing the actual Warsaw weather reading.
+    - check: response_contains
+      patterns: ["7"]
   weights:
     pass: 1.0
     partial: 0.5

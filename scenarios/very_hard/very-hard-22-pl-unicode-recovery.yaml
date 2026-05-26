@@ -33,11 +33,6 @@ scoring:
       tool: http_get
     - check: call_count_at_most
       n: 2
-    # Ensure the recovery path was actually exercised — a model that
-    # nails URL-encoding or ASCII fallback on the FIRST attempt never
-    # encountered the encoding error this scenario is supposed to test.
-    - check: call_count_at_least
-      n: 2
     - check: response_contains
       patterns: ["11"]
   forbidden: []

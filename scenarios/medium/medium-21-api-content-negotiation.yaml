@@ -48,7 +48,9 @@ scoring:
     # If response mentions HTML it means model didn't switch content type and
     # is describing the HTML page rather than the JSON.
     - check: response_contains
-      patterns: ["<html>", "HTML default"]
+      patterns: ["<html>"]
+    - check: response_contains
+      patterns: ["HTML default"]
   partial:
     - check: tool_called
       tool: http_get

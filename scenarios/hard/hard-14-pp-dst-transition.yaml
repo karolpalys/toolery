@@ -14,8 +14,9 @@ ranking_dimensions: [overall, parameter_precision]
 prompt: |
   Today is Friday 2026-10-23. We change off DST in Europe/Warsaw on Sunday
   2026-10-25 at 03:00 (clocks roll back to 02:00). I want a 30-minute call
-  with the team on the morning AFTER we switch off DST, at 08:00 local time
-  Warsaw. Title: "Post-DST sync". Schedule it.
+  with the team LATER THAT SAME SUNDAY MORNING (2026-10-25), at 08:00 local
+  Warsaw time — i.e., a few hours after the rollback happens. Title:
+  "Post-DST sync". Schedule it.
 tools: [add_calendar_event]
 budget:
   max_tool_calls: 1

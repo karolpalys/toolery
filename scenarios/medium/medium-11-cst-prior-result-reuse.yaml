@@ -42,8 +42,8 @@ scoring:
       tool: calculator
       arg: expression
       pattern: "175(\\.43)?\\s*\\*\\s*30|30\\s*\\*\\s*175(\\.43)?"
-    - check: response_contains
-      patterns: ["5262", "5,262"]
+    - check: response_satisfies
+      any_of: [["5262", "5,262", "5 262"]]
     - check: call_count_at_most
       n: 2
   forbidden: []
