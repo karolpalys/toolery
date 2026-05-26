@@ -15,7 +15,7 @@ from textual.widgets import Button, DataTable, Input, Label, Markdown, Static
 
 from llm_test.compare import compare_runs
 from llm_test.core.store import Store
-from llm_test.tui.home_tab import _profile_run
+from llm_test.tui.home_tab import _DIM_LABEL
 
 
 class ConfirmRemoveModal(ModalScreen[bool]):
@@ -144,13 +144,95 @@ class MarkdownModal(ModalScreen[None]):
         self.dismiss(None)
 
 
+def _profile_md(results: list[dict]) -> str:
+    """Markdown variant of home_tab._profile_run — used at the top of the
+    details modal so the high-level read renders with proper styling
+    (headers, bold, bullets) instead of a monospace code block.
+    """
+    if not results:
+        return ""
+
+    by_dim: dict[str, list[float]] = {}
+    by_tier: dict[str, list[float]] = {}
+    statuses: Counter[str] = Counter()
+    for r in results:
+        try:
+            dims = json.loads(r.get("ranking_dims_json") or '["overall"]')
+        except json.JSONDecodeError:
+            dims = ["overall"]
+        score = r.get("score") or 0.0
+        for d in dims:
+            by_dim.setdefault(d, []).append(score)
+        by_tier.setdefault(r.get("tier", "?"), []).append(score)
+        statuses[r.get("status", "?")] += 1
+
+    dim_means = {d: sum(v) / len(v) for d, v in by_dim.items() if v}
+    overall = dim_means.get("overall", 0.0)
+    ranked = sorted(((d, m) for d, m in dim_means.items() if d != "overall"),
+                    key=lambda x: -x[1])
+    strong = [(d, m) for d, m in ranked[:3] if m >= 0.5]
+    weak = [(d, m) for d, m in ranked[-3:] if m < 0.7]
+
+    lines: list[str] = ["### 🏁 Run summary", ""]
+    total = sum(statuses.values())
+    fails = statuses.get("fail", 0) + statuses.get("error", 0)
+    lines.append(
+        f"- **Overall:** {overall * 100:.1f}%  ·  "
+        f"{statuses.get('pass', 0)}/{total} pass · "
+        f"{statuses.get('partial', 0)} partial · {fails} fail"
+    )
+
+    tier_parts = []
+    for tier in ("easy", "medium", "hard", "very_hard"):
+        vs = by_tier.get(tier)
+        if vs:
+            tier_parts.append(f"{tier} {sum(vs) / len(vs) * 100:.0f}%")
+    if tier_parts:
+        lines.append(f"- **Per tier:** {'  ·  '.join(tier_parts)}")
+    lines.append("")
+
+    if strong:
+        lines.append("**Strong points**")
+        lines.append("")
+        for d, m in strong:
+            lines.append(f"- {_DIM_LABEL.get(d, d)} — **{m * 100:.0f}%**")
+        lines.append("")
+    if weak:
+        lines.append("**Weak points**")
+        lines.append("")
+        for d, m in weak:
+            lines.append(f"- {_DIM_LABEL.get(d, d)} — **{m * 100:.0f}%**")
+        lines.append("")
+
+    recommended = [d for d, m in strong if m >= 0.7]
+    avoid = [d for d, m in weak if m < 0.4]
+    if recommended:
+        lines.append(
+            f"**Recommended for:** "
+            f"{', '.join(_DIM_LABEL.get(d, d) for d in recommended)}"
+        )
+    if avoid:
+        lines.append(
+            f"**Avoid for:** "
+            f"{', '.join(_DIM_LABEL.get(d, d) for d in avoid)}"
+        )
+    if not recommended and not avoid:
+        lines.append(
+            "_Mixed profile — no dimension is decisively strong or weak._"
+        )
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _build_details_md(run: dict, results: list[dict],
                       perf_rows: list[dict], adapters: list[str]) -> str:
     """Render a Markdown summary of one run for the details modal.
 
-    Starts with the same `_profile_run` block the Home tab shows after a
-    run finishes (overall / per-tier / strong-weak / recommend-avoid),
-    then continues with the full breakdown.
+    Starts with the `_profile_md` block (overall / per-tier / strong-weak
+    / recommend-avoid — same data as the Home tab's post-run summary),
+    then the full breakdown (config, scenario stats, failures, perf).
     """
     by_tier: dict[str, list[float]] = {}
     by_status: Counter[str] = Counter()
@@ -167,12 +249,9 @@ def _build_details_md(run: dict, results: list[dict],
         cfg = run.get("config_json") or ""
 
     lines: list[str] = []
-    profile_plain = _profile_run(results).plain.rstrip()
-    if profile_plain:
-        lines.append("```")
-        lines.append(profile_plain)
-        lines.append("```")
-        lines.append("")
+    profile_block = _profile_md(results)
+    if profile_block:
+        lines.append(profile_block)
     lines.append(f"## {run['run_id']}")
     lines.append("")
     lines.append(f"- **Model:** `{run.get('model','?')}`")
