@@ -1,0 +1,60 @@
+id: hard-24-pl-strict-schema
+title: "PL: profil klienta JSON wg schematu + wybór toolu"
+tier: hard
+category: structured_output
+domain: generic
+description: |
+  Polish prompt asks to build a customer profile JSON to an explicit schema,
+  pulling data from one of 3 tools (must pick `db_list_tables` first, then
+  `sql_query`). Output must be valid JSON with exact field names.
+tags: [polish, schema, multi_tool]
+ranking_dimensions: [overall, structured_output, localization, tool_selection]
+prompt: |
+  Zbuduj JSON `customer_profile` dla klienta o id 42 wg schematu:
+    {
+      "id": <int>,
+      "email": <string>,
+      "name": <string>,
+      "joined_at": <string ISO date>,
+      "tier": <"free"|"prime">
+    }
+  Wybierz odpowiednie narzędzie spośród dostępnych. Tylko JSON, bez prozy.
+tools: [db_list_tables, sql_query, http_get]
+budget:
+  max_tool_calls: 3
+  max_turns: 2
+  timeout_seconds: 60
+tool_responses:
+  db_list_tables:
+    - match: any
+      returns: ["customers", "orders", "products"]
+  sql_query:
+    - match: { query: "SELECT * FROM customers WHERE id = 42" }
+      returns:
+        rows:
+          - { id: 42, email: "a.kowalski@example.com", name: "Anna Kowalska", joined_at: "2024-03-12", tier: "prime" }
+    - match: any
+      returns: { error: "no_match" }
+  http_get:
+    - match: any
+      returns: { error: "unrelated_tool" }
+scoring:
+  required:
+    - check: tool_called
+      tool: sql_query
+    - check: response_satisfies
+      all_of: ["id", "email", "name", "joined_at", "tier"]
+      any_of: [["42"]]
+      none_of: ["unrelated"]
+    - check: response_satisfies
+      any_of: [["a.kowalski@example.com"], ["Anna Kowalska"]]
+  forbidden:
+    - check: tool_called
+      tool: http_get
+  partial:
+    - check: response_satisfies
+      all_of: ["{", "}"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

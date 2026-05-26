@@ -1,0 +1,49 @@
+id: hard-25-pl-code-review-json
+title: "PL: code review snippetu Pythona jako JSON"
+tier: hard
+category: structured_output
+domain: dev_ops
+description: |
+  Polish prompt asks to review a small Python function (with a bug) and
+  return a structured JSON: `{issues: [{line, severity, msg}]}`. Tests
+  PL + JSON shape + coding judgment.
+tags: [polish, code_review, json, coding]
+ranking_dimensions: [overall, structured_output, localization, coding]
+prompt: |
+  Przeanalizuj poniższy kod Pythona i zwróć JSON: {issues: [{line: <int>, severity: <"low"|"medium"|"high">, msg: <str>}]}.
+
+  Kod (linie ponumerowane od 1):
+  1: def calc_discount(price, discount):
+  2:     if discount > 100:
+  3:         discount = 100
+  4:     result = price - (price * discount / 100)
+  5:     return result
+  6:
+  7: # użycie:
+  8: x = calc_discount(100, -10)
+  9: print(x)
+
+  Zwróć minimum 1 issue. Tylko JSON, bez prozy.
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 30
+tool_responses: {}
+scoring:
+  required:
+    - check: response_satisfies
+      all_of: ["issues", "line", "severity", "msg"]
+    - check: response_satisfies
+      any_of: [["-10"], ["ujemn"], ["negative"], ["<0"], ["less than 0"]]
+  forbidden:
+    - check: response_satisfies
+      any_of: [["nie znalezion"], ["brak problemów"], ["wszystko ok"], ["no issues"]]
+  partial:
+    - check: response_satisfies
+      all_of: ["{"]
+      any_of: [["issues"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

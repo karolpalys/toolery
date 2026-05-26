@@ -1,0 +1,49 @@
+id: hard-27-pl-budget-summarize
+title: "PL: streść 3 dokumenty w 1 toolcall (parallel fan-out)"
+tier: hard
+category: hard_mode
+domain: generic
+description: |
+  Polish: summarize three different documents in ONE assistant turn — model
+  must issue parallel read_file calls in a single tool call set (3 calls
+  count as a single turn). Then synthesize one summary.
+tags: [polish, parallel, fan_out]
+ranking_dimensions: [overall, localization, budget_efficiency]
+prompt: |
+  Streść w 3-4 zdaniach łącznie zawartość trzech dokumentów:
+  /workspace/raport_q1.md
+  /workspace/raport_q2.md
+  /workspace/raport_q3.md
+  Wszystkie 3 odczyty muszą zmieścić się w jednym wywołaniu narzędzia (parallel).
+tools: [read_file]
+budget:
+  max_tool_calls: 3
+  max_turns: 2
+  timeout_seconds: 45
+tool_responses:
+  read_file:
+    - match: { path: "/workspace/raport_q1.md" }
+      returns: "Q1 2026: przychody 2.1M PLN. Wzrost 8% r/r. Nowy plan PRIME."
+    - match: { path: "/workspace/raport_q2.md" }
+      returns: "Q2 2026: przychody 2.4M PLN. Wzrost 14% r/r. Rozszerzenie zespołu o 4 osoby."
+    - match: { path: "/workspace/raport_q3.md" }
+      returns: "Q3 2026: przychody 2.7M PLN. Wzrost 19% r/r. Wejście na rynek DE."
+    - match: any
+      returns: { error: "file_not_found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: read_file
+    - check: call_count_at_most
+      n: 3
+    - check: response_satisfies
+      any_of: [["Q1"], ["Q2"], ["Q3"]]
+      all_of: ["wzrost"]
+  forbidden: []
+  partial:
+    - check: response_satisfies
+      any_of: [["2.1M"], ["2.4M"], ["2.7M"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

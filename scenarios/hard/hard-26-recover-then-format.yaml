@@ -1,0 +1,49 @@
+id: hard-26-recover-then-format
+title: "Przełącz tool po błędzie, sformatuj wynik do JSON"
+tier: hard
+category: error_recovery
+domain: generic
+description: |
+  http_get for the primary API fails with 503. Model must switch to
+  http_get on a backup endpoint (different host), then format the response
+  as the requested JSON shape.
+tags: [recovery, fallback, structured_output]
+ranking_dimensions: [overall, structured_output, tool_selection, error_recovery]
+prompt: |
+  Pobierz status `auth` z API i sformatuj jako JSON {"service": "auth", "status": <str>, "version": <str>}.
+  Primary: https://api.acme.com/health/auth
+  Backup:  https://api-backup.acme.com/health/auth
+  Jeśli primary nie działa, użyj backup.
+tools: [http_get]
+budget:
+  max_tool_calls: 3
+  max_turns: 2
+  timeout_seconds: 45
+tool_responses:
+  http_get:
+    - match: { url: "https://api.acme.com/health/auth" }
+      returns: { status: 503, body: "service_unavailable" }
+    - match: { url: "https://api-backup.acme.com/health/auth" }
+      returns: { status: 200, body: "{\"status\": \"ok\", \"version\": \"3.1.0\"}" }
+    - match: any
+      returns: { status: 404, body: "" }
+scoring:
+  required:
+    - check: tool_args_contain
+      tool: http_get
+      args: { url: "https://api-backup.acme.com/health/auth" }
+    - check: response_satisfies
+      all_of: ["service", "status", "version"]
+      any_of: [["3.1.0"], ["ok"]]
+    - check: call_count_at_most
+      n: 3
+  forbidden: []
+  partial:
+    - check: tool_called
+      tool: http_get
+    - check: response_contains
+      patterns: ["3.1.0"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
