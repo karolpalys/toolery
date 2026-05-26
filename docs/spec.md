@@ -226,7 +226,12 @@ Wszystkie deterministyczne — zero LLM judge.
 | `tool_args_type` | Typ argumentu (int/string/bool — łapie hallucinated types) |
 | `call_count_at_most` / `at_least` / `exactly` | Liczba wywołań |
 | `unique_tools_called` | Set wywołanych tooli (bez duplikatów) |
-| `response_contains` / `not_contains` | Tekst odpowiedzi finalnej |
+| `response_contains` / `not_contains` | Tekst odpowiedzi finalnej; krótkie liczby i krótkie tokeny są dopasowywane z granicami, żeby ograniczyć fałszywe trafienia |
+| `response_matches_regex` | Regex na odpowiedź finalną (`all_of` / `any_of` / `none_of`) dla precyzyjnych wartości tekstowych |
+| `response_number` | Wyciąga liczby z odpowiedzi i sprawdza `equals` albo zakres `min`/`max` z opcjonalną tolerancją |
+| `response_csv` | Parsuje CSV przez standardowy parser i sprawdza header, liczbę wierszy oraz wymagane wiersze |
+| `response_yaml` | Parsuje YAML i opcjonalnie waliduje wynik JSON Schema |
+| `response_markdown_table` | Parsuje tabelę Markdown i sprawdza header, liczbę wierszy oraz wymagane wiersze |
 | `response_matches_schema` | JSON schema validation |
 | `response_language` | Język odpowiedzi (PL/EN/DE) — wykryty przez heurystykę słownikową |
 | `no_hallucinated_tool` | Czy model nie próbował zawołać tooli spoza listy |

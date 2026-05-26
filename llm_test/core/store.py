@@ -45,6 +45,15 @@ CREATE INDEX IF NOT EXISTS idx_results_model ON runs(model, started_at);
 CREATE INDEX IF NOT EXISTS idx_results_status ON scenario_results(status, failure_kind);
 """
 
+# Lightweight migrations for runs added in Phase 13 (live progress) and later.
+# Applied idempotently in init_schema(). Older DBs auto-upgrade on first open.
+_MIGRATIONS = [
+    "ALTER TABLE runs ADD COLUMN total_units INTEGER",
+    "ALTER TABLE runs ADD COLUMN phase TEXT",
+    "ALTER TABLE runs ADD COLUMN current_scenario TEXT",
+    "ALTER TABLE runs ADD COLUMN cluster TEXT",   # 'single' | 'dual' | NULL
+]
+
 
 class Store:
     def __init__(self, path: Path) -> None:
@@ -65,20 +74,72 @@ class Store:
     def init_schema(self) -> None:
         with self.conn() as c:
             c.executescript(SCHEMA)
+            existing = {row[1] for row in c.execute("PRAGMA table_info(runs)").fetchall()}
+            for stmt in _MIGRATIONS:
+                col = stmt.rsplit(" ADD COLUMN ", 1)[1].split(" ", 1)[0]
+                if col not in existing:
+                    c.execute(stmt)
 
     def create_run(self, run_id, model, base_url, started_at, config_json, scenarios_hash,
-                   llm_test_version: str = "0.1.0") -> None:
+                   llm_test_version: str = "0.1.0", total_units: int | None = None,
+                   cluster: str | None = None) -> None:
         with self.conn() as c:
             c.execute(
                 "INSERT INTO runs(run_id, model, base_url, started_at, status, config_json, "
-                "llm_test_version, scenarios_hash) VALUES (?,?,?,?, 'running', ?, ?, ?)",
-                (run_id, model, base_url, started_at, config_json, llm_test_version, scenarios_hash),
+                "llm_test_version, scenarios_hash, total_units, phase, cluster) "
+                "VALUES (?,?,?,?, 'running', ?, ?, ?, ?, 'scenarios', ?)",
+                (run_id, model, base_url, started_at, config_json, llm_test_version,
+                 scenarios_hash, total_units, cluster),
             )
+
+    def update_phase(self, run_id: str, phase: str,
+                     current_scenario: str | None = None) -> None:
+        """Phase: 'scenarios' | 'perf' | 'done'. current_scenario optional latest id."""
+        with self.conn() as c:
+            if current_scenario is not None:
+                c.execute("UPDATE runs SET phase=?, current_scenario=? WHERE run_id=?",
+                          (phase, current_scenario, run_id))
+            else:
+                c.execute("UPDATE runs SET phase=? WHERE run_id=?", (phase, run_id))
 
     def finish_run(self, run_id, finished_at, duration_s, status: str = "done") -> None:
         with self.conn() as c:
-            c.execute("UPDATE runs SET finished_at=?, duration_s=?, status=? WHERE run_id=?",
-                      (finished_at, duration_s, status, run_id))
+            c.execute(
+                "UPDATE runs SET finished_at=?, duration_s=?, status=?, phase='done' "
+                "WHERE run_id=?",
+                (finished_at, duration_s, status, run_id),
+            )
+
+    def count_results_for_run(self, run_id: str) -> int:
+        with self.conn() as c:
+            row = c.execute(
+                "SELECT COUNT(*) FROM scenario_results WHERE run_id=?", (run_id,)
+            ).fetchone()
+        return int(row[0]) if row else 0
+
+    def fetch_run(self, run_id: str) -> dict | None:
+        with self.conn() as c:
+            row = c.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
+        return dict(row) if row else None
+
+    def fetch_completed_units(self, run_id: str) -> set[tuple[str, str, int]]:
+        """(scenario_id, adapter, trial_index) triples already persisted for run_id."""
+        with self.conn() as c:
+            rows = c.execute(
+                "SELECT scenario_id, adapter, trial_index "
+                "FROM scenario_results WHERE run_id=?",
+                (run_id,),
+            ).fetchall()
+        return {(r[0], r[1], int(r[2])) for r in rows}
+
+    def reopen_run(self, run_id: str) -> None:
+        """Reset a finished/aborted run back to 'running' so resume can append more results."""
+        with self.conn() as c:
+            c.execute(
+                "UPDATE runs SET status='running', finished_at=NULL, duration_s=NULL, "
+                "phase='scenarios' WHERE run_id=?",
+                (run_id,),
+            )
 
     def upsert_adapter(self, run_id, adapter, adapter_version):
         with self.conn() as c:
@@ -105,14 +166,6 @@ class Store:
         with self.conn() as c:
             rows = c.execute("SELECT * FROM scenario_results WHERE run_id=?", (run_id,)).fetchall()
         return [dict(r) for r in rows]
-
-    def count_results_for_run(self, run_id) -> int:
-        with self.conn() as c:
-            row = c.execute(
-                "SELECT COUNT(*) AS n FROM scenario_results WHERE run_id=?",
-                (run_id,),
-            ).fetchone()
-        return int(row["n"]) if row else 0
 
     def fetch_all_runs(self) -> list[dict]:
         with self.conn() as c:

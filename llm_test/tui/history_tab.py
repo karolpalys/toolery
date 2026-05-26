@@ -62,6 +62,54 @@ class ConfirmRemoveModal(ModalScreen[bool]):
         self.dismiss(event.button.id == "confirm")
 
 
+class ConfirmRemoveRunningModal(ModalScreen[bool]):
+    """Second-stage confirm shown only when the run is still status=running."""
+
+    DEFAULT_CSS = """
+    ConfirmRemoveRunningModal { align: center middle; }
+    ConfirmRemoveRunningModal > Vertical {
+        width: 78; padding: 1 2;
+        background: $surface; border: thick $warning;
+    }
+    ConfirmRemoveRunningModal .row { height: auto; margin-top: 1; }
+    ConfirmRemoveRunningModal Button { margin-right: 2; }
+    """
+
+    BINDINGS = [
+        Binding("y", "confirm", "Yes"),
+        Binding("n", "cancel", "No"),
+        Binding("escape", "cancel", "Cancel", show=False),
+    ]
+
+    def __init__(self, run_id: str) -> None:
+        super().__init__()
+        self.run_id = run_id
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label("[bold yellow]⚠  This run is ACTIVE (status=running)[/bold yellow]")
+            yield Label(self.run_id)
+            yield Label(
+                "[dim]Deleting an active run does NOT stop any running "
+                "subprocess. Any in-flight scorer process may keep writing "
+                "until it finishes or you kill it manually. The DB rows and "
+                "trace directory will be removed immediately and any final "
+                "results from the subprocess will be discarded.[/dim]"
+            )
+            with Horizontal(classes="row"):
+                yield Button("Cancel (n)", id="cancel")
+                yield Button("Delete anyway (y)", id="confirm", variant="error")
+
+    def action_confirm(self) -> None:
+        self.dismiss(True)
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "confirm")
+
+
 class MarkdownModal(ModalScreen[None]):
     """Big scrollable modal that renders Markdown — used for both run details
     and compare diffs."""
@@ -380,11 +428,12 @@ class HistoryTab(Container):
         store = self._store()
         rows = [r for r in store.fetch_all_runs() if r["run_id"] == run_id]
         if rows and rows[0].get("status") == "running":
-            self.app.notify(
-                f"Refusing to remove an active run ({run_id}). "
-                "Abort the subprocess first.",
-                severity="error", markup=False)
-            return
+            # Extra confirm gate for active runs — deletion is allowed but
+            # the user must explicitly acknowledge the test is still running.
+            still_confirmed = await self.app.push_screen_wait(
+                ConfirmRemoveRunningModal(run_id))
+            if not still_confirmed:
+                return
         try:
             self._do_remove(run_id)
         except Exception as e:

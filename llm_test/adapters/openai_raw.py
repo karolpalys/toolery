@@ -42,8 +42,12 @@ class OpenAIRawAdapter:
             for _ in range(scenario.budget.max_turns + 1):
                 payload = {
                     "model": model, "messages": messages,
-                    "tools": tools_schema, "temperature": 0.0,
+                    "temperature": 0.0,
                 }
+                # vLLM (and some other servers) reject `tools: []` with HTTP 400.
+                # Only include the key when the scenario actually exposes tools.
+                if tools_schema:
+                    payload["tools"] = tools_schema
                 headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
                 resp = await self._client.post(
                     f"{self.base_url}/v1/chat/completions", json=payload, headers=headers

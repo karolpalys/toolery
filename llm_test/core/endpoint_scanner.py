@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 class EndpointInfo(BaseModel):
     port: int
     base_url: str
-    model_id: str
+    model_id: str            # Friendly display name (basename of root if vLLM provides it; else served alias).
+    served_model_id: str     # Alias the API expects in the `model` field of requests (id from /v1/models).
     models: list[str]
     server_hint: str  # "vLLM" | "llama.cpp" | "unknown"
 
@@ -47,11 +48,23 @@ async def _probe_one(client: httpx.AsyncClient, port: int) -> EndpointInfo | Non
     if not isinstance(data, list):
         return None
     models = [item["id"] for item in data if isinstance(item, dict) and "id" in item]
-    primary = models[0] if models else "(none loaded)"
+    primary_alias = models[0] if models else "(none loaded)"
+    # Prefer basename of `root` — vLLM exposes the on-disk model path there,
+    # which is the actual model name. /v1/models `id` is often a short alias
+    # like "qwen" that doesn't tell the user which checkpoint is loaded.
+    primary_root = ""
+    if data and isinstance(data[0], dict):
+        primary_root = (data[0].get("root") or "").strip()
+    if primary_root:
+        # Strip the directory and any "/models/" prefix → "Qwen3.6-35B-A3B-int4-mixed-AutoRound"
+        display_name = primary_root.rstrip("/").rsplit("/", 1)[-1] or primary_alias
+    else:
+        display_name = primary_alias
     return EndpointInfo(
         port=port,
         base_url=base_url,
-        model_id=primary,
+        model_id=display_name,
+        served_model_id=primary_alias,
         models=models,
         server_hint=_classify_server(resp.headers.get("Server")),
     )
