@@ -19,8 +19,7 @@ from llm_test.core import endpoint_scanner
 from llm_test.core.endpoint_scanner import EndpointInfo
 from llm_test.core.store import Store
 
-DEFAULT_PORTS = [8000, 8080, 8081, 8888, 8889, 5000, 5001, 11434]
-DEEP_SCAN_PORTS = list(range(8000, 9001))
+DEFAULT_PORTS = sorted({5000, 5001, 11434, *range(8000, 9001)})
 
 ScannerCallable = Callable[[list[int]], Awaitable[list[EndpointInfo]]]
 KnownProvider = Callable[[], set[str]]
@@ -268,8 +267,7 @@ class HomeTab(Container):
     def compose(self) -> ComposeResult:
         with Vertical(id="scanner-strip"):
             with Horizontal(id="buttons"):
-                yield Button("Scan default ports", id="scan", variant="primary")
-                yield Button("Deep scan 8000-9000", id="deep")
+                yield Button("Scan endpoints", id="scan", variant="primary")
                 yield Static("Click Scan to discover endpoints",
                              id="scan-status")
             yield DataTable(id="endpoints", cursor_type="row")
@@ -329,8 +327,6 @@ class HomeTab(Container):
             return
         if event.button.id == "scan":
             await self._run_scan(DEFAULT_PORTS)
-        elif event.button.id == "deep":
-            await self._run_scan(DEEP_SCAN_PORTS)
 
     async def _run_scan(self, ports: list[int]) -> None:
         self._scanning = True
@@ -576,4 +572,3 @@ class HomeTab(Container):
 
     def _set_buttons_disabled(self, disabled: bool) -> None:
         self.query_one("#scan", Button).disabled = disabled
-        self.query_one("#deep", Button).disabled = disabled

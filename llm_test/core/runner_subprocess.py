@@ -24,6 +24,11 @@ class RunArgs(BaseModel):
     trials: int = Field(ge=1, le=100)
     concurrency: int = Field(ge=1, le=64)
     with_perf: bool = False
+    perf_only: bool = False
+    category: str = "all"
+    # API-side model name (alias the served endpoint expects). If None or equal
+    # to `model`, omit --served-model and let cli.py default to --model value.
+    served_model: str | None = None
 
 
 def build_argv(args: RunArgs, executable: str = "llm-test") -> list[str]:
@@ -36,8 +41,14 @@ def build_argv(args: RunArgs, executable: str = "llm-test") -> list[str]:
         "--base-url", args.base_url,
         "--concurrency", str(args.concurrency),
     ]
+    if args.served_model and args.served_model != args.model:
+        argv.extend(["--served-model", args.served_model])
+    if args.category and args.category != "all":
+        argv.extend(["--category", args.category])
     if args.with_perf:
         argv.append("--with-perf")
+    if args.perf_only:
+        argv.append("--perf-only")
     return argv
 
 

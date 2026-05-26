@@ -71,12 +71,16 @@ def run(
                                      help="name to send in API model= (default: --model)"),
     adapter: str = typer.Option("raw", help="comma-separated: raw,hermes,claude_code,codex"),
     tier: str = typer.Option("all", help="easy|medium|hard|very_hard|all"),
+    category: str = typer.Option("all", "--category",
+                                 help="scenario category filter (see Category enum) or 'all'"),
     trials: int = typer.Option(5, "--trials"),
     base_url: str = typer.Option("http://localhost:8000", "--base-url"),
     scenarios_dir: Path = typer.Option(Path("scenarios")),  # noqa: B008
     concurrency: int = typer.Option(4),
     no_tui: bool = typer.Option(True, "--no-tui/--tui", help="MVP: --no-tui only"),
     with_perf: bool = typer.Option(False, "--with-perf"),
+    perf_only: bool = typer.Option(False, "--perf-only",
+                                   help="skip eval phase; run only llama-benchy"),
     cluster: str = typer.Option("single", "--cluster",
                                 help="single | dual (DGX Spark deployment topology)"),
 ):
@@ -93,6 +97,7 @@ def run(
         elif a == "hermes":
             from llm_test.adapters.hermes import HermesAdapter
             adapters[a] = HermesAdapter(
+                timeout_per_scenario=int(os.environ.get("HERMES_TIMEOUT", "600")),
                 api_url=os.environ.get("HERMES_API_URL", "http://localhost:8644"),
                 gateway_url=os.environ.get("HERMES_GATEWAY_URL", "http://localhost:8642"),
                 token=os.environ.get("HERMES_TOKEN", ""),
@@ -120,7 +125,9 @@ def run(
     xs = load_all_scenarios(scenarios_dir)
     if tier != "all":
         xs = [s for s in xs if s.tier.value == tier]
-    if not xs:
+    if category != "all":
+        xs = [s for s in xs if s.category.value == category]
+    if not xs and not perf_only:
         console.print("[red]No scenarios match filter.[/red]")
         raise typer.Exit(2)
 
@@ -142,15 +149,16 @@ def run(
     ).hexdigest()[:16]
 
     store = _store()
-    total_units = len(xs) * len(adapters) * trials
+    total_units = 0 if perf_only else len(xs) * len(adapters) * trials
     if cluster not in ("single", "dual"):
         console.print(f"[yellow]Unknown --cluster {cluster!r}, falling back to 'single'.[/yellow]")
         cluster = "single"
     cfg = {"model": model, "served_model": api_model, "adapter": list(adapters),
-           "tier": tier, "trials": trials, "base_url": base_url,
+           "tier": tier, "category": category, "trials": trials, "base_url": base_url,
            "concurrency": concurrency, "total_units": total_units,
-           "scenarios_count": len(xs), "with_perf": bool(with_perf),
-           "cluster": cluster}
+           "scenarios_count": 0 if perf_only else len(xs),
+           "with_perf": bool(with_perf or perf_only),
+           "perf_only": bool(perf_only), "cluster": cluster}
     store.create_run(run_id=run_id, model=model, base_url=base_url,
                      started_at=datetime.now(UTC).isoformat(),
                      config_json=json.dumps(cfg),
@@ -161,46 +169,49 @@ def run(
         store.upsert_adapter(run_id, name, ad.version)
 
     started = datetime.now(UTC)
-    runner = Runner(adapters=adapters, trials=trials, model=api_model, concurrency=concurrency)
-    console.print(f"[bold]Running {len(xs)} scenarios × {len(adapters)} adapters × {trials} trials"
-                  f" = {total_units} units[/bold]")
+    if perf_only:
+        console.print("[bold]Perf-only mode: skipping eval, running llama-benchy[/bold]")
+    else:
+        runner = Runner(adapters=adapters, trials=trials, model=api_model, concurrency=concurrency)
+        console.print(f"[bold]Running {len(xs)} scenarios × {len(adapters)} adapters × {trials} trials"
+                      f" = {total_units} units[/bold]")
 
-    sc_by_id = {s.id: s for s in xs}
-    tier_lookup = {s.id: s.tier.value for s in xs}
+        sc_by_id = {s.id: s for s in xs}
+        tier_lookup = {s.id: s.tier.value for s in xs}
 
-    def _on_result(r) -> None:
-        # Incremental: persist trace + DB row immediately so the Live tab sees progress.
-        s = sc_by_id[r.scenario_id]
-        trace_filename = f"{r.scenario_id}__{r.adapter}__t{r.trial_index}.json"
-        (run_dir / "traces" / trace_filename).write_text(r.trace.model_dump_json(indent=2))
-        store.write_scenario_result(
-            run_id=run_id, result=r,
-            tags=s.tags, ranking_dims=s.ranking_dimensions,
-            scenario_hash="", category=s.category.value, tier=s.tier.value,
-            trace_path=f"traces/{trace_filename}",
+        def _on_result(r) -> None:
+            # Incremental: persist trace + DB row immediately so the Live tab sees progress.
+            s = sc_by_id[r.scenario_id]
+            trace_filename = f"{r.scenario_id}__{r.adapter}__t{r.trial_index}.json"
+            (run_dir / "traces" / trace_filename).write_text(r.trace.model_dump_json(indent=2))
+            store.write_scenario_result(
+                run_id=run_id, result=r,
+                tags=s.tags, ranking_dims=s.ranking_dimensions,
+                scenario_hash="", category=s.category.value, tier=s.tier.value,
+                trace_path=f"traces/{trace_filename}",
+            )
+            store.update_phase(run_id, "scenarios", current_scenario=r.scenario_id)
+
+        results = asyncio.run(runner.run(xs, on_result=_on_result))
+
+        for s in xs:
+            md = render_scenario(scenario_id=s.id, results=results, title=s.title,
+                                 tier=s.tier.value, category=s.category.value)
+            (run_dir / "scenarios" / f"{s.id}.md").write_text(md)
+        duration = (datetime.now(UTC) - started).total_seconds()
+        md = render_summary(
+            run_id=run_id, model=model, adapters=list(adapters),
+            trials=trials, duration_s=duration, results=results, perf_rows=[],
+            tier_lookup=tier_lookup,
         )
-        store.update_phase(run_id, "scenarios", current_scenario=r.scenario_id)
+        (run_dir / "summary.md").write_text(md)
 
-    results = asyncio.run(runner.run(xs, on_result=_on_result))
-
-    for s in xs:
-        md = render_scenario(scenario_id=s.id, results=results, title=s.title,
-                             tier=s.tier.value, category=s.category.value)
-        (run_dir / "scenarios" / f"{s.id}.md").write_text(md)
-    duration = (datetime.now(UTC) - started).total_seconds()
-    md = render_summary(
-        run_id=run_id, model=model, adapters=list(adapters),
-        trials=trials, duration_s=duration, results=results, perf_rows=[],
-        tier_lookup=tier_lookup,
-    )
-    (run_dir / "summary.md").write_text(md)
-
-    if with_perf:
+    if with_perf or perf_only:
         from llm_test.perf.benchy import run_benchy
         store.update_phase(run_id, "perf", current_scenario="llama-bench")
         try:
             perf = run_benchy(model=api_model, base_url=base_url,
-                              depth=[0, 16384, 65536], runs=3)
+                              depth=[0, 4096, 8192], runs=3)
             for row in perf.rows:
                 store.write_perf(run_id, depth=row["depth"],
                                  pp_tps=row.get("pp_tps"), tg_tps=row.get("tg_tps"),
@@ -243,7 +254,7 @@ def run(
 def perf(model: str = typer.Option(..., "--model"),
          base_url: str = typer.Option("http://localhost:8000", "--base-url"),
          pp: int = 4096, tg: int = 512,
-         depth: str = "0,16384,65536", runs: int = 3):
+         depth: str = "0,4096,8192", runs: int = 3):
     """Run llama-benchy only (no scoring)."""
     from llm_test.perf.benchy import run_benchy
     res = run_benchy(model=model, base_url=base_url, pp=pp, tg=tg,
