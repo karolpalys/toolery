@@ -1,0 +1,43 @@
+id: easy-23-back-reference
+title: "Streść trzeci punkt z listy w dokumencie"
+tier: easy
+category: context_state_tracking
+domain: generic
+description: |
+  Pre-filled context contains a numbered list of 5 items inside a ~600-token
+  doc. User asks for "the third point". Model must resolve positional
+  reference within the in-prompt context.
+tags: [in_context, positional_ref]
+ranking_dimensions: [overall, context_state_tracking, long_context]
+prompt: |
+  Dokument:
+  ---
+  Projekt X — notatki ze spotkania (2026-04-12). Obecni: A, B, C, D. Zakres
+  spotkania: omówienie statusu i priorytetów. Decyzje:
+  1. Przyspieszyć pracę nad modułem auth do końca maja.
+  2. Zatrzymać prace nad legacy migracją do Q3.
+  3. Wybrać Postgres 16 jako docelową wersję bazy zamiast wcześniej rozważanego MySQL 8.
+  4. Powołać podzespół ds. bezpieczeństwa (3 osoby).
+  5. Zorganizować szkolenie z observability w czerwcu.
+  Następne kroki ustalone na 2026-04-19.
+  ---
+  Streść trzeci punkt jedną linijką.
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 20
+tool_responses: {}
+scoring:
+  required:
+    - check: response_satisfies
+      any_of: [["Postgres", "PostgreSQL"]]
+      none_of: ["auth", "legacy migr", "obser", "szkolen", "podzesp"]
+  forbidden: []
+  partial:
+    - check: response_satisfies
+      any_of: [["16", "MySQL"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

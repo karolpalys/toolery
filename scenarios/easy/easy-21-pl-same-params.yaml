@@ -1,0 +1,41 @@
+id: easy-21-pl-same-params
+title: "PL: użyj tej samej lokalizacji co poprzednio"
+tier: easy
+category: context_state_tracking
+domain: generic
+description: |
+  Polish two-turn conversation. Turn 1 sets location to "Kraków" (any tool
+  arg). Turn 2 says "a teraz to samo dla pogody" — model must pass
+  location=Kraków to get_weather without asking again.
+tags: [multi_turn, polish, parameter_reuse]
+ranking_dimensions: [overall, localization, context_state_tracking, parameter_precision]
+prompt: |
+  Turn 1: "Sprawdź ekspresową stację pogodową dla Krakowa." Turn 2: "A teraz to samo dla pogody."
+tools: [get_weather]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 40
+tool_responses:
+  get_weather:
+    - match: { location: "Kraków" }
+      returns: { temp_c: 12, condition: "rainy" }
+    - match: { location: "Krakow" }
+      returns: { temp_c: 12, condition: "rainy" }
+    - match: any
+      returns: { error: "city not found" }
+scoring:
+  required:
+    - check: tool_args_contain
+      tool: get_weather
+      args: { location: "Kraków" }
+  forbidden: []
+  partial:
+    - check: tool_called
+      tool: get_weather
+    - check: response_satisfies
+      any_of: [["12", "rainy", "deszcz"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

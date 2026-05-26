@@ -1,0 +1,39 @@
+id: easy-20-pl-cities-json
+title: "PL: 3 polskie miasta nad Bałtykiem jako JSON"
+tier: easy
+category: structured_output
+domain: generic
+description: |
+  Polish prompt asks for a JSON array of 3 Polish Baltic-coast cities.
+  Tests localization, JSON structure, and refusal to fabricate cities not
+  on the Baltic (e.g., adding Warsaw).
+tags: [json, polish, geography]
+ranking_dimensions: [overall, localization, structured_output, hallucination]
+prompt: "Zwróć listę 3 polskich miast nad Bałtykiem jako JSON: tablica obiektów z polem `name`."
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 20
+tool_responses: {}
+scoring:
+  required:
+    - check: response_satisfies
+      all_of: ["["]
+      any_of:
+        - ["Gdańsk", "Gdansk"]
+        - ["Gdynia"]
+        - ["Sopot", "Kołobrzeg", "Kolobrzeg", "Świnoujście", "Swinoujscie"]
+      none_of: ["Warszawa", "Kraków", "Krakow", "Wrocław", "Wroclaw", "Poznań", "Poznan"]
+  forbidden:
+    - check: response_contains
+      patterns: ["Warszawa"]
+  partial:
+    - check: response_satisfies
+      all_of: ["name"]
+      any_of:
+        - ["Gdańsk", "Gdynia", "Sopot"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

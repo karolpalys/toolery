@@ -1,0 +1,46 @@
+id: easy-26-extract-field
+title: "Wyciągnij price z 1k-tokenowego changeloga"
+tier: easy
+category: structured_output
+domain: generic
+description: |
+  Long in-prompt doc (changelog-style log of releases) contains exactly one
+  price field. Model must extract the value precisely and return it in a
+  short JSON object.
+tags: [extraction, json]
+ranking_dimensions: [overall, long_context, structured_output, parameter_precision]
+prompt: |
+  Z poniższego changeloga wyciągnij końcową cenę produktu i zwróć JSON {"price": <wartość>}.
+  ---
+  v1.0 (2025-01): wprowadzenie produktu. Cena startowa 49.00 PLN.
+  v1.1 (2025-04): drobne fixy, brak zmian cenowych.
+  v1.2 (2025-07): nowa skórka, cena bez zmian.
+  v2.0 (2025-12): refaktor backendu, dodano API. Podwyżka — cena 79.00 PLN.
+  v2.1 (2026-02): hotfix, brak zmian.
+  v2.2 (2026-03): integracja z SSO, brak zmian cenowych. Promocja sezonowa: 69.00 PLN do końca marca.
+  v2.3 (2026-04): koniec promocji, cena wraca do 79.00 PLN.
+  v2.4 (2026-05): nowy plan PRO. Cena podstawowa pozostaje 79.00 PLN, plan PRO 149.00 PLN/mies.
+  ---
+  Wyciągnij cenę podstawową (nie PRO, nie promocyjną, aktualnie obowiązującą).
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 25
+tool_responses: {}
+scoring:
+  required:
+    - check: response_satisfies
+      all_of: ["price"]
+      any_of: [["79.00", "79"]]
+      none_of: ["149", "69", "49"]
+  forbidden:
+    - check: response_contains
+      patterns: ["149"]
+  partial:
+    - check: response_satisfies
+      any_of: [["79"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

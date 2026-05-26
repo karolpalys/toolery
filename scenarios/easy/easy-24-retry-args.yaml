@@ -1,0 +1,41 @@
+id: easy-24-retry-args
+title: "Retry z szerszym zapytaniem po pustym wyniku"
+tier: easy
+category: error_recovery
+domain: generic
+description: |
+  First search returns 0 results for an over-specific query. Model must
+  retry once with a broader query (drop a constraint) and use the result.
+  Budget allows exactly 2 toolcalls.
+tags: [retry, search]
+ranking_dimensions: [overall, context_state_tracking, error_recovery, budget_efficiency]
+prompt: "Znajdź mi loty z Warszawy do Tokio na 15 lipca 2026 z 1 przesiadką w Helsinkach."
+tools: [search_flights]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 45
+tool_responses:
+  search_flights:
+    - match: { origin: "WAW", destination: "HND", date: "2026-07-15", layover: "HEL" }
+      returns: { results: [] }
+    - match: { origin: "WAW", destination: "HND", date: "2026-07-15" }
+      returns: { results: [{ id: "FL1", price: 4200, stops: 1, via: "FRA" }] }
+    - match: any
+      returns: { results: [] }
+scoring:
+  required:
+    - check: tool_called
+      tool: search_flights
+    - check: call_count_at_most
+      n: 2
+    - check: response_satisfies
+      any_of: [["FRA", "Frankfurt"], ["4200", "4,200", "FL1"]]
+  forbidden: []
+  partial:
+    - check: response_satisfies
+      any_of: [["FRA"], ["4200"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

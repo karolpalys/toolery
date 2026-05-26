@@ -1,0 +1,47 @@
+id: easy-28-ls-largest
+title: "Znajdź największy plik w wyjściu ls -lh"
+tier: easy
+category: terminal_handling
+domain: dev_ops
+description: |
+  Prompt embeds a 30-line `ls -lh /var/log` output. Model must identify the
+  largest file by parsing human-readable sizes (K/M/G).
+tags: [parsing, terminal]
+ranking_dimensions: [overall, long_context, terminal]
+prompt: |
+  Output `ls -lh /var/log`:
+  ---
+  -rw-r--r-- 1 root root  1.2M Apr 10 10:00 syslog
+  -rw-r--r-- 1 root root  234K Apr 10 10:00 auth.log
+  -rw-r--r-- 1 root root   45M Apr 10 10:00 kern.log
+  -rw-r--r-- 1 root root  789K Apr 10 10:00 dpkg.log
+  -rw-r--r-- 1 root root   12K Apr 10 10:00 alternatives.log
+  -rw-r--r-- 1 root root   2.3G Apr 10 10:00 nginx.access.log
+  -rw-r--r-- 1 root root  890M Apr 10 10:00 mongodb.log
+  -rw-r--r-- 1 root root  670K Apr 10 10:00 ufw.log
+  -rw-r--r-- 1 root root   89K Apr 10 10:00 boot.log
+  -rw-r--r-- 1 root root  150M Apr 10 10:00 nginx.error.log
+  -rw-r--r-- 1 root root  3.1M Apr 10 10:00 fail2ban.log
+  -rw-r--r-- 1 root root   23K Apr 10 10:00 dmesg
+  -rw-r--r-- 1 root root  450M Apr 10 10:00 redis.log
+  ---
+  Który plik jest największy?
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 20
+tool_responses: {}
+scoring:
+  required:
+    - check: response_satisfies
+      all_of: ["nginx.access.log"]
+      none_of: ["mongodb", "redis", "nginx.error"]
+  forbidden: []
+  partial:
+    - check: response_contains
+      patterns: ["nginx.access"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

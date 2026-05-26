@@ -1,0 +1,42 @@
+id: easy-29-exact-numbers
+title: "JSON z min/max/avg — bez zaokrągleń"
+tier: easy
+category: structured_output
+domain: generic
+description: |
+  Compute min/max/avg over a fixed list and return JSON. Tests exact
+  numeric representation (no rounding for avg, no fabricated values).
+tags: [json, math]
+ranking_dimensions: [overall, parameter_precision, structured_output, hallucination]
+prompt: |
+  Dla listy [12, 7, 23, 5, 19, 14] zwróć JSON z polami:
+    - min (liczba),
+    - max (liczba),
+    - avg (liczba, dokładnie do 2 miejsc po przecinku).
+  Tylko JSON, bez komentarza.
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 15
+tool_responses: {}
+scoring:
+  required:
+    - check: response_satisfies
+      all_of: ["min", "max", "avg"]
+      any_of: [["13.33"]]
+    - check: response_satisfies
+      all_of: ["5", "23"]
+      none_of: ["6", "22", "24"]
+  forbidden:
+    - check: response_contains
+      patterns: ["13.34"]
+    - check: response_contains
+      patterns: ["13.3"]
+  partial:
+    - check: response_satisfies
+      any_of: [["13.33", "13,33"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

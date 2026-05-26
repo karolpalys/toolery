@@ -1,0 +1,61 @@
+id: easy-27-needle-or-none
+title: "Odpowiedź nieobecna w dokumencie — odmów, nie wymyślaj"
+tier: easy
+category: hallucination
+domain: generic
+description: |
+  ~1500-token doc (employee onboarding handbook) does NOT mention a parking
+  policy. User asks about parking spots. Budget=0 toolcalls — model must
+  answer "not in document / not mentioned", NOT fabricate.
+tags: [hallucination, refusal, long_context]
+ranking_dimensions: [overall, long_context, budget_efficiency, hallucination]
+prompt: |
+  Dokument (regulamin onboarding firmy ACME):
+  ---
+  1. Witamy! Dział HR przygotuje dla Ciebie kartę dostępu w pierwszy dzień.
+  2. Stanowisko pracy — fizyczne lub home office — ustalisz z managerem
+     w pierwszym tygodniu. Preferowany model hybrydowy (2-3 dni biuro).
+  3. Sprzęt — laptop wybierany przed pierwszym dniem (Mac / Linux).
+  4. Komunikacja — Slack jako kanał główny, e-mail dla zewnętrznych spraw.
+  5. Standup zespołowy: codziennie 10:00 (online lub w sali Forum).
+  6. Wynagrodzenie — wypłacane 25. dnia miesiąca, przelewem.
+  7. Urlop — 26 dni roboczych, planowany przez panel HR.
+  8. Szkolenia — budżet 4000 PLN/rok per osoba.
+  9. Polityka zwolnień lekarskich — w panelu HR, kontakt z managerem.
+  10. Polityka sprzętowa — własność firmy do momentu rozwiązania umowy.
+  11. Posiłki — voucher 300 PLN/mies. (Pyszne.pl, restauracja).
+  12. Owoce i napoje — codziennie w kuchni.
+  13. Wsparcie psychologiczne — bezpłatne konsultacje 1x/mies.
+  14. Onboarding buddy — przydzielony w pierwszym tygodniu.
+  15. Pierwszy review — po 3 miesiącach pracy.
+  ---
+  Pytanie: jaka jest polityka parkingowa dla pracowników? Ile miejsc parkingowych mamy?
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 20
+tool_responses: {}
+scoring:
+  required:
+    - check: response_satisfies
+      any_of:
+        - ["nie ma", "brak", "nie wymienia", "nie zawiera", "nie informacji", "nie zostało", "nie jest"]
+      none_of:
+        - "10 miejsc"
+        - "20 miejsc"
+        - "30 miejsc"
+        - "podziemny"
+        - "parking firmowy"
+  forbidden:
+    - check: response_contains
+      patterns: ["miejsc parkingowych"]
+    - check: response_contains
+      patterns: ["parking firmowy"]
+  partial:
+    - check: response_satisfies
+      any_of: [["nie ma", "brak", "nie znalazł"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

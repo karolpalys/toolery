@@ -1,0 +1,37 @@
+id: easy-22-pl-date-recover
+title: "PL: odzyskanie po błędzie formatu daty"
+tier: easy
+category: error_recovery
+domain: generic
+description: |
+  Polish prompt with date in DD.MM.YYYY format. Calendar tool first rejects
+  with "expected ISO" error. Model must retry with ISO YYYY-MM-DD format.
+tags: [polish, retry, date_format]
+ranking_dimensions: [overall, localization, error_recovery]
+prompt: "Dodaj spotkanie z Anną na 03.06.2026 o 15:00 do kalendarza."
+tools: [add_calendar_event]
+budget:
+  max_tool_calls: 3
+  max_turns: 3
+  timeout_seconds: 40
+tool_responses:
+  add_calendar_event:
+    - match: { date: "2026-06-03" }
+      returns: { ok: true, id: "evt_123" }
+    - match: any
+      returns: { error: "invalid_date_format", expected: "YYYY-MM-DD" }
+scoring:
+  required:
+    - check: tool_args_contain
+      tool: add_calendar_event
+      args: { date: "2026-06-03" }
+    - check: call_count_at_most
+      n: 3
+  forbidden: []
+  partial:
+    - check: tool_called
+      tool: add_calendar_event
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

@@ -1,0 +1,39 @@
+id: easy-30-fix-format
+title: "Popraw format argumentu po błędzie tool"
+tier: easy
+category: parameter_precision
+domain: dev_ops
+description: |
+  Model calls http_get with a relative URL. Tool returns "expected absolute
+  URL". Model must retry with absolute https:// URL.
+tags: [retry, http]
+ranking_dimensions: [overall, parameter_precision, error_recovery]
+prompt: "Pobierz aktualny status serwisu z /healthz na hoście api.acme.com."
+tools: [http_get]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  http_get:
+    - match: { url: "https://api.acme.com/healthz" }
+      returns: { status: 200, body: "{\"ok\": true, \"version\": \"2.3.1\"}" }
+    - match: any
+      returns: { error: "expected_absolute_url", expected: "https://host/path" }
+scoring:
+  required:
+    - check: tool_args_contain
+      tool: http_get
+      args: { url: "https://api.acme.com/healthz" }
+    - check: call_count_at_most
+      n: 2
+  forbidden: []
+  partial:
+    - check: tool_called
+      tool: http_get
+    - check: response_contains
+      patterns: ["2.3.1"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

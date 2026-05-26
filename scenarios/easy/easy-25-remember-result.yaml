@@ -1,0 +1,38 @@
+id: easy-25-remember-result
+title: "Pamiętaj wynik z poprzedniego turn — bez ponownego wywołania"
+tier: easy
+category: context_state_tracking
+domain: generic
+description: |
+  Turn 1: fetch a value via tool. Turn 2: user references "that value" and
+  asks for a derived computation. Model must use the in-context value, NOT
+  call the tool again. Budget=1 enforces this.
+tags: [multi_turn, memoize]
+ranking_dimensions: [overall, context_state_tracking, budget_efficiency]
+prompt: |
+  Turn 1: "Sprawdź aktualny kurs USD/PLN." Turn 2: "Ile to będzie 250 USD w PLN według tego kursu?"
+tools: [get_exchange_rate]
+budget:
+  max_tool_calls: 1
+  max_turns: 3
+  timeout_seconds: 30
+tool_responses:
+  get_exchange_rate:
+    - match: any
+      returns: { pair: "USDPLN", rate: 4.10 }
+scoring:
+  required:
+    - check: call_count_at_most
+      n: 1
+    - check: response_satisfies
+      any_of: [["1025", "1,025", "1 025"]]
+  forbidden:
+    - check: response_contains
+      patterns: ["nie znam", "nie wiem"]
+  partial:
+    - check: response_satisfies
+      any_of: [["4.10", "4,10", "PLN"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
