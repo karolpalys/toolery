@@ -1,0 +1,64 @@
+id: medium-33-budget-pressure-doc
+title: "Dwa zapytania do tej samej sekcji 2k-tokenowego dokumentu"
+tier: medium
+category: hard_mode
+domain: generic
+description: |
+  Multi-turn over a ~2k-token policy document. Turn 1 asks about section X.
+  Turn 2 asks for a different fact from the SAME section. Model must reuse
+  in-context content rather than re-fetch. Budget = 2 total toolcalls.
+tags: [multi_turn, long_context, budget]
+ranking_dimensions: [overall, budget_efficiency, long_context, context_state_tracking]
+prompt: |
+  Dokument: regulamin programu lojalnościowego ACME PRIME (zobacz sekcje 1-8 poniżej).
+
+  §1 (Założenia) Program ACME PRIME to płatny program lojalnościowy. Składka
+    roczna: 199 PLN. Aktywowany w panelu klienta. Można zrezygnować w ciągu
+    14 dni od opłacenia (pełny zwrot).
+
+  §2 (Korzyści) Darmowa dostawa od 50 PLN, zniżka 10% na produkty ACME ORIGINS,
+    wcześniejszy dostęp do wyprzedaży (24h przed standardową bazą klientów),
+    dedykowane wsparcie telefoniczne 24/7.
+
+  §3 (Zwroty) Standardowe 14 dni. PRIME: 30 dni. Koszt zwrotu pokrywa ACME.
+
+  §4 (Wymiana punktów) Klient PRIME zbiera 2x punktów za każdy zakup. Punkty
+    wymienialne na bonusy w panelu klienta lub na bonus voucher 50 PLN
+    po zebraniu 1000 punktów.
+
+  §5 (Anulowanie) Anulowanie programu w panelu klienta. Po dacie zakończenia
+    nie ma zwrotów za niewykorzystane miesiące.
+
+  §6 (Reklamacje) Reklamacje rozpatrywane priorytetowo w 24h dla PRIME.
+
+  §7 (Polityka prywatności) Dane przetwarzane wyłącznie do celów programu.
+
+  §8 (Zmiana regulaminu) ACME zastrzega prawo do zmiany regulaminu z 30-dniowym
+    wyprzedzeniem.
+
+  Turn 1: "Z paragrafu 2 — jakie są główne korzyści programu?"
+  Turn 2: "A z tego samego paragrafu — czy wsparcie telefoniczne jest 24/7?"
+tools: [read_file]
+budget:
+  max_tool_calls: 2
+  max_turns: 3
+  timeout_seconds: 60
+tool_responses:
+  read_file:
+    - match: any
+      returns: { error: "no_external_doc_available" }
+scoring:
+  required:
+    - check: response_satisfies
+      any_of: [["24/7"], ["tak", "yes"]]
+      none_of: ["nie wiem", "brak informacji"]
+    - check: call_count_at_most
+      n: 1
+  forbidden: []
+  partial:
+    - check: response_satisfies
+      any_of: [["24"], ["dedykowan"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

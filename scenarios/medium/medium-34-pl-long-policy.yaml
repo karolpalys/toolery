@@ -1,0 +1,76 @@
+id: medium-34-pl-long-policy
+title: "PL: paragraf 7 — zwrot po 14 dniach?"
+tier: medium
+category: localization
+domain: generic
+description: |
+  Polish 1500-token regulamin embedded in prompt. Question targets §7
+  specifically. Budget=1 — model should answer from in-context content
+  without unnecessary tool calls.
+tags: [polish, long_context]
+ranking_dimensions: [overall, budget_efficiency, long_context, localization]
+prompt: |
+  Regulamin sklepu internetowego ACME (wyciąg):
+
+  §1 (Postanowienia ogólne) Sklep prowadzony przez ACME Sp. z o.o., NIP 1234567890.
+    Adres siedziby: ul. Próżna 5, Warszawa.
+
+  §2 (Zamówienia) Składanie zamówień przez panel klienta lub gościa. Po złożeniu
+    zamówienia klient otrzymuje e-mail potwierdzający.
+
+  §3 (Płatności) Dostępne metody: BLIK, karta, przelew tradycyjny. Płatność
+    pobierana w momencie potwierdzenia.
+
+  §4 (Dostawa) Kurier (24-48h), paczkomat (1-3 dni), odbiór osobisty (Warszawa).
+    Koszt dostawy: zależny od metody, od 9.99 PLN.
+
+  §5 (Reklamacje) Zgłoszenia w panelu klienta w terminie do 12 miesięcy od zakupu.
+    Czas rozpatrywania: 14 dni roboczych.
+
+  §6 (Bezpieczeństwo danych) Dane osobowe zgodnie z RODO. Polityka prywatności
+    dostępna w stopce strony.
+
+  §7 (Zwroty) Standardowy okres zwrotu: 14 dni kalendarzowych od daty
+    otrzymania przesyłki. Klient pokrywa koszt odesłania chyba że towar jest
+    wadliwy. Zwrot środków: 14 dni od otrzymania paczki przez sklep. Z tej
+    procedury nie można skorzystać dla produktów spersonalizowanych ani
+    higienicznych po naruszeniu opakowania.
+
+  §8 (Gwarancja) 24 miesiące dla osób fizycznych, 12 miesięcy dla działalności
+    gospodarczej. Zgłoszenia w punkcie serwisowym ACME.
+
+  §9 (Cookies) Strona korzysta z plików cookies w celach analitycznych.
+
+  §10 (Spory) Konsumenckie spory rozstrzygane przez sąd właściwy miejscowo dla
+    pozwanego lub przez UOKiK.
+
+  Pytanie: czy paragraf 7 dopuszcza zwrot towaru po 14 dniach od otrzymania?
+  Odpowiedz krótko i wskaż konkretny zapis.
+tools: [read_file]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 40
+tool_responses:
+  read_file:
+    - match: any
+      returns: { error: "no_external_doc" }
+scoring:
+  required:
+    - check: response_satisfies
+      any_of: [["nie", "tylko 14", "okres 14", "14 dni"]]
+      none_of: ["30 dni", "60 dni"]
+    - check: response_satisfies
+      any_of: [["14 dni", "kalendarz"]]
+    - check: call_count_at_most
+      n: 1
+  forbidden:
+    - check: response_contains
+      patterns: ["30 dni"]
+  partial:
+    - check: response_contains
+      patterns: ["14"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

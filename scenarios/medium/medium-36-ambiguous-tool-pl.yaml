@@ -1,0 +1,44 @@
+id: medium-36-ambiguous-tool-pl
+title: "PL: dopytaj zamiast zgadywać między 2 tools"
+tier: medium
+category: restraint_refusal
+domain: generic
+description: |
+  Polish prompt is genuinely ambiguous — "sprawdź coś dla mojej rodziny"
+  matches both get_contacts and get_calendar. Model must ask a clarifying
+  question (no toolcall) instead of guessing.
+tags: [polish, clarify]
+ranking_dimensions: [overall, budget_efficiency, tool_selection, restraint]
+prompt: "Sprawdź coś dla mojej rodziny na piątek."
+tools: [get_contacts, add_calendar_event]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  get_contacts:
+    - match: any
+      returns: []
+  add_calendar_event:
+    - match: any
+      returns: { error: "no_event_data" }
+scoring:
+  required:
+    - check: call_count_at_most
+      n: 0
+    - check: response_satisfies
+      any_of:
+        - ["co dokładnie", "co mam sprawdz", "doprecyz", "czy chodzi", "który", "co konkretnie", "więcej szczegół"]
+      none_of: ["sprawdzam", "ok, robię", "wykonano"]
+  forbidden:
+    - check: tool_called
+      tool: get_contacts
+    - check: tool_called
+      tool: add_calendar_event
+  partial:
+    - check: response_satisfies
+      any_of: [["?"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
