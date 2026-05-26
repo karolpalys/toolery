@@ -12,7 +12,7 @@ tags: [api, auth, multi_step, bearer_token]
 ranking_dimensions: [overall, agentic, parameter_precision]
 prompt: |
   Authenticate against the API at https://api.example.com with username
-  "kpalys" / password "hunter2" using POST /v1/auth/token. Then fetch
+  "pkarol" / password "hunter2" using POST /v1/auth/token. Then fetch
   /v1/me using the token you receive in the Authorization header and tell
   me the user's email.
 tools: [http_get, http_post]
@@ -37,8 +37,8 @@ tool_responses:
         status: 200
         body:
           id: "u-42"
-          email: "kpalys@company.com"
-          name: "Karol Palys"
+          email: "pkarol@company.com"
+          name: "P. Karol"
     - match: any
       returns: { status: 401, body: { error: "unauthorized" } }
 scoring:
@@ -59,7 +59,7 @@ scoring:
       arg: headers
       pattern: "Bearer eyJ\\.signed-jwt-abc123\\.def"
     - check: response_contains
-      patterns: ["kpalys@company.com"]
+      patterns: ["pkarol@company.com"]
     - check: call_count_at_most
       n: 2
   forbidden:
@@ -79,7 +79,7 @@ scoring:
       pattern: "/v1/auth/token"
     - check: response_satisfies
       any_of:
-        - ["kpalys", "email", "Karol"]
+        - ["pkarol", "email", "Karol"]
   weights:
     pass: 1.0
     partial: 0.5

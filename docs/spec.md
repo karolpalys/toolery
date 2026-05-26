@@ -1,7 +1,7 @@
 # LLM-test — Design Spec
 
 **Status:** Draft v1 — approved 2026-05-23
-**Owner:** Karol Pałys
+**Owner:** P. Karol
 **Repo:** `/home/rahueme/LLM-test`
 
 ---

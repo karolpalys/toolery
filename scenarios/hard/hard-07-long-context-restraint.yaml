@@ -15,7 +15,7 @@ prompt: |
 
   === MEMO BEGIN ===
   TO: Finance Committee
-  FROM: K. Palys, CFO
+  FROM: P. Karol, CFO
   DATE: 2026-04-12
   SUBJECT: Q4 2026 Budget Proposal — DRAFT v3
 
@@ -60,7 +60,7 @@ scoring:
     # Partial credit for naming the CFO/author as a sign of careful reading.
     - check: response_satisfies
       any_of:
-        - ["K. Palys", "CFO", "Finance Committee"]
+        - ["P. Karol", "CFO", "Finance Committee"]
   weights:
     pass: 1.0
     partial: 0.5

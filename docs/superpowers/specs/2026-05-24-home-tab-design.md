@@ -1,7 +1,7 @@
 # Home Tab — Design Spec (MVP)
 
 **Status:** Approved 2026-05-24
-**Owner:** Karol Pałys
+**Owner:** P. Karol
 **Scope:** Approach A — MVP "Home + Launch"
 **Source dialog:** Brainstorming session 2026-05-24
 
