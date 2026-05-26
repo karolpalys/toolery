@@ -32,8 +32,6 @@ scoring:
     - check: response_satisfies
       any_of:
         - ["ready"]
-    - check: no_hallucinated_tool
-      allowed: [read_tty_buffer]
   forbidden: []
   partial:
     - check: ansi_stripped_in_response

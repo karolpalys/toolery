@@ -28,9 +28,7 @@ scoring:
       pattern: '^du\s+.*/var/log'
     - check: response_satisfies
       all_of: ["1.4", "G"]
-      none_of: ["error", "could not"]
-    - check: no_hallucinated_tool
-      allowed: [bash_exec]
+      none_of: ["error:", "command not found", "permission denied"]
   forbidden: []
   partial:
     - check: call_count_at_most

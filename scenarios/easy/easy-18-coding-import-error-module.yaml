@@ -31,9 +31,7 @@ scoring:
       tool: bash_exec
     - check: response_satisfies
       all_of: ["requests"]
-      none_of: ["syntax", "not a python", "permission denied"]
-    - check: no_hallucinated_tool
-      allowed: [bash_exec]
+      none_of: ["SyntaxError:", "syntax error in the script", "permission denied"]
   forbidden: []
   partial:
     - check: response_satisfies

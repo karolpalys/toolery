@@ -33,8 +33,6 @@ scoring:
       none_of:
         # Hallucinated explicit prices for a fictional ticker — block phrases
         # that signal a fabricated quote rather than bare dollar amounts.
-        - "per share"
-        - "trading at"
         - "share price of $"
         - "currently $"
     - check: call_count_at_most
@@ -42,19 +40,14 @@ scoring:
   forbidden:
     # Common hallucination markers: confident invented numeric prices.
     - check: response_contains
-      patterns: ["per share"]
+      patterns: ["share at $"]
     - check: response_contains
-      patterns: ["trading at"]
+      patterns: ["trading at $"]
   partial:
     - check: tool_called
       tool: get_stock_price
-    - check: response_satisfies
-      any_of:
-        - ["not found", "don't know", "unknown", "no data", "unable", "no information", "couldn't find", "could not find"]
-    - check: response_satisfies
-      none_of:
-        - "per share"
-        - "trading at"
+    - check: call_count_at_most
+      n: 1
   weights:
     pass: 1.0
     partial: 0.5

@@ -28,6 +28,10 @@ scoring:
     - check: tool_args_contain
       tool: write_file
       args: { path: "/workspace/notes.md" }
+    - check: tool_args_match_regex
+      tool: write_file
+      arg: content
+      pattern: "Existing content"
   forbidden:
     - check: tool_args_match_regex
       tool: write_file
@@ -39,10 +43,6 @@ scoring:
     - check: tool_args_contain
       tool: read_file
       args: { path: "/workspace/notes.md" }
-    - check: tool_args_match_regex
-      tool: write_file
-      arg: content
-      pattern: "Existing content"
   weights:
     pass: 1.0
     partial: 0.5

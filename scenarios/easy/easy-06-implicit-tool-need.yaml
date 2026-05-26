@@ -32,7 +32,7 @@ scoring:
       any_of:
         - ["meeting", "moved", "4pm", "4 pm", "16:00", "reschedul"]
         - ["sent", "send", "email", "message"]
-      none_of: ["error", "couldn't find"]
+      none_of: ["an error", "error:", "couldn't send", "could not send"]
   forbidden:
     - check: tool_called
       tool: calculator

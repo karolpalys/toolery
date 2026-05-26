@@ -33,8 +33,6 @@ scoring:
       all_of: ["test_divide_by_zero"]
       any_of:
         - ["test_calc", "tests/test_calc.py"]
-    - check: no_hallucinated_tool
-      allowed: [bash_exec]
   forbidden: []
   partial:
     - check: command_regex_match

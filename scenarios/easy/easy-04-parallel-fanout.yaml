@@ -34,11 +34,10 @@ scoring:
       patterns: ["7", "10", "18"]
     - check: tool_called
       tool: get_weather
+    - check: tool_called_in_parallel
+      tools: [get_weather]
     - check: response_satisfies
-      any_of:
-        - ["Warsaw"]
-        - ["Berlin"]
-        - ["Tokyo"]
+      all_of: ["Warsaw", "Berlin", "Tokyo"]
   weights:
     pass: 1.0
     partial: 0.5

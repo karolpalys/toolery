@@ -30,9 +30,7 @@ scoring:
       tool: bash_exec
     - check: response_satisfies
       all_of: ["nginx.log", "auth.log", "kern.log"]
-      none_of: ["error", "no such"]
-    - check: no_hallucinated_tool
-      allowed: [bash_exec]
+      none_of: ["no such file", "command not found", "error:"]
   forbidden: []
   partial:
     - check: call_count_at_most

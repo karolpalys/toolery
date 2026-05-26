@@ -17,8 +17,9 @@ scoring:
   required:
     - check: tool_not_called
       tool: calculator
-    - check: response_contains
-      patterns: ["4"]
+    - check: response_satisfies
+      any_of:
+        - ["4", "four", "cztery"]
   forbidden: []
   partial:
     - check: response_satisfies

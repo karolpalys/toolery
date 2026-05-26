@@ -47,11 +47,7 @@ scoring:
         - "30 miejsc"
         - "podziemny"
         - "parking firmowy"
-  forbidden:
-    - check: response_contains
-      patterns: ["miejsc parkingowych"]
-    - check: response_contains
-      patterns: ["parking firmowy"]
+  forbidden: []
   partial:
     - check: response_satisfies
       any_of: [["nie ma", "brak", "nie znalazł"]]

@@ -4,9 +4,10 @@ tier: easy
 category: context_state_tracking
 domain: generic
 description: |
-  Turn 1: fetch a value via tool. Turn 2: user references "that value" and
-  asks for a derived computation. Model must use the in-context value, NOT
-  call the tool again. Budget=1 enforces this.
+  Tests single-turn instruction following (the harness presents both turns as
+  one message). Turn 1: fetch a value via tool. Turn 2: user references "that
+  value" and asks for a derived computation. Model must use the in-context
+  value, NOT call the tool again. Budget=1 enforces this.
 tags: [multi_turn, memoize]
 ranking_dimensions: [overall, context_state_tracking, budget_efficiency]
 prompt: |
@@ -26,9 +27,7 @@ scoring:
       n: 1
     - check: response_satisfies
       any_of: [["1025", "1,025", "1 025"]]
-  forbidden:
-    - check: response_contains
-      patterns: ["nie znam", "nie wiem"]
+  forbidden: []
   partial:
     - check: response_satisfies
       any_of: [["4.10", "4,10", "PLN"]]

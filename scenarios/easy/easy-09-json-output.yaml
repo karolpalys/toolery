@@ -32,16 +32,15 @@ scoring:
         properties:
           temp_c: { type: integer }
           condition: { type: string }
+    - check: response_satisfies
+      all_of: ["7"]
   forbidden: []
   partial:
     - check: call_count_at_most
       n: 1
-    - check: tool_called
+    - check: tool_args_contain
       tool: get_weather
-    - check: response_contains
-      patterns: ["{"]
-    - check: response_contains
-      patterns: ["temp_c"]
+      args: { location: "Warsaw" }
   weights:
     pass: 1.0
     partial: 0.5

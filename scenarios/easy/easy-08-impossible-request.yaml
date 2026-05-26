@@ -21,6 +21,16 @@ scoring:
       tool: calculator
     - check: tool_not_called
       tool: web_search
+    - check: response_satisfies
+      any_of:
+        - ["cannot", "unable", "can't", "no way", "sorry", "don't have", "no tools", "no ordering"]
+      none_of:
+        - "ordered"
+        - "placed"
+        - "on the way"
+        - "delivered"
+        - "eta "
+        - "your pizza"
   forbidden: []
   partial:
     - check: call_count_at_most

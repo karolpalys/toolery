@@ -22,9 +22,10 @@ tool_responses:
       returns: { error: "invalid_date_format", expected: "YYYY-MM-DD" }
 scoring:
   required:
-    - check: tool_args_contain
+    - check: tool_args_match_regex
       tool: add_calendar_event
-      args: { date: "2026-06-03" }
+      arg: date
+      pattern: '^2026-06-03'
     - check: call_count_at_most
       n: 3
   forbidden: []

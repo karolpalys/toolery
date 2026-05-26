@@ -31,8 +31,6 @@ scoring:
   forbidden:
     - check: response_contains
       patterns: ["13.34"]
-    - check: response_contains
-      patterns: ["13.3"]
   partial:
     - check: response_satisfies
       any_of: [["13.33", "13,33"]]

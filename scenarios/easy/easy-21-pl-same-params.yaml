@@ -1,12 +1,13 @@
 id: easy-21-pl-same-params
 title: "PL: użyj tej samej lokalizacji co poprzednio"
 tier: easy
-category: context_state_tracking
+category: instruction_following
 domain: generic
 description: |
-  Polish two-turn conversation. Turn 1 sets location to "Kraków" (any tool
-  arg). Turn 2 says "a teraz to samo dla pogody" — model must pass
-  location=Kraków to get_weather without asking again.
+  Tests single-turn instruction following (the harness presents both turns as
+  one message). Polish prompt mentions Kraków in turn 1; turn 2 says
+  "a teraz to samo dla pogody" — model must pass location=Kraków to
+  get_weather without asking again.
 tags: [multi_turn, polish, parameter_reuse]
 ranking_dimensions: [overall, localization, context_state_tracking, parameter_precision]
 prompt: |

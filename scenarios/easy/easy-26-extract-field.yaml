@@ -36,10 +36,8 @@ scoring:
       none_of: ["149", "69", "49"]
   forbidden:
     - check: response_contains
-      patterns: ["149"]
-  partial:
-    - check: response_satisfies
-      any_of: [["79"]]
+      patterns: ['"price": 149']
+  partial: []
   weights:
     pass: 1.0
     partial: 0.5

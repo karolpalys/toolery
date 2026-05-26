@@ -22,9 +22,10 @@ tool_responses:
       returns: { error: "expected_absolute_url", expected: "https://host/path" }
 scoring:
   required:
-    - check: tool_args_contain
+    - check: tool_args_match_regex
       tool: http_get
-      args: { url: "https://api.acme.com/healthz" }
+      arg: url
+      pattern: '^https://api\.acme\.com(:443)?/healthz/?(\?.*)?$'
     - check: call_count_at_most
       n: 2
   forbidden: []

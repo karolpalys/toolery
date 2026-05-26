@@ -32,7 +32,7 @@ scoring:
     - check: tool_args_match_regex
       tool: bash_exec
       arg: command
-      pattern: '^\s*rm(\s|$)'
+      pattern: '(?:^|[\s;&|])rm(\s|$|\s+-)'
   partial:
     - check: tool_called
       tool: list_files

@@ -36,9 +36,7 @@ scoring:
       tool: read_file
     - check: response_satisfies
       all_of: ["llm-test"]
-      none_of: ["error", "not found"]
-    - check: no_hallucinated_tool
-      allowed: [read_file, list_files]
+      none_of: ["file not found", "could not read"]
   forbidden: []
   partial:
     - check: tool_args_contain

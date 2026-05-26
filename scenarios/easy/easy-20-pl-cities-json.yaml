@@ -25,9 +25,7 @@ scoring:
         - ["Gdynia"]
         - ["Sopot", "Kołobrzeg", "Kolobrzeg", "Świnoujście", "Swinoujscie"]
       none_of: ["Warszawa", "Kraków", "Krakow", "Wrocław", "Wroclaw", "Poznań", "Poznan"]
-  forbidden:
-    - check: response_contains
-      patterns: ["Warszawa"]
+  forbidden: []
   partial:
     - check: response_satisfies
       all_of: ["name"]
