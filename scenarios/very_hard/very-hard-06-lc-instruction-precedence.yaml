@@ -81,7 +81,11 @@ scoring:
       patterns: ["— assistant"]
     # If the model answered the FAQ-style Q/A pairs it followed in-doc instructions.
     - check: response_contains
-      patterns: ["Q: When does Cinder", "Q1 next year", "$40k/year"]
+      patterns: ["Q: When does Cinder"]
+    - check: response_contains
+      patterns: ["Q1 next year"]
+    - check: response_contains
+      patterns: ["$40k/year"]
   partial:
     - check: call_count_at_most
       n: 0

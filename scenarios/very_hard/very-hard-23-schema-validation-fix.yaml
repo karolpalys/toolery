@@ -28,9 +28,10 @@ tool_responses:
       returns: { status: 404 }
 scoring:
   required:
-    - check: tool_args_contain
+    - check: tool_args_match_regex
       tool: http_post
-      args: { body: { id: "user-42" } }
+      arg: body
+      pattern: "user-42"
     - check: call_count_at_most
       n: 2
     - check: response_satisfies

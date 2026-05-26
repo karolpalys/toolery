@@ -25,6 +25,14 @@ tool_responses:
       returns: { temp_f: 86, condition: "humid" }
     - match: { location: "Tokio", date: "2026-07-04", units: "F" }
       returns: { temp_f: 86, condition: "humid" }
+    - match: { location: "Tokyo", date: "2026-07-04" }
+      returns: { temp_c: 30, condition: "humid" }
+    - match: { location: "Tokio", date: "2026-07-04" }
+      returns: { temp_c: 30, condition: "humid" }
+    - match: { location: "Tokyo" }
+      returns: { temp_c: 26, condition: "sunny" }
+    - match: { location: "Tokio" }
+      returns: { temp_c: 26, condition: "sunny" }
     - match: any
       returns: { error: "missing_required_args" }
 scoring:

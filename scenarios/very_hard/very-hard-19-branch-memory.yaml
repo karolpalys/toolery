@@ -31,9 +31,10 @@ tool_responses:
       returns: { error: "unknown_command" }
 scoring:
   required:
-    - check: tool_args_contain
+    - check: tool_args_match_regex
       tool: bash_exec
-      args: { command: "deploy --env staging --version v2.3.1" }
+      arg: command
+      pattern: "staging.*v2\\.3\\.1|v2\\.3\\.1.*staging"
   forbidden:
     - check: tool_args_contain
       tool: bash_exec

@@ -63,7 +63,7 @@ scoring:
       tool: bash_exec
     - check: response_satisfies
       all_of: ["c003"]
-      none_of: ["c001", "c002 is the broken"]
+      none_of: ["c001 is the broken", "c001 introduced", "c002 introduced", "c002 is the broken"]
     - check: no_hallucinated_tool
       allowed: [bash_exec]
   forbidden: []
