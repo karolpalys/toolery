@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -267,6 +268,123 @@ def load_active_use_case(results_dir: Path) -> tuple[str | None, dict[str, float
     return (key, dict(uc.weights))
 
 
+def _mean(values: list[float]) -> float | None:
+    return sum(values) / len(values) if values else None
+
+
+def _stddev(values: list[float]) -> float | None:
+    if len(values) < 2:
+        return 0.0 if values else None
+    m = sum(values) / len(values)
+    return math.sqrt(sum((v - m) ** 2 for v in values) / len(values))
+
+
+def _summarize_run_scores(run_scores: list[float]) -> dict[str, float | None]:
+    return {
+        "mean": _mean(run_scores),
+        "stddev": _stddev(run_scores),
+        "worst": min(run_scores) if run_scores else None,
+        "best": max(run_scores) if run_scores else None,
+        "pass_rate": (sum(1 for s in run_scores if s >= 1.0) / len(run_scores)) if run_scores else None,
+    }
+
+
+def compute_failure_breakdown(store: Store, dimensions: list[str] | None = None) -> dict[tuple[str, str], dict[str, int]]:
+    """Return failure_kind counts per (model, adapter).
+
+    `dimensions` optionally filters scenario_results by ranking dimension. Passing
+    ["overall"] includes all results, matching the overall ranking semantics.
+    """
+    runs = {r["run_id"]: r for r in store.fetch_all_runs()}
+    wanted = set(dimensions or [])
+    out: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    with store.conn() as c:
+        rows = [dict(r) for r in c.execute("SELECT * FROM scenario_results").fetchall()]
+    for row in rows:
+        meta = runs.get(row["run_id"])
+        if not meta:
+            continue
+        if wanted and "overall" not in wanted:
+            dims = set(json.loads(row["ranking_dims_json"] or "[]"))
+            if not dims.intersection(wanted):
+                continue
+        kind = row.get("failure_kind")
+        if not kind:
+            continue
+        out[(meta["model"], row["adapter"])][kind] += 1
+    return {k: dict(v) for k, v in out.items()}
+
+
+def collapse_matrix_rows(matrix: list[dict], mode: str = "pair") -> list[dict]:
+    """Collapse per-(model, adapter) matrix rows for different ranking views.
+
+    Modes:
+      - pair: one row per model+adapter
+      - model_best: one row per model, best overall adapter wins
+      - model_mean: one row per model, adapter scores averaged per dimension
+      - raw_only: one row per model for adapter == raw
+    """
+    if mode == "pair":
+        return [dict(r) for r in matrix]
+    if mode == "raw_only":
+        return [dict(r) for r in matrix if r.get("adapter") == "raw"]
+
+    grouped: dict[str, list[dict]] = defaultdict(list)
+    for row in matrix:
+        grouped[row["model"]].append(row)
+
+    out: list[dict] = []
+    if mode == "model_best":
+        for model, rows in grouped.items():
+            best = max(rows, key=lambda r: r.get("scores", {}).get("overall", -1.0))
+            merged = dict(best)
+            merged["adapter"] = best.get("adapter", "")
+            merged["adapters"] = [r.get("adapter") for r in rows]
+            merged["ranking_mode"] = mode
+            out.append(merged)
+        return out
+
+    if mode == "model_mean":
+        for model, rows in grouped.items():
+            dims = sorted({d for r in rows for d in r.get("scores", {})})
+            scores = {
+                d: sum(r["scores"][d] for r in rows if d in r.get("scores", {}))
+                / sum(1 for r in rows if d in r.get("scores", {}))
+                for d in dims
+            }
+            perf_keys = sorted({k for r in rows for k in r.get("perf", {})})
+            perf = {
+                k: sum(r["perf"][k] for r in rows if k in r.get("perf", {}))
+                / sum(1 for r in rows if k in r.get("perf", {}))
+                for k in perf_keys
+            }
+            out.append({
+                "model": model,
+                "adapter": "mean",
+                "adapters": [r.get("adapter") for r in rows],
+                "runs": sum(int(r.get("runs") or 0) for r in rows),
+                "scores": scores,
+                "perf": perf,
+                "scenarios_hashes": set().union(*(r.get("scenarios_hashes") or set() for r in rows)),
+                "stability": _merge_stability(rows),
+                "ranking_mode": mode,
+            })
+        return out
+
+    raise ValueError(f"unknown ranking collapse mode: {mode}")
+
+
+def _merge_stability(rows: list[dict]) -> dict[str, dict]:
+    dims = sorted({d for r in rows for d in r.get("stability", {})})
+    merged: dict[str, dict] = {}
+    for dim in dims:
+        means = [r["stability"][dim].get("mean") for r in rows if dim in r.get("stability", {})]
+        means = [m for m in means if m is not None]
+        if means:
+            merged[dim] = _summarize_run_scores(means)
+    return merged
+
+
 def compute_matrix(
     *, store: Store, dimensions: list[str],
     history_window_runs: int = 5, half_life_days: float = 14.0,
@@ -325,6 +443,7 @@ def compute_matrix(
     matrix: list[dict] = []
     for (model, adapter), dim_results in pairs.items():
         scores: dict[str, float] = {}
+        stability: dict[str, dict] = {}
         total_runs = 0
         for dim, items in dim_results.items():
             by_run: dict[str, list[tuple[float, str, str]]] = defaultdict(list)
@@ -335,6 +454,7 @@ def compute_matrix(
             runs_sorted = sorted(by_run.keys(), key=lambda rid: run_started[rid], reverse=True)
             recent = runs_sorted[:history_window_runs]
             decay_pairs: list[tuple[float, float]] = []
+            run_scores: list[float] = []
             for rid in recent:
                 items_in_run = by_run[rid]
                 if dim == "overall":
@@ -350,10 +470,12 @@ def compute_matrix(
                 weighted_mean = sum(
                     s * w for (s, _, _), w in zip(items_in_run, weights)
                 ) / w_sum
+                run_scores.append(weighted_mean)
                 age = max((now - _parse_iso(run_started[rid])).total_seconds() / 86400, 0)
                 decay_pairs.append((weighted_mean, age))
             if decay_pairs:
                 scores[dim] = decay_weighted_mean(decay_pairs, half_life_days)
+                stability[dim] = _summarize_run_scores(run_scores)
             total_runs = max(total_runs, len(runs_sorted))
             # If a use-case is active AND we're processing the overall dim,
             # compute an extra `use_case` score from the SAME per-run items
@@ -384,6 +506,7 @@ def compute_matrix(
             matrix.append({
                 "model": model, "adapter": adapter,
                 "runs": total_runs, "scores": scores,
+                "stability": stability,
                 "scenarios_hashes": pair_hashes[(model, adapter)],
             })
     return matrix

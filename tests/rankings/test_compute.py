@@ -54,3 +54,38 @@ def test_regenerate_overall_ranking(tmp_path):
     a_idx = md.index("model_a")
     b_idx = md.index("model_b")
     assert a_idx < b_idx
+
+
+def test_compute_matrix_exposes_stability_metrics(tmp_path):
+    store = _seed(tmp_path, "model_stable", [1.0, 0.0], ["overall"])
+    matrix = __import__("llm_test.rankings.compute", fromlist=["compute_matrix"]).compute_matrix(
+        store=store, dimensions=["overall"]
+    )
+    row = matrix[0]
+    assert "stability" in row
+    assert row["stability"]["overall"]["mean"] == 0.5
+    assert row["stability"]["overall"]["worst"] == 0.5
+    assert row["stability"]["overall"]["pass_rate"] == 0.0
+
+
+def test_collapse_matrix_rows_modes():
+    from llm_test.rankings.compute import collapse_matrix_rows
+    matrix = [
+        {"model": "m", "adapter": "raw", "runs": 1, "scores": {"overall": 0.4}, "perf": {}, "stability": {"overall": {"mean": 0.4}}, "scenarios_hashes": {"h"}},
+        {"model": "m", "adapter": "hermes", "runs": 1, "scores": {"overall": 0.8}, "perf": {}, "stability": {"overall": {"mean": 0.8}}, "scenarios_hashes": {"h"}},
+    ]
+    assert len(collapse_matrix_rows(matrix, "pair")) == 2
+    best = collapse_matrix_rows(matrix, "model_best")
+    assert len(best) == 1 and best[0]["adapter"] == "hermes"
+    mean = collapse_matrix_rows(matrix, "model_mean")
+    assert len(mean) == 1 and abs(mean[0]["scores"]["overall"] - 0.6) < 0.001
+    raw = collapse_matrix_rows(matrix, "raw_only")
+    assert len(raw) == 1 and raw[0]["adapter"] == "raw"
+
+
+def test_compute_failure_breakdown_counts_by_model_adapter(tmp_path):
+    store = _seed(tmp_path, "model_fail", [0.0, 0.0], ["overall", "coding"])
+    from llm_test.rankings.compute import compute_failure_breakdown
+    breakdown = compute_failure_breakdown(store)
+    assert breakdown[("model_fail", "raw")]["wrong_tool"] == 2
+    assert compute_failure_breakdown(store, dimensions=["coding"])[("model_fail", "raw")]["wrong_tool"] == 2
