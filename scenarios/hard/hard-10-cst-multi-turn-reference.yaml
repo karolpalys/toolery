@@ -1,13 +1,14 @@
 id: hard-10-cst-multi-turn-reference
-title: "Resolve a pronoun referring to a tool result from 2 turns ago"
+title: "Resolve a back-reference to fetched data within a single multi-step prompt"
 tier: hard
 category: context_state_tracking
 domain: generic
 description: |
-  Turn 1 user lists three stocks (TSLA, NVDA, AAPL) and asks for prices in
-  parallel. Turn 2 user says "send Bob the cheapest one" — model must resolve
-  "the cheapest one" against the prior parallel fetch (NVDA $128.10) and
-  compose the email accordingly. Tests cross-turn reference resolution.
+  Single user message with two sequential steps. Step 1 lists three stocks
+  (TSLA, NVDA, AAPL) and asks for prices in parallel. Step 2 says "send Bob
+  the cheapest one" — model must resolve "the cheapest one" against the
+  fetched prices (NVDA $128.10) and compose the email accordingly. Tests
+  intra-turn back-reference resolution and use of in-context tool results.
 tags: [context_state_tracking, multi_turn, parallel, pronoun_resolution]
 ranking_dimensions: [overall, context_state_tracking, agentic]
 prompt: |

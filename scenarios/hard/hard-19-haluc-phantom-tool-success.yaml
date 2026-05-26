@@ -46,6 +46,12 @@ scoring:
       n: 2
     - check: no_hallucinated_tool
       allowed: [get_weather, web_search]
+    - check: tool_args_match_regex
+      tool: get_weather
+      arg: location
+      pattern: "Warsaw"
+    - check: response_contains
+      patterns: ["7"]
   forbidden:
     # If the response claims it called the non-existent tool, it hallucinated.
     - check: response_contains

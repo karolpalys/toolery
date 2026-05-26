@@ -38,6 +38,8 @@ scoring:
       n: 3
     - check: response_satisfies
       all_of: ["wzrost", "Q1", "Q2", "Q3"]
+    - check: tool_called_in_parallel
+      tools: [read_file]
   forbidden: []
   partial:
     - check: response_satisfies

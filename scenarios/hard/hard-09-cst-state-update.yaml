@@ -45,7 +45,7 @@ scoring:
     - check: tool_args_match_regex
       tool: add_calendar_event
       arg: start
-      pattern: "2026-06-04T14:00"
+      pattern: "2026-06-04T14:00(:00)?(\\+02:00|Europe/Warsaw)"
     - check: tool_args_match_regex
       tool: add_calendar_event
       arg: attendees

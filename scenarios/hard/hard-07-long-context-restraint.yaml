@@ -45,8 +45,9 @@ scoring:
       tool: calculator
     - check: tool_not_called
       tool: read_file
-    - check: response_contains
-      patterns: ["2,310,000"]
+    - check: response_satisfies
+      any_of:
+        - ["2,310,000", "2310000", "$2.31M", "2.31M"]
     - check: response_contains
       patterns: ["2026-04-12"]
   forbidden: []

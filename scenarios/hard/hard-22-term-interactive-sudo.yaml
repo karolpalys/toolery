@@ -51,6 +51,12 @@ scoring:
       tool: process_start
     - check: no_hallucinated_tool
       allowed: [process_start, process_status, process_send_input]
+    - check: tool_called
+      tool: process_send_input
+    - check: tool_args_match_regex
+      tool: process_send_input
+      arg: text
+      pattern: "hunter2"
   forbidden: []
   partial:
     - check: tool_called

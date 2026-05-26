@@ -84,10 +84,12 @@ scoring:
       patterns: ["22%"]       # YoY growth %
     - check: response_contains
       patterns: ["26.6"]     # Operating margin %
-    - check: response_contains
-      patterns: ["4,213"]    # Headcount
-    - check: response_contains
-      patterns: ["1,842"]    # Cash & equivalents
+    - check: response_satisfies
+      any_of:
+        - ["4,213", "4213"]   # Headcount (either comma or no-comma)
+    - check: response_satisfies
+      any_of:
+        - ["1,842", "1842"]   # Cash & equivalents (either comma or no-comma)
     - check: call_count_at_most
       n: 0
   forbidden: []

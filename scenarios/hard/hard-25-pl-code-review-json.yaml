@@ -37,6 +37,8 @@ scoring:
     - check: response_satisfies
       all_of: ["discount"]
       any_of: [["-10"], ["ujemn"], ["negative"], ["<0"], ["less than 0"]]
+    - check: response_satisfies
+      all_of: ["{", "}", "[", "]", "\"issues\""]
   forbidden:
     - check: response_satisfies
       any_of: [["nie znalezion"], ["brak problemów"], ["wszystko ok"], ["no issues"]]

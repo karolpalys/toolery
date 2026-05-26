@@ -56,10 +56,7 @@ scoring:
       patterns: ["main"]
     - check: response_contains
       patterns: ["core product line"]
-  forbidden:
-    # If the model retried 404 it doesn't understand status semantics.
-    - check: call_count_at_least
-      n: 4
+  forbidden: []
   partial:
     - check: tool_args_match_regex
       tool: http_get

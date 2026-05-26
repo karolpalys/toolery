@@ -46,6 +46,8 @@ scoring:
       none_of: ["unrelated"]
     - check: response_satisfies
       any_of: [["a.kowalski@example.com"], ["Anna Kowalska"]]
+    - check: response_satisfies
+      all_of: ["{", "}", "\"id\"", "\"email\""]
   forbidden:
     - check: tool_called
       tool: http_get

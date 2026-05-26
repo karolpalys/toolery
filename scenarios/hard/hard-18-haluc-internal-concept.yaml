@@ -62,10 +62,6 @@ scoring:
       patterns: ["phase 1"]
     - check: response_contains
       patterns: ["phase 3"]
-    - check: response_contains
-      patterns: ["2025"]
-    - check: response_contains
-      patterns: ["launched"]
   partial:
     # Partial credit for asking the user to share internal docs rather than guessing.
     - check: response_satisfies

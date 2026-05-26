@@ -31,6 +31,9 @@ scoring:
   required:
     - check: tool_args_contain
       tool: http_get
+      args: { url: "https://api.acme.com/health/auth" }
+    - check: tool_args_contain
+      tool: http_get
       args: { url: "https://api-backup.acme.com/health/auth" }
     - check: response_satisfies
       all_of: ["service", "auth", "status", "version"]

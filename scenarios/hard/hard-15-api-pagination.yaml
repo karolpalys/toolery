@@ -22,21 +22,15 @@ tool_responses:
   http_paginate:
     - match: { url: "https://api.example.com/v1/users" }
       returns:
-        items: [{ "id": 1 }, { "id": 2 }, { "id": 3 }]   # page 1: 3 items (shortened)
-        page_meta: { "size": 50, "count": 50 }
-        item_count: 50
+        items: [{ "id": 1 }, { "id": 2 }, { "id": 3 }]   # page 1: 3 items
         next_cursor: "cur-page-2"
     - match: { url: "https://api.example.com/v1/users", cursor: "cur-page-2" }
       returns:
-        items: [{ "id": 51 }]
-        page_meta: { "size": 50, "count": 50 }
-        item_count: 50
+        items: [{ "id": 51 }]                            # page 2: 1 item
         next_cursor: "cur-page-3"
     - match: { url: "https://api.example.com/v1/users", cursor: "cur-page-3" }
       returns:
-        items: [{ "id": 101 }]
-        page_meta: { "size": 50, "count": 23 }
-        item_count: 23
+        items: [{ "id": 101 }]                           # page 3: 1 item
         next_cursor: null
     # If the model calls again after null cursor, complain.
     - match: any
@@ -56,9 +50,10 @@ scoring:
       tool: http_paginate
       arg: cursor
       pattern: "cur-page-3"
-    # Total = 50 + 50 + 23 = 123. Either spelling.
-    - check: response_contains
-      patterns: ["123"]
+    # Total = 3 + 1 + 1 = 5. Faithful counter sums actual items returned.
+    - check: response_satisfies
+      all_of: ["5"]
+      any_of: [["users", "items", "results", "total", "rows", "records"]]
   forbidden:
     # If model gives up after one page.
     - check: response_contains

@@ -30,7 +30,9 @@ tool_responses:
         duration_ms: 88
     - match: { command_regex: 'find.*\.gz' }
       returns:
-        stdout: "/backups/2026-04-snapshot.gz\n/backups/2026-03-snapshot.gz\n/backups/2026-02-snapshot.gz\n/backups/2026-01-snapshot.gz\n/backups/2025-12-snapshot.gz\n/backups/other.gz\n"
+        # Plain `find` returns alphabetical (directory order) — NOT size-sorted.
+        # Includes extra files; the top-5-by-size cannot be derived without sort|head.
+        stdout: "/backups/2025-12-snapshot.gz\n/backups/2026-01-snapshot.gz\n/backups/2026-02-snapshot.gz\n/backups/2026-03-snapshot.gz\n/backups/2026-04-snapshot.gz\n/backups/2026-05-tmp.gz\n/backups/archive-2024.gz\n/backups/other.gz\n"
         stderr: ""
         exit_code: 0
         duration_ms: 40

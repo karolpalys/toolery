@@ -39,6 +39,8 @@ scoring:
       n: 3
     - check: response_contains
       patterns: ["complete"]
+    - check: response_contains
+      patterns: ["14.2 GB"]
   forbidden: []
   partial:
     - check: call_count_at_most

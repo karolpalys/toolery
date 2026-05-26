@@ -64,6 +64,8 @@ scoring:
     - check: tool_args_contain
       tool: get_stock_price
       args: { symbol: "AAPL" }
+    - check: tool_called_in_parallel
+      tools: [get_stock_price]
   weights:
     pass: 1.0
     partial: 0.5
