@@ -282,6 +282,10 @@ class RankingsTab(Container):
         self._rows_cache: list[dict] = []
         self._matrix_cache: list[dict] = []
         self._mode = "model_best"
+        # Signature of the last rendered table. Lets the 5s polling skip the
+        # clear+rebuild when nothing changed — otherwise `tbl.clear()` resets
+        # the user's horizontal scroll position every 5 seconds.
+        self._last_render_sig: tuple | None = None
 
     def compose(self):
         yield Static(
@@ -329,14 +333,68 @@ class RankingsTab(Container):
         landed while the user was looking at another tab."""
         self.reload()
 
+    @staticmethod
+    def _signature_for_row(r: dict) -> tuple:
+        """Capture rendered fields only — used to detect 'nothing changed'."""
+        return (
+            r.get("model"), r.get("adapter"),
+            tuple(sorted((r.get("scores") or {}).items())),
+            tuple(sorted((r.get("perf") or {}).items())),
+            tuple(sorted((r.get("stability", {}).get("overall") or {}).items())),
+            r.get("runs"), bool(r.get("stale")), r.get("cluster"),
+        )
+
     # -- data loading --
     def reload(self) -> None:
         tbl = self.query_one("#rank-matrix", DataTable)
-        tbl.clear(columns=True)
         summary = self.query_one("#rank-summary", Static)
 
-        # Always register columns + accessors so headers are visible even
-        # before any run is recorded.
+        results_dir = Path(os.environ.get("LLM_TEST_RESULTS_DIR", "./results"))
+        db = results_dir / "runs.db"
+        if not db.exists():
+            summary.update("[dim italic]💤 No runs recorded yet. Use the Home tab to start a benchmark, then return here.[/dim italic]")
+            self._rows_cache = []
+            tbl.clear(columns=True)
+            self._last_render_sig = None
+            return
+        store = Store(db)
+        store.init_schema()
+
+        matrix = compute_matrix(store=store, dimensions=_DIMENSIONS)
+        if not matrix:
+            summary.update("[dim italic]💤 Database is empty. Use the Home tab to start a benchmark.[/dim italic]")
+            self._rows_cache = []
+            tbl.clear(columns=True)
+            self._last_render_sig = None
+            return
+
+        perf_agg = _aggregate_perf(store)
+        cluster_agg = _latest_cluster(store)
+        canonical_hash = _current_scenarios_hash()
+
+        for r in matrix:
+            key = (r["model"], r["adapter"])
+            r["perf"] = perf_agg.get(key, {})
+            r["cluster"] = cluster_agg.get(key)   # None when not recorded
+            hashes = r.get("scenarios_hashes") or set()
+            r["stale"] = bool(canonical_hash and hashes and canonical_hash not in hashes)
+
+        self._matrix_cache = matrix
+        self._rows_cache = self._rows_for_mode(matrix, canonical_hash)
+
+        # Skip the clear+rebuild if nothing user-visible has changed —
+        # preserves horizontal scroll position across the 5s polling loop.
+        sig = (self._mode,
+               tuple(self._signature_for_row(r) for r in self._rows_cache))
+        if sig == self._last_render_sig:
+            self._update_mode_buttons()
+            return
+        self._last_render_sig = sig
+
+        tbl.clear(columns=True)
+        # Re-register columns + sort accessors. Sort accessors are pure
+        # functions over a row dict — independent of current data — so
+        # rebuilding them here (only when data actually changed) is fine.
         for key, header in [("rank", "#"), ("model", "Model"), ("adapter", "Adapter")]:
             tbl.add_column(header, key=key)
         for dim in _DIMENSIONS:
@@ -353,7 +411,6 @@ class RankingsTab(Container):
             "adapter": lambda r: r["adapter"],
             "runs": lambda r: -(r.get("runs") or 0),
             "set": lambda r: 1 if r.get("stale") else 0,
-            # dual ranks before single ranks before unknown — purely display.
             "cluster": lambda r: {"dual": 0, "single": 1}.get(r.get("cluster"), 2),
         }
         for dim in _DIMENSIONS:
@@ -363,35 +420,6 @@ class RankingsTab(Container):
             self._sort_keys[f"perf:{p}"] = lambda r, p=p: -(r["perf"].get(p, -1.0))
         for s in _STABILITY_COLS:
             self._sort_keys[f"stab:{s}"] = lambda r, s=s: -(r.get("stability", {}).get("overall", {}).get(s) or -1.0)
-
-        results_dir = Path(os.environ.get("LLM_TEST_RESULTS_DIR", "./results"))
-        db = results_dir / "runs.db"
-        if not db.exists():
-            summary.update("[dim italic]💤 No runs recorded yet. Use the Home tab to start a benchmark, then return here.[/dim italic]")
-            self._rows_cache = []
-            return
-        store = Store(db)
-        store.init_schema()
-
-        matrix = compute_matrix(store=store, dimensions=_DIMENSIONS)
-        if not matrix:
-            summary.update("[dim italic]💤 Database is empty. Use the Home tab to start a benchmark.[/dim italic]")
-            self._rows_cache = []
-            return
-
-        perf_agg = _aggregate_perf(store)
-        cluster_agg = _latest_cluster(store)
-        canonical_hash = _current_scenarios_hash()
-
-        for r in matrix:
-            key = (r["model"], r["adapter"])
-            r["perf"] = perf_agg.get(key, {})
-            r["cluster"] = cluster_agg.get(key)   # None when not recorded
-            hashes = r.get("scenarios_hashes") or set()
-            r["stale"] = bool(canonical_hash and hashes and canonical_hash not in hashes)
-
-        self._matrix_cache = matrix
-        self._rows_cache = self._rows_for_mode(matrix, canonical_hash)
         self._populate_rows()
         self._update_mode_buttons()
 
