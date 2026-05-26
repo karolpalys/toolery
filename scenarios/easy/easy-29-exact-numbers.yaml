@@ -1,5 +1,5 @@
 id: easy-29-exact-numbers
-title: "JSON z min/max/avg — bez zaokrągleń"
+title: "JSON with min/max/avg — no rounding"
 tier: easy
 category: structured_output
 domain: generic
@@ -9,11 +9,11 @@ description: |
 tags: [json, math]
 ranking_dimensions: [overall, parameter_precision, structured_output, hallucination]
 prompt: |
-  Dla listy [12, 7, 23, 5, 19, 14] zwróć JSON z polami:
-    - min (liczba),
-    - max (liczba),
-    - avg (liczba, dokładnie do 2 miejsc po przecinku).
-  Tylko JSON, bez komentarza.
+  For the list [12, 7, 23, 5, 19, 14] return JSON with fields:
+    - min (number),
+    - max (number),
+    - avg (number, exactly 2 decimal places).
+  JSON only, no commentary.
 tools: []
 budget:
   max_tool_calls: 0

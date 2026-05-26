@@ -1,5 +1,5 @@
 id: hard-26-recover-then-format
-title: "Przełącz tool po błędzie, sformatuj wynik do JSON"
+title: "Switch tool after error, format result as JSON"
 tier: hard
 category: error_recovery
 domain: generic
@@ -10,10 +10,10 @@ description: |
 tags: [recovery, fallback, structured_output]
 ranking_dimensions: [overall, structured_output, tool_selection, error_recovery]
 prompt: |
-  Pobierz status `auth` z API i sformatuj jako JSON {"service": "auth", "status": <str>, "version": <str>}.
+  Fetch the `auth` service status from the API and format it as JSON {"service": "auth", "status": <str>, "version": <str>}.
   Primary: https://api.acme.com/health/auth
   Backup:  https://api-backup.acme.com/health/auth
-  Jeśli primary nie działa, użyj backup.
+  If the primary fails, use the backup.
 tools: [http_get]
 budget:
   max_tool_calls: 3

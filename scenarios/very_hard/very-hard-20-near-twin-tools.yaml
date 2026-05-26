@@ -11,7 +11,7 @@ description: |
   only one tool is registered.
 tags: [near_twin, parameter_choice]
 ranking_dimensions: [overall, parameter_precision, tool_selection]
-prompt: "Jaka będzie pogoda w Berlinie w piątek 2026-08-14?"
+prompt: "What will the weather be like in Berlin on Friday 2026-08-14?"
 tools: [get_weather_global]
 budget:
   max_tool_calls: 1

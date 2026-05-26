@@ -1,5 +1,5 @@
 id: easy-23-back-reference
-title: "Streść trzeci punkt z listy w dokumencie"
+title: "Summarize the third point from a list in a document"
 tier: easy
 category: context_state_tracking
 domain: generic
@@ -10,18 +10,18 @@ description: |
 tags: [in_context, positional_ref]
 ranking_dimensions: [overall, context_state_tracking, long_context]
 prompt: |
-  Dokument:
+  Document:
   ---
-  Projekt X — notatki ze spotkania (2026-04-12). Obecni: A, B, C, D. Zakres
-  spotkania: omówienie statusu i priorytetów. Decyzje:
-  1. Przyspieszyć pracę nad modułem auth do końca maja.
-  2. Zatrzymać prace nad legacy migracją do Q3.
-  3. Wybrać Postgres 16 jako docelową wersję bazy zamiast wcześniej rozważanego MySQL 8.
-  4. Powołać podzespół ds. bezpieczeństwa (3 osoby).
-  5. Zorganizować szkolenie z observability w czerwcu.
-  Następne kroki ustalone na 2026-04-19.
+  Project X — meeting notes (2026-04-12). Present: A, B, C, D. Scope of the
+  meeting: discuss status and priorities. Decisions:
+  1. Accelerate work on the auth module by the end of May.
+  2. Pause work on the legacy migration until Q3.
+  3. Choose Postgres 16 as the target database version instead of the previously considered MySQL 8.
+  4. Form a security sub-team (3 people).
+  5. Organize an observability training in June.
+  Next steps set for 2026-04-19.
   ---
-  Streść trzeci punkt jedną linijką.
+  Summarize the third item in one line.
 tools: []
 budget:
   max_tool_calls: 0
@@ -33,7 +33,7 @@ scoring:
     - check: response_satisfies
       any_of: [["Postgres", "PostgreSQL"]]
       all_of: ["MySQL"]
-      none_of: ["moduł auth", "legacy migr", "observability", "szkolenie", "podzespół"]
+      none_of: ["auth module", "legacy migration", "observability training", "security sub-team", "security subteam"]
   forbidden: []
   partial:
     - check: response_satisfies

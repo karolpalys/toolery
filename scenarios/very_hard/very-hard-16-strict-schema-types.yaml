@@ -1,5 +1,5 @@
 id: very-hard-16-strict-schema-types
-title: "JSON z null + enum — brakujące pola jako null, nie wymyślaj"
+title: "JSON with null + enum — missing fields as null, don't invent"
 tier: very_hard
 category: structured_output
 domain: generic
@@ -10,19 +10,19 @@ description: |
 tags: [json_schema, typed, hallucination]
 ranking_dimensions: [overall, hallucination, parameter_precision, structured_output]
 prompt: |
-  Z poniższego raportu bezpieczeństwa zwróć JSON wg schematu:
+  From the security report below, return JSON per this schema:
     {
       "title": <str>,
       "severity": <"low"|"medium"|"high">,
       "cve_id": <str|null>,
       "affected_versions": <str>
     }
-  Brak pola w źródle → null. Pole `severity` musi być z enum. Tylko JSON.
+  Missing field in source → null. The `severity` field must be from the enum. JSON only.
   ---
-  Raport: Wykryto problem w komponencie auth modułu v1.2.x — w niektórych
-  ścieżkach token sesji nie był odświeżany. Wpływ: średnie ryzyko utraty
-  uprawnień użytkownika. Wersje: 1.2.0-1.2.7. Brak przypisanego identyfikatora
-  CVE.
+  Report: An issue was detected in the auth component of module v1.2.x — on
+  some code paths the session token was not being refreshed. Impact: medium
+  risk of user privilege loss. Versions: 1.2.0-1.2.7. No CVE identifier has
+  been assigned.
   ---
 tools: []
 budget:

@@ -1,5 +1,5 @@
 id: very-hard-23-schema-validation-fix
-title: "Schema validator: brakuje id — uzupełnij i wyślij ponownie"
+title: "Schema validator: missing id — fill it in and resubmit"
 tier: very_hard
 category: error_recovery
 domain: dev_ops
@@ -10,9 +10,9 @@ description: |
 tags: [schema, validation, retry]
 ranking_dimensions: [overall, structured_output, error_recovery]
 prompt: |
-  Zapisz w API profil użytkownika o id "user-42": imię Marta, rola admin.
-  Endpoint: https://api.acme.com/profiles (POST, JSON). Jeśli API zwróci
-  błąd walidacji, przeczytaj pole `missing` i popraw payload.
+  Save a user profile via the API with id "user-42": name Marta, role admin.
+  Endpoint: https://api.acme.com/profiles (POST, JSON). If the API returns a
+  validation error, read the `missing` field and fix the payload.
 tools: [http_post]
 budget:
   max_tool_calls: 2

@@ -1,5 +1,5 @@
 id: easy-26-extract-field
-title: "Wyciągnij price z 1k-tokenowego changeloga"
+title: "Extract price from a 1k-token changelog"
 tier: easy
 category: structured_output
 domain: generic
@@ -10,18 +10,18 @@ description: |
 tags: [extraction, json]
 ranking_dimensions: [overall, long_context, structured_output, parameter_precision]
 prompt: |
-  Z poniższego changeloga wyciągnij końcową cenę produktu i zwróć JSON {"price": <wartość>}.
+  From the changelog below, extract the current product price and return JSON {"price": <value>}.
   ---
-  v1.0 (2025-01): wprowadzenie produktu. Cena startowa 49.00 PLN.
-  v1.1 (2025-04): drobne fixy, brak zmian cenowych.
-  v1.2 (2025-07): nowa skórka, cena bez zmian.
-  v2.0 (2025-12): refaktor backendu, dodano API. Podwyżka — cena 79.00 PLN.
-  v2.1 (2026-02): hotfix, brak zmian.
-  v2.2 (2026-03): integracja z SSO, brak zmian cenowych. Promocja sezonowa: 69.00 PLN do końca marca.
-  v2.3 (2026-04): koniec promocji, cena wraca do 79.00 PLN.
-  v2.4 (2026-05): nowy plan PRO. Cena podstawowa pozostaje 79.00 PLN, plan PRO 149.00 PLN/mies.
+  v1.0 (2025-01): product launch. Starting price 49.00 PLN.
+  v1.1 (2025-04): minor fixes, no price changes.
+  v1.2 (2025-07): new skin, price unchanged.
+  v2.0 (2025-12): backend refactor, API added. Price increase — price 79.00 PLN.
+  v2.1 (2026-02): hotfix, no changes.
+  v2.2 (2026-03): SSO integration, no price changes. Seasonal promotion: 69.00 PLN until end of March.
+  v2.3 (2026-04): end of promotion, price returns to 79.00 PLN.
+  v2.4 (2026-05): new PRO plan. Base price stays at 79.00 PLN, PRO plan 149.00 PLN/month.
   ---
-  Wyciągnij cenę podstawową (nie PRO, nie promocyjną, aktualnie obowiązującą).
+  Extract the base price (not PRO, not promotional, currently in effect).
 tools: []
 budget:
   max_tool_calls: 0

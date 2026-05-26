@@ -1,5 +1,5 @@
 id: medium-35-back-ref-list
-title: "Status drugiego i czwartego zadania z listy"
+title: "Status of the second and fourth tasks in the list"
 tier: medium
 category: context_state_tracking
 domain: dev_ops
@@ -10,7 +10,7 @@ description: |
 tags: [positional_ref, long_context]
 ranking_dimensions: [overall, long_context, context_state_tracking]
 prompt: |
-  Output z trackera projektu (numerowana lista 15 zadań):
+  Output from the project tracker (numbered list of 15 tasks):
   ---
   1. [done] Setup repo + CI                          owner: alice
   2. [in_progress] Auth module refactor              owner: bob, ETA: 2026-06-01
@@ -28,7 +28,7 @@ prompt: |
   14. [in_progress] Profile page                     owner: mia
   15. [done] Code review tooling                     owner: nico
   ---
-  Podaj status zadań #2 i #4 w jednym zdaniu (najpierw #2, potem #4).
+  Give the status of tasks #2 and #4 in one sentence (first #2, then #4).
 tools: []
 budget:
   max_tool_calls: 0
@@ -42,7 +42,7 @@ scoring:
     - check: response_satisfies
       any_of: [["blocked", "zablokowan"]]
     - check: response_satisfies
-      none_of: ["zadanie 2 jest done", "zadanie 4 jest todo", "#2 jest zakończ", "#4 jest ukończ"]
+      none_of: ["task 2 is done", "task 4 is todo", "#2 is done", "#4 is completed", "zadanie 2 jest done", "zadanie 4 jest todo", "#2 jest zakończ", "#4 jest ukończ"]
   forbidden: []
   partial:
     - check: call_count_at_most

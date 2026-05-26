@@ -1,5 +1,5 @@
 id: easy-30-fix-format
-title: "Popraw format argumentu po błędzie tool"
+title: "Fix argument format after tool error"
 tier: easy
 category: parameter_precision
 domain: dev_ops
@@ -8,7 +8,7 @@ description: |
   URL". Model must retry with absolute https:// URL.
 tags: [retry, http]
 ranking_dimensions: [overall, parameter_precision, error_recovery]
-prompt: "Pobierz aktualny status serwisu z /healthz na hoście api.acme.com."
+prompt: "Fetch the current service status from /healthz on host api.acme.com."
 tools: [http_get]
 budget:
   max_tool_calls: 2

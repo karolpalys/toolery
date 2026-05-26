@@ -1,5 +1,5 @@
 id: easy-25-remember-result
-title: "Pamiętaj wynik z poprzedniego turn — bez ponownego wywołania"
+title: "Remember the result from previous turn — no re-call"
 tier: easy
 category: context_state_tracking
 domain: generic
@@ -11,7 +11,7 @@ description: |
 tags: [multi_turn, memoize]
 ranking_dimensions: [overall, context_state_tracking, budget_efficiency]
 prompt: |
-  Turn 1: "Sprawdź aktualny kurs USD/PLN." Turn 2: "Ile to będzie 250 USD w PLN według tego kursu?"
+  Turn 1: "Check the current USD/PLN rate." Turn 2: "How much is 250 USD in PLN at that rate?"
 tools: [get_exchange_rate]
 budget:
   max_tool_calls: 1

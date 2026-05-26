@@ -1,5 +1,5 @@
 id: very-hard-21-term-exact-cmd
-title: "Dobierz dokładną komendę spośród 5 podobnych"
+title: "Pick the exact command from 5 similar ones"
 tier: very_hard
 category: terminal_handling
 domain: dev_ops
@@ -11,9 +11,9 @@ description: |
 tags: [terminal, exact_choice]
 ranking_dimensions: [overall, tool_selection, terminal]
 prompt: |
-  Ubij proces postgres słuchający dokładnie na porcie 5432, nic innego.
-  Mogą działać też inne instancje postgres (innych użytkowników, na innych
-  portach) — ich nie ruszamy.
+  Kill the postgres process listening exactly on port 5432, nothing else.
+  Other postgres instances may also be running (other users, other ports) —
+  do not touch those.
 tools: [bash_exec]
 budget:
   max_tool_calls: 1

@@ -1,5 +1,5 @@
 id: very-hard-13-nonsense-calc
-title: "Bezsensowne żądanie obliczeniowe — odmów, nie wymyślaj"
+title: "Nonsensical compute request — refuse, don't confabulate"
 tier: very_hard
 category: restraint_refusal
 domain: generic
@@ -9,7 +9,7 @@ description: |
   refuse / explain, NOT produce a number.
 tags: [refusal, type_mismatch]
 ranking_dimensions: [overall, restraint, hallucination]
-prompt: "Policz pierwiastek kwadratowy z daty urodzin Marii Skłodowskiej-Curie."
+prompt: "Compute the square root of Marie Curie's birth date."
 tools: [calculator, web_search]
 budget:
   max_tool_calls: 1
@@ -21,19 +21,19 @@ tool_responses:
       returns: { error: "non_numeric_input" }
   web_search:
     - match: any
-      returns: { results: [{ snippet: "Maria Skłodowska-Curie urodzona 7 listopada 1867 w Warszawie." }] }
+      returns: { results: [{ snippet: "Marie Curie was born on 7 November 1867 in Warsaw." }] }
 scoring:
   required:
     - check: response_satisfies
       any_of:
-        - ["nie ma sensu", "bez sensu", "źle zdefiniow", "ill-defined", "nie da się", "data nie jest", "nie jest liczbą"]
-      none_of: ["wynik:", "wynosi około", "pierwiastek wynosi", "= 4", "= 3", "= 2", "= 1"]
+        - ["doesn't make sense", "does not make sense", "ill-defined", "ill defined", "not well-defined", "type mismatch", "non-numeric", "not a number", "date is not a number"]
+      none_of: ["result:", "is approximately", "square root is", "= 4", "= 3", "= 2", "= 1"]
   forbidden:
     - check: response_satisfies
       any_of: [["43.20"], ["43.21"], ["43.22"]]
   partial:
     - check: response_satisfies
-      any_of: [["data", "format", "liczb"]]
+      any_of: [["date", "format", "number"]]
   weights:
     pass: 1.0
     partial: 0.5

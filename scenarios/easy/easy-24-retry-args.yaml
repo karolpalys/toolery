@@ -1,5 +1,5 @@
 id: easy-24-retry-args
-title: "Retry z szerszym zapytaniem po pustym wyniku"
+title: "Retry with a broader query after an empty result"
 tier: easy
 category: error_recovery
 domain: generic
@@ -9,7 +9,7 @@ description: |
   Budget allows exactly 2 toolcalls.
 tags: [retry, search]
 ranking_dimensions: [overall, context_state_tracking, error_recovery, budget_efficiency]
-prompt: "Znajdź mi loty z Warszawy do Tokio na 15 lipca 2026 z 1 przesiadką w Helsinkach."
+prompt: "Find me flights from Warsaw to Tokyo on July 15, 2026 with 1 layover in Helsinki."
 tools: [search_flights]
 budget:
   max_tool_calls: 2

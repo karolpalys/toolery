@@ -1,5 +1,5 @@
 id: easy-28-ls-largest
-title: "Znajdź największy plik w wyjściu ls -lh"
+title: "Find the largest file in ls -lh output"
 tier: easy
 category: terminal_handling
 domain: dev_ops
@@ -25,7 +25,7 @@ prompt: |
   -rw-r--r-- 1 root root   23K Apr 10 10:00 dmesg
   -rw-r--r-- 1 root root  450M Apr 10 10:00 redis.log
   ---
-  Który plik jest największy?
+  Which file is the largest?
 tools: []
 budget:
   max_tool_calls: 0
@@ -37,11 +37,12 @@ scoring:
     - check: response_satisfies
       all_of: ["nginx.access.log"]
       none_of:
-        - "mongodb.log to największy"
-        - "redis.log to największy"
-        - "nginx.error.log to największy"
-        - "mongodb.log jest największy"
-        - "redis.log jest największy"
+        - "mongodb.log is the largest"
+        - "redis.log is the largest"
+        - "nginx.error.log is the largest"
+        - "largest file is mongodb.log"
+        - "largest file is redis.log"
+        - "largest file is nginx.error.log"
   forbidden: []
   partial:
     - check: response_contains
