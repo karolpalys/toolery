@@ -106,6 +106,14 @@ class Store:
             rows = c.execute("SELECT * FROM scenario_results WHERE run_id=?", (run_id,)).fetchall()
         return [dict(r) for r in rows]
 
+    def count_results_for_run(self, run_id) -> int:
+        with self.conn() as c:
+            row = c.execute(
+                "SELECT COUNT(*) AS n FROM scenario_results WHERE run_id=?",
+                (run_id,),
+            ).fetchone()
+        return int(row["n"]) if row else 0
+
     def fetch_all_runs(self) -> list[dict]:
         with self.conn() as c:
             rows = c.execute("SELECT * FROM runs ORDER BY started_at DESC").fetchall()
