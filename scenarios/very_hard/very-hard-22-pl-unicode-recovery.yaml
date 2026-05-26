@@ -1,0 +1,41 @@
+id: very-hard-22-pl-unicode-recovery
+title: "PL: Polish chars cause tool error, recover with escapes"
+tier: very_hard
+category: error_recovery
+domain: dev_ops
+description: |
+  Polish city name "Łódź" in tool args triggers encoding error from
+  http_get. Model must retry with URL-encoded form (`%C5%81%C3%B3d%C5%BA`)
+  or ASCII fallback ("Lodz") that the tool accepts.
+tags: [polish, unicode, http]
+ranking_dimensions: [overall, localization, error_recovery]
+prompt: "Pobierz dane meteo dla miasta Łódź z https://api.acme.com/weather?city=Łódź"
+tools: [http_get]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 40
+tool_responses:
+  http_get:
+    - match: { url: "https://api.acme.com/weather?city=%C5%81%C3%B3d%C5%BA" }
+      returns: { status: 200, body: "{\"temp\": 11, \"condition\": \"cloudy\"}" }
+    - match: { url: "https://api.acme.com/weather?city=Lodz" }
+      returns: { status: 200, body: "{\"temp\": 11, \"condition\": \"cloudy\"}" }
+    - match: any
+      returns: { error: "url_encoding_invalid", hint: "use URL-encoded city name" }
+scoring:
+  required:
+    - check: tool_called
+      tool: http_get
+    - check: call_count_at_most
+      n: 2
+    - check: response_contains
+      patterns: ["11"]
+  forbidden: []
+  partial:
+    - check: response_contains
+      patterns: ["cloudy"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

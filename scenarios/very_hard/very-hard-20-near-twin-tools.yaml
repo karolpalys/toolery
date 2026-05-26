@@ -1,0 +1,40 @@
+id: very-hard-20-near-twin-tools
+title: "get_weather_global (current) vs get_weather_global (forecast)"
+tier: very_hard
+category: tool_selection
+domain: generic
+description: |
+  Two near-identical signatures: `get_weather_global(location)` for current
+  and `get_weather_global(location, date)` for forecast. Question asks for
+  forecast — model must include date arg (precise selection).
+tags: [near_twin, parameter_choice]
+ranking_dimensions: [overall, parameter_precision, tool_selection]
+prompt: "Jaka będzie pogoda w Berlinie w piątek 2026-08-14?"
+tools: [get_weather_global]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  get_weather_global:
+    - match: { location: "Berlin", date: "2026-08-14" }
+      returns: { temp_c: 24, condition: "sunny" }
+    - match: { location: "Berlin" }
+      returns: { error: "missing_date_for_forecast" }
+    - match: any
+      returns: { error: "city_not_found" }
+scoring:
+  required:
+    - check: tool_args_contain
+      tool: get_weather_global
+      args: { date: "2026-08-14" }
+    - check: response_contains
+      patterns: ["24"]
+  forbidden: []
+  partial:
+    - check: tool_called
+      tool: get_weather_global
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

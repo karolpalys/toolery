@@ -1,0 +1,55 @@
+id: very-hard-16-strict-schema-types
+title: "JSON z null + enum — brakujące pola jako null, nie wymyślaj"
+tier: very_hard
+category: structured_output
+domain: generic
+description: |
+  Strict JSON schema with required fields including `severity: enum
+  ("low"|"medium"|"high")` and `cve_id: string|null`. Input doc omits cve_id
+  — model must emit null, not invent a CVE.
+tags: [json_schema, typed, hallucination]
+ranking_dimensions: [overall, hallucination, parameter_precision, structured_output]
+prompt: |
+  Z poniższego raportu bezpieczeństwa zwróć JSON wg schematu:
+    {
+      "title": <str>,
+      "severity": <"low"|"medium"|"high">,
+      "cve_id": <str|null>,
+      "affected_versions": <str>
+    }
+  Brak pola w źródle → null. Pole `severity` musi być z enum. Tylko JSON.
+  ---
+  Raport: Wykryto problem w komponencie auth modułu v1.2.x — w niektórych
+  ścieżkach token sesji nie był odświeżany. Wpływ: średnie ryzyko utraty
+  uprawnień użytkownika. Wersje: 1.2.0-1.2.7. Brak przypisanego identyfikatora
+  CVE.
+  ---
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 30
+tool_responses: {}
+scoring:
+  required:
+    - check: response_satisfies
+      all_of: ["title", "severity", "cve_id", "affected_versions"]
+      any_of: [["medium"]]
+    - check: response_satisfies
+      any_of: [["null"]]
+      none_of: ["CVE-202"]
+  forbidden:
+    - check: response_contains
+      patterns: ["CVE-2025"]
+    - check: response_contains
+      patterns: ["CVE-2026"]
+    - check: response_contains
+      patterns: ["critical"]
+  partial:
+    - check: response_satisfies
+      all_of: ["severity"]
+      any_of: [["medium"]]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

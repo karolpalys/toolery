@@ -1,0 +1,47 @@
+id: very-hard-19-branch-memory
+title: "Branching workflow — zapamiętaj wybór ścieżki"
+tier: very_hard
+category: context_state_tracking
+domain: dev_ops
+description: |
+  Turn 1: user chooses path "B" (deploy to staging, not prod). Turn 2:
+  intermediate confirmation. Turn 3: user says "OK, idź dalej" — model must
+  call deploy on STAGING (path B), not prod.
+tags: [branching, multi_turn, deploy]
+ranking_dimensions: [overall, context_state_tracking, tool_selection]
+prompt: |
+  Turn 1: "Wdróż wersję v2.3.1. Najpierw na staging." (model potwierdza)
+  Turn 2: "Pokaż mi git_status przed wdrożeniem."
+  Turn 3: "OK, idź dalej z wdrożeniem."
+tools: [git_status, bash_exec]
+budget:
+  max_tool_calls: 3
+  max_turns: 4
+  timeout_seconds: 60
+tool_responses:
+  git_status:
+    - match: any
+      returns: "On branch main\nnothing to commit, working tree clean"
+  bash_exec:
+    - match: { command: "deploy --env staging --version v2.3.1" }
+      returns: { status: "deployed", env: "staging", version: "v2.3.1" }
+    - match: { command: "deploy --env production --version v2.3.1" }
+      returns: { error: "wrong_env_chosen" }
+    - match: any
+      returns: { error: "unknown_command" }
+scoring:
+  required:
+    - check: tool_args_contain
+      tool: bash_exec
+      args: { command: "deploy --env staging --version v2.3.1" }
+  forbidden:
+    - check: tool_args_contain
+      tool: bash_exec
+      args: { command: "deploy --env production --version v2.3.1" }
+  partial:
+    - check: response_contains
+      patterns: ["staging"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

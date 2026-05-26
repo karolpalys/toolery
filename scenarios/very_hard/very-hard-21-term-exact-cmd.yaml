@@ -1,0 +1,53 @@
+id: very-hard-21-term-exact-cmd
+title: "Dobierz dokładną komendę spośród 5 podobnych"
+tier: very_hard
+category: terminal_handling
+domain: dev_ops
+description: |
+  User wants to "kill the postgres process running on port 5432". Multiple
+  approaches (pkill, kill `pgrep`, lsof -ti, fuser -k, killall). Constraint:
+  only kill the process listening on port 5432 specifically, not all postgres.
+  Correct: `lsof -ti :5432 | xargs kill` (or `fuser -k 5432/tcp`).
+tags: [terminal, exact_choice]
+ranking_dimensions: [overall, tool_selection, terminal]
+prompt: |
+  Ubij proces postgres słuchający dokładnie na porcie 5432, nic innego.
+  Mogą działać też inne instancje postgres (innych użytkowników, na innych
+  portach) — ich nie ruszamy.
+tools: [bash_exec]
+budget:
+  max_tool_calls: 1
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  bash_exec:
+    - match: { command: "lsof -ti :5432 | xargs kill" }
+      returns: { stdout: "", exit: 0 }
+    - match: { command: "fuser -k 5432/tcp" }
+      returns: { stdout: "5432/tcp: 12345", exit: 0 }
+    - match: { command: "killall postgres" }
+      returns: { error: "too_broad" }
+    - match: { command: "pkill postgres" }
+      returns: { error: "too_broad" }
+    - match: any
+      returns: { error: "unsupported_command" }
+scoring:
+  required:
+    - check: response_satisfies
+      any_of:
+        - ["lsof -ti :5432", "fuser -k 5432"]
+      none_of: ["killall postgres", "pkill postgres"]
+  forbidden:
+    - check: tool_args_contain
+      tool: bash_exec
+      args: { command: "killall postgres" }
+    - check: tool_args_contain
+      tool: bash_exec
+      args: { command: "pkill postgres" }
+  partial:
+    - check: response_contains
+      patterns: ["5432"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

@@ -1,0 +1,47 @@
+id: very-hard-18-evolving-params
+title: "Akumulujące się constrainty na argumenty toolu"
+tier: very_hard
+category: parameter_precision
+domain: generic
+description: |
+  3-turn conversation. Each turn adds a constraint to the next get_weather
+  call. Turn 1: just location. Turn 2: also a future date. Turn 3: also
+  units in F. Model must carry forward all constraints and call with the
+  full set in turn 3.
+tags: [multi_turn, parameter_carryover]
+ranking_dimensions: [overall, parameter_precision, context_state_tracking]
+prompt: |
+  Turn 1: "Pogoda dla Tokio."
+  Turn 2: "A na 2026-07-04."
+  Turn 3: "I podaj w Fahrenheitach."
+tools: [get_weather_global]
+budget:
+  max_tool_calls: 3
+  max_turns: 4
+  timeout_seconds: 50
+tool_responses:
+  get_weather_global:
+    - match: { location: "Tokyo", date: "2026-07-04", units: "F" }
+      returns: { temp_f: 86, condition: "humid" }
+    - match: { location: "Tokio", date: "2026-07-04", units: "F" }
+      returns: { temp_f: 86, condition: "humid" }
+    - match: any
+      returns: { error: "missing_required_args" }
+scoring:
+  required:
+    - check: tool_args_contain
+      tool: get_weather_global
+      args: { units: "F" }
+    - check: tool_args_contain
+      tool: get_weather_global
+      args: { date: "2026-07-04" }
+    - check: response_contains
+      patterns: ["86"]
+  forbidden: []
+  partial:
+    - check: tool_called
+      tool: get_weather_global
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

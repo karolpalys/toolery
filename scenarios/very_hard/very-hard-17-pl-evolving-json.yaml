@@ -1,0 +1,38 @@
+id: very-hard-17-pl-evolving-json
+title: "PL: schema JSON ewoluuje — zachowaj poprzednie pola"
+tier: very_hard
+category: structured_output
+domain: generic
+description: |
+  Polish 3-turn conversation. Turn 1: produce JSON {name}. Turn 2: add
+  field {age}. Turn 3: add field {city}. Each turn must preserve prior
+  values and only extend the schema.
+tags: [polish, json, multi_turn]
+ranking_dimensions: [overall, localization, structured_output, context_state_tracking]
+prompt: |
+  Turn 1: "Zwróć JSON z polem `name`: Ania Kowalska. Tylko JSON."
+  Turn 2: "Dodaj pole `age` = 31."
+  Turn 3: "Dodaj pole `city` = Wrocław."
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 4
+  timeout_seconds: 40
+tool_responses: {}
+scoring:
+  required:
+    - check: response_satisfies
+      all_of: ["name", "age", "city"]
+      any_of: [["Ania", "Kowalska"]]
+    - check: response_satisfies
+      any_of: [["31"]]
+    - check: response_satisfies
+      any_of: [["Wrocław", "Wroclaw"]]
+  forbidden: []
+  partial:
+    - check: response_satisfies
+      all_of: ["name"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
