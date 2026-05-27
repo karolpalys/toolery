@@ -37,3 +37,21 @@ def test_store_inserts_and_reads_run(tmp_results_dir):
     assert len(rows) == 1
     assert rows[0]["status"] == "pass"
     assert rows[0]["score"] == 1.0
+
+
+def test_init_schema_creates_in_flight_units(tmp_results_dir):
+    store = Store(tmp_results_dir / "runs.db")
+    store.init_schema()
+    with store.conn() as c:
+        tables = {r[0] for r in c.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+        assert "in_flight_units" in tables
+        cols = {r[1] for r in c.execute("PRAGMA table_info(runs)").fetchall()}
+        assert "updated_at" in cols
+        cols_inflight = {r[1] for r in c.execute(
+            "PRAGMA table_info(in_flight_units)"
+        ).fetchall()}
+        assert cols_inflight == {
+            "run_id", "scenario_id", "adapter", "trial_index", "started_at"
+        }

@@ -40,6 +40,15 @@ CREATE TABLE IF NOT EXISTS perf_results (
   raw_json TEXT,
   PRIMARY KEY (run_id, depth)
 );
+CREATE TABLE IF NOT EXISTS in_flight_units (
+  run_id      TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+  scenario_id TEXT NOT NULL,
+  adapter     TEXT NOT NULL,
+  trial_index INTEGER NOT NULL,
+  started_at  TEXT NOT NULL,
+  PRIMARY KEY (run_id, scenario_id, adapter, trial_index)
+);
+CREATE INDEX IF NOT EXISTS idx_in_flight_run ON in_flight_units(run_id);
 CREATE INDEX IF NOT EXISTS idx_results_dim ON scenario_results(scenario_id, adapter);
 CREATE INDEX IF NOT EXISTS idx_results_model ON runs(model, started_at);
 CREATE INDEX IF NOT EXISTS idx_results_status ON scenario_results(status, failure_kind);
@@ -51,7 +60,8 @@ _MIGRATIONS = [
     "ALTER TABLE runs ADD COLUMN total_units INTEGER",
     "ALTER TABLE runs ADD COLUMN phase TEXT",
     "ALTER TABLE runs ADD COLUMN current_scenario TEXT",
-    "ALTER TABLE runs ADD COLUMN cluster TEXT",   # 'single' | 'dual' | NULL
+    "ALTER TABLE runs ADD COLUMN cluster TEXT",   # 'single' | 'dual' | 'triple' | 'quad' | NULL
+    "ALTER TABLE runs ADD COLUMN updated_at TEXT",
 ]
 
 
@@ -163,8 +173,14 @@ class Store:
             )
 
     def fetch_results_for_run(self, run_id) -> list[dict]:
+        # ORDER BY result_id → insertion order. Without it SQLite uses the
+        # UNIQUE autoindex and returns rows sorted by (scenario_id, adapter,
+        # trial_index), which breaks the TUI's append-only render assumption.
         with self.conn() as c:
-            rows = c.execute("SELECT * FROM scenario_results WHERE run_id=?", (run_id,)).fetchall()
+            rows = c.execute(
+                "SELECT * FROM scenario_results WHERE run_id=? ORDER BY result_id",
+                (run_id,),
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def fetch_all_runs(self) -> list[dict]:
