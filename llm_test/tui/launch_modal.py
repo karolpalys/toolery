@@ -85,7 +85,7 @@ class LaunchModal(ModalScreen[RunArgs | None]):
                     if not status.available:
                         text = f"{text}  - disabled ({status.reason})"
                     btn = RadioButton(text, id=f"adapter-{name}", disabled=not status.available)
-                    if name == "hermes":
+                    if name == "raw":
                         btn.value = True
                     yield btn
 
