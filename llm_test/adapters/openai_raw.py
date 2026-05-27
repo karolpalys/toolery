@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 import httpx
 
 from llm_test.core.models import Message, Scenario, ToolCall, TraceResult
+from llm_test.core.text_utils import strip_reasoning_tags
 from llm_test.tools.mock_runtime import MockToolRuntime
 from llm_test.tools.registry import ToolRegistry
 
@@ -62,6 +63,13 @@ class OpenAIRawAdapter:
                     fallback = msg.get("reasoning") or msg.get("reasoning_content")
                     if fallback:
                         msg["content"] = fallback
+                # Strip <think>/<thinking>/<reasoning> blocks from content. Some
+                # models (MiniMax-M2, DeepSeek-R1, QwQ, etc.) emit chain-of-thought
+                # inline in content; without stripping, structured-output checks
+                # (JSON/YAML schema, regex, response_contains) fail on otherwise
+                # correct answers and the model carries its own scratchpad into
+                # subsequent turn context.
+                msg["content"] = strip_reasoning_tags(msg.get("content"))
                 messages.append(msg)
                 tool_calls = msg.get("tool_calls") or []
                 if not tool_calls:

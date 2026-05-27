@@ -28,6 +28,32 @@ def _scenario():
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_openai_raw_strips_think_tags_from_content():
+    """Regression: MiniMax-M2 (and similar) embed <think>...</think> in the
+    same content field as the final answer. Adapter must strip so structured
+    rubrics see the clean payload."""
+    response = {
+        "choices": [{"message": {
+            "role": "assistant",
+            "content": "<think>The user wants temp in Warsaw. I should answer in JSON.</think>\n\n"
+                       '{"temp_c": 7, "condition": "cloudy"}',
+        }}]
+    }
+    respx.post("http://localhost:8000/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=response)
+    )
+    adapter = OpenAIRawAdapter(base_url="http://localhost:8000", api_key="x")
+    trace = await adapter.run_scenario(_scenario(), model="test-model", timeout=10)
+    assert trace.error is None
+    assert trace.final_response == '{"temp_c": 7, "condition": "cloudy"}'
+    # Also verify the message in conversation history is cleaned (so future
+    # turns don't carry the model's scratchpad back to it as context).
+    assistant_msgs = [m for m in trace.messages if m.role == "assistant"]
+    assert all("<think>" not in (m.content or "") for m in assistant_msgs)
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_openai_raw_handles_tool_call_then_final():
     first = {
         "choices": [{

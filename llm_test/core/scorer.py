@@ -12,6 +12,7 @@ import jsonschema
 import yaml
 
 from llm_test.core.models import CheckResult, ScoringCheck, ToolCall
+from llm_test.core.text_utils import unwrap_structured_payload
 
 
 def _implicit_partial_gradient_enabled() -> bool:
@@ -289,8 +290,9 @@ def check_response_matches_schema(calls, chk, response):
     if response is None:
         return _bad("response_matches_schema", "no response")
     schema = chk.model_dump()["schema"]
+    payload = unwrap_structured_payload(response)
     try:
-        data = json.loads(response)
+        data = json.loads(payload)
     except json.JSONDecodeError as e:
         return _bad("response_matches_schema", f"not valid JSON: {e}")
     try:
@@ -341,8 +343,9 @@ def check_response_csv(calls, chk, response):
     if response is None:
         return _bad("response_csv", "no response")
     d = chk.model_dump()
+    payload = unwrap_structured_payload(response)
     try:
-        rows = list(csv.reader(io.StringIO(response.strip())))
+        rows = list(csv.reader(io.StringIO(payload.strip())))
     except csv.Error as e:
         return _bad("response_csv", f"invalid CSV: {e}")
     if not rows:
@@ -365,8 +368,9 @@ def check_response_yaml(calls, chk, response):
     if response is None:
         return _bad("response_yaml", "no response")
     d = chk.model_dump()
+    payload = unwrap_structured_payload(response)
     try:
-        data = yaml.safe_load(response)
+        data = yaml.safe_load(payload)
     except yaml.YAMLError as e:
         return _bad("response_yaml", f"invalid YAML: {e}")
     schema = d.get("schema")
@@ -397,7 +401,8 @@ def check_response_markdown_table(calls, chk, response):
     if response is None:
         return _bad("response_markdown_table", "no response")
     d = chk.model_dump()
-    parsed = _parse_markdown_table(response)
+    payload = unwrap_structured_payload(response)
+    parsed = _parse_markdown_table(payload)
     if parsed is None:
         return _bad("response_markdown_table", "no markdown table found")
     header, rows = parsed

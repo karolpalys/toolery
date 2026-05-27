@@ -146,6 +146,38 @@ def test_implicit_gradient_off_does_not_affect_full_pass_path(monkeypatch):
     assert 0.0 < r.score < 1.0
 
 
+def test_schema_check_tolerates_think_tag_wrapped_json():
+    """Defense-in-depth: even if some adapter forgets to strip <think>...</think>,
+    response_matches_schema must still see the JSON payload underneath."""
+    scoring = Scoring(
+        required=[ScoringCheck.model_validate({
+            "check": "response_matches_schema",
+            "schema": {"type": "object", "required": ["temp_c"],
+                       "properties": {"temp_c": {"type": "integer"}}},
+        })],
+        forbidden=[], partial=[],
+    )
+    raw = "<think>The user wants weather. Answer in JSON.</think>\n\n" \
+          '{"temp_c": 7, "condition": "cloudy"}'
+    r = evaluate(_scenario(scoring), _trace(response=raw))
+    assert r.status == "pass"
+    assert r.score == 1.0
+
+
+def test_schema_check_tolerates_code_fence_wrapped_json():
+    """Defense-in-depth: ```json\\n{...}\\n``` wrapping must still parse."""
+    scoring = Scoring(
+        required=[ScoringCheck.model_validate({
+            "check": "response_matches_schema",
+            "schema": {"type": "object", "required": ["min", "max"]},
+        })],
+        forbidden=[], partial=[],
+    )
+    raw = '```json\n{"min": 5, "max": 23, "avg": 13.33}\n```'
+    r = evaluate(_scenario(scoring), _trace(response=raw))
+    assert r.status == "pass"
+
+
 def test_implicit_gradient_off_keeps_budget_violation_as_fail(monkeypatch):
     """Budget overruns and hallucinations stay hard-fail regardless of flag."""
     monkeypatch.setenv("LLM_TEST_PARTIAL_GRADIENT", "on")
