@@ -26,6 +26,7 @@ import time
 from datetime import UTC, datetime
 
 from llm_test.core.models import Message, Scenario, ToolCall, TraceResult
+from llm_test.core.text_utils import strip_reasoning_tags
 
 
 def _build_prompt(scenario: Scenario) -> str:
@@ -137,6 +138,11 @@ class HermesAdapter:
                     error = f"session export failed: {type(e).__name__}: {e}"
 
         final_response = final_response_db or final_response_stdout
+        # Strip <think>/<thinking>/<reasoning> blocks emitted inline by
+        # reasoning models (MiniMax-M2, DeepSeek-R1, QwQ, etc.). Without this,
+        # structured-output rubrics see the scratchpad and fail on otherwise
+        # correct payloads.
+        final_response = strip_reasoning_tags(final_response)
         duration_ms = int((time.monotonic() - started) * 1000)
         return TraceResult(
             scenario_id=scenario.id,

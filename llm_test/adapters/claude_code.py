@@ -7,6 +7,7 @@ import time
 from datetime import UTC, datetime
 
 from llm_test.core.models import Message, Scenario, ToolCall, TraceResult
+from llm_test.core.text_utils import strip_reasoning_tags
 
 
 def _build_prompt(scenario: Scenario) -> str:
@@ -60,6 +61,9 @@ class ClaudeCodeAdapter:
             error = f"claude_code CLI not found: {e}"
 
         tool_calls, final_response, session_id = self._parse_stream(stdout.decode(errors="replace"))
+        # Strip <think>/<thinking>/<reasoning> blocks emitted inline by
+        # reasoning models (MiniMax-M2, DeepSeek-R1, QwQ, etc.).
+        final_response = strip_reasoning_tags(final_response)
         duration_ms = int((time.monotonic() - started) * 1000)
         return TraceResult(
             scenario_id=scenario.id, adapter=self.name, trial_index=0,

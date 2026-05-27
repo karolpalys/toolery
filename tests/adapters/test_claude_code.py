@@ -54,3 +54,28 @@ async def test_claude_code_parses_stream_json():
     assert trace.tool_calls[0].args == {"location": "Warsaw"}
     assert trace.final_response == "It's 7°C."
     assert trace.adapter_metadata.get("session_id") == "s-x"
+
+
+_FAKE_STREAM_WITH_THINK = "\n".join([
+    json.dumps({"type": "system", "subtype": "init", "session_id": "s-y"}),
+    json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "text",
+         "text": "<think>I should respond with JSON.</think>\n\n"
+                 '{"temp_c": 7, "condition": "cloudy"}'}
+    ]}}),
+])
+
+
+@pytest.mark.asyncio
+async def test_claude_code_strips_think_tags_from_final_response():
+    """Regression: when a reasoning model is proxied through claude_code,
+    its text block may embed <think>...</think>. Adapter must strip."""
+    adapter = ClaudeCodeAdapter(cli_path="claude", backend_url="http://localhost:8000")
+    with patch("asyncio.create_subprocess_exec") as mp:
+        proc = AsyncMock()
+        proc.communicate = AsyncMock(return_value=(_FAKE_STREAM_WITH_THINK.encode(), b""))
+        proc.returncode = 0
+        mp.return_value = proc
+        trace = await adapter.run_scenario(_scenario(), model="local-model", timeout=10)
+    assert trace.final_response == '{"temp_c": 7, "condition": "cloudy"}'
+    assert "<think>" not in (trace.messages[1].content or "")

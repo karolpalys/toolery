@@ -95,6 +95,31 @@ async def test_hermes_cli_parses_stdout_and_session():
     assert call_count["n"] == 2
 
 
+_FAKE_STDOUT_WITH_THINK = (
+    "session_id: 20260527_140000_minimax\n"
+    "<think>The user wants weather in JSON form.</think>\n\n"
+    '{"temp_c": 7, "condition": "cloudy"}\n'
+)
+
+
+@pytest.mark.asyncio
+async def test_hermes_cli_strips_think_tags_from_final_response():
+    """Regression: MiniMax-M2 served through hermes CLI emits <think>...</think>
+    inline. Adapter must strip before downstream scoring sees it."""
+    async def fake_subprocess(*args, **kwargs):
+        proc = AsyncMock()
+        proc.communicate = AsyncMock(return_value=(_FAKE_STDOUT_WITH_THINK.encode(), b""))
+        proc.returncode = 0
+        return proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess):
+        adapter = HermesAdapter(cli_path="hermes")
+        trace = await adapter.run_scenario(_scenario(), model="MiniMax-M2.7", timeout=10)
+
+    assert trace.final_response == '{"temp_c": 7, "condition": "cloudy"}'
+    assert "<think>" not in (trace.messages[1].content or "")
+
+
 @pytest.mark.asyncio
 async def test_hermes_cli_handles_missing_session():
     """If session_id is missing from stdout, adapter still returns a trace."""
