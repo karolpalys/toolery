@@ -57,7 +57,7 @@ class LaunchModal(ModalScreen[RunArgs | None]):
                 with Vertical(id="tier-col"):
                     yield Label("Tier:")
                     with RadioSet(id="tier"):
-                        for value in ("easy", "medium", "hard", "very_hard", "all"):
+                        for value in ("all", "easy", "medium", "hard", "very_hard"):
                             btn = RadioButton(value, id=f"tier-{value}")
                             if value == "all":
                                 btn.value = True
