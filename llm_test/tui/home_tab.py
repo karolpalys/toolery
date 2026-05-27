@@ -56,6 +56,31 @@ _DIM_LABEL = {
 }
 
 
+def _build_plan(config_json: str, *,
+                scenario_ids_in_loader_order: list[str]
+                ) -> list[tuple[str, str, int]]:
+    """Reconstruct the full submission order Runner.run() would have used.
+
+    Order: scenario_loader_order × config["adapter"] × range(config["trials"]).
+    """
+    try:
+        cfg = json.loads(config_json or "{}")
+    except json.JSONDecodeError:
+        cfg = {}
+    adapters_field = cfg.get("adapter", [])
+    if isinstance(adapters_field, str):
+        adapters = [adapters_field]
+    else:
+        adapters = list(adapters_field)
+    trials = int(cfg.get("trials", 0) or 0)
+    plan: list[tuple[str, str, int]] = []
+    for sid in scenario_ids_in_loader_order:
+        for ad in adapters:
+            for t in range(trials):
+                plan.append((sid, ad, t))
+    return plan
+
+
 def _why_summary(status: str, failure_kind: str | None,
                  checks_json: str | None) -> str:
     if status == "pass":

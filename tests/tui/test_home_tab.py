@@ -85,3 +85,37 @@ async def test_row_select_invokes_app_opener():
         await pilot.pause()
     assert len(captured) == 1
     assert captured[0].port == 8888
+
+
+import json as _json
+from llm_test.tui.home_tab import _build_plan
+
+
+def test_build_plan_orders_scenario_adapter_trial():
+    config_json = _json.dumps({
+        "adapter": ["raw", "hermes"],
+        "trials": 3,
+        "tier": "easy",
+        "category": "all",
+    })
+
+    plan = _build_plan(
+        config_json,
+        scenario_ids_in_loader_order=["easy-01", "easy-02"],
+    )
+
+    # Expected: scenario-major, then adapter, then trial — matches Runner.run() order
+    assert plan == [
+        ("easy-01", "raw", 0), ("easy-01", "raw", 1), ("easy-01", "raw", 2),
+        ("easy-01", "hermes", 0), ("easy-01", "hermes", 1), ("easy-01", "hermes", 2),
+        ("easy-02", "raw", 0), ("easy-02", "raw", 1), ("easy-02", "raw", 2),
+        ("easy-02", "hermes", 0), ("easy-02", "hermes", 1), ("easy-02", "hermes", 2),
+    ]
+
+
+def test_build_plan_handles_single_adapter_string():
+    """If config_json has adapter as a string (legacy), still produce a plan."""
+    config_json = _json.dumps({"adapter": "raw", "trials": 2, "tier": "easy",
+                               "category": "all"})
+    plan = _build_plan(config_json, scenario_ids_in_loader_order=["easy-01"])
+    assert plan == [("easy-01", "raw", 0), ("easy-01", "raw", 1)]
