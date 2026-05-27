@@ -25,18 +25,31 @@ ScannerCallable = Callable[[list[int]], Awaitable[list[EndpointInfo]]]
 KnownProvider = Callable[[], set[str]]
 
 _STATUS_STYLE = {
-    "pass": "bold green",
-    "partial": "bold yellow",
-    "fail": "bold red",
+    "pass": "green",
+    "partial": "orange3",
+    "fail": "red",
     "error": "bold red",
-    "timeout": "bold red",
+    "timeout": "red dim",
+    "running": "magenta",
+    "upcoming": "grey50",
 }
 _STATUS_ICON = {
-    "pass": "✓",
-    "partial": "~",
-    "fail": "✗",
-    "error": "⚠",
+    "pass": "✅",
+    "partial": "⚠",
+    "fail": "❌",
+    "error": "💥",
     "timeout": "⏱",
+    "running": "⟳",
+    "upcoming": "⌛",
+}
+_STATUS_DISPLAY = {
+    "pass": "✅ pass",
+    "partial": "⚠ partial",
+    "fail": "❌ fail",
+    "error": "💥 error",
+    "timeout": "⏱ timeout",
+    "running": "⟳ running",
+    "upcoming": "⌛ upcoming",
 }
 
 UPCOMING_VISIBLE = 10
@@ -717,17 +730,37 @@ class HomeTab(Container):
 
     def _format_row(self, state: str, key: tuple[str, str, int],
                     payload: dict | None) -> tuple:
-        """Stub — Task 9 fills this in with proper colors."""
         scenario_id, adapter, trial_index = key
+        if state == "done":
+            status = payload.get("status") or "?"
+            style = _STATUS_STYLE.get(status, "bold")
+            display = _STATUS_DISPLAY.get(status, status)
+            why = _why_summary(status, payload.get("failure_kind"),
+                               payload.get("checks_json"))
+            tier = payload.get("tier") or "?"
+            score = f"{payload.get('score') or 0.0:.2f}"
+        elif state == "running":
+            style = _STATUS_STYLE["running"]
+            display = _STATUS_DISPLAY["running"]
+            why = "—"
+            tier = "—"
+            score = "—"
+        else:  # upcoming
+            style = _STATUS_STYLE["upcoming"]
+            display = _STATUS_DISPLAY["upcoming"]
+            why = "—"
+            tier = "—"
+            score = "—"
+        idx = len(self.query_one("#scenarios-table", DataTable).rows) + 1
         return (
-            Text(state),
-            Text(scenario_id),
-            Text("?"),                       # tier — filled by Task 9
-            Text(adapter),
-            Text(str(trial_index)),
-            Text(f"{(payload or {}).get('score') or 0.0:.2f}"),
-            Text(state),
-            Text("—"),
+            Text(str(idx), style=style),
+            Text(scenario_id, style=style),
+            Text(str(tier), style=style),
+            Text(adapter, style=style),
+            Text(str(trial_index), style=style),
+            Text(score, style=style),
+            Text(display, style=style),
+            Text(why, style=style),
         )
 
     def _maybe_autoscroll(self) -> None:
