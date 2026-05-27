@@ -27,7 +27,16 @@ def test_cli_run_wires_in_flight_callbacks(tmp_path, monkeypatch):
     import llm_test.cli as cli_module
 
     monkeypatch.setenv("LLM_TEST_RESULTS_DIR", str(tmp_path / "results"))
-    monkeypatch.setattr(cli_module, "load_all_scenarios", lambda _p: [])
+    import types
+    fake_scenario = types.SimpleNamespace(
+        id="easy-XX",
+        tier=types.SimpleNamespace(value="easy"),
+        category=types.SimpleNamespace(value="general"),
+        budget=types.SimpleNamespace(timeout_seconds=30),
+        tags=[],
+        ranking_dimensions=[],
+    )
+    monkeypatch.setattr(cli_module, "load_all_scenarios", lambda _p: [fake_scenario])
 
     captured: dict = {}
 

@@ -128,6 +128,9 @@ def run(
         xs = [s for s in xs if s.tier.value == tier]
     if category != "all":
         xs = [s for s in xs if s.category.value == category]
+    if not xs and not perf_only:
+        console.print("[red]No scenarios match filter.[/red]")
+        raise typer.Exit(2)
     api_model = served_model or model
     # NIM model IDs use `<org>/<name>` — strip the slash so we don't create
     # nested directories under results/runs/.
