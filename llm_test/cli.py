@@ -128,10 +128,6 @@ def run(
         xs = [s for s in xs if s.tier.value == tier]
     if category != "all":
         xs = [s for s in xs if s.category.value == category]
-    if not xs and not perf_only:
-        console.print("[red]No scenarios match filter.[/red]")
-        raise typer.Exit(2)
-
     api_model = served_model or model
     # NIM model IDs use `<org>/<name>` — strip the slash so we don't create
     # nested directories under results/runs/.
@@ -173,7 +169,21 @@ def run(
     if perf_only:
         console.print("[bold]Perf-only mode: skipping eval, running llama-benchy[/bold]")
     else:
-        runner = Runner(adapters=adapters, trials=trials, model=api_model, concurrency=concurrency)
+        # Defensive cleanup at startup: if a prior crashed session left orphan in_flight
+        # rows for this run_id (resume path), wipe them now before any task starts.
+        store.clear_all_in_flight(run_id)
+
+        def _on_start(scenario_id: str, adapter_name: str, trial_index: int,
+                      started_at: str) -> None:
+            store.mark_in_flight(run_id, scenario_id, adapter_name, trial_index, started_at)
+
+        def _on_end(scenario_id: str, adapter_name: str, trial_index: int) -> None:
+            store.clear_in_flight(run_id, scenario_id, adapter_name, trial_index)
+
+        runner = Runner(
+            adapters=adapters, trials=trials, model=api_model, concurrency=concurrency,
+            on_start=_on_start, on_end=_on_end,
+        )
         console.print(f"[bold]Running {len(xs)} scenarios × {len(adapters)} adapters × {trials} trials"
                       f" = {total_units} units[/bold]")
 
