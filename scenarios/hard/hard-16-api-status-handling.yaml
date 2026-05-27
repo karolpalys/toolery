@@ -26,8 +26,12 @@ tool_responses:
       returns:
         status: 404
         body: { error: "not_found", message: "project 'zzz' does not exist" }
+    # First time /main is hit return 503; second time return 200. Uses
+    # match_index (per-URL match counter), NOT call_index — call_index
+    # counts ALL http_get invocations globally, so any /zzz call before
+    # /main would shift the counter and skip this rule.
     - match: { url: "https://api.example.com/v1/projects/main" }
-      call_index: 0
+      match_index: 0
       returns:
         status: 503
         body: { error: "service_unavailable", message: "upstream timeout" }

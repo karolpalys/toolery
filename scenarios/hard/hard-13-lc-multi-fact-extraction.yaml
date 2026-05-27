@@ -80,8 +80,12 @@ scoring:
       tool: read_file
     - check: response_contains
       patterns: ["487"]      # Q3 revenue
-    - check: response_contains
-      patterns: ["22%"]       # YoY growth %
+    # YoY growth — accept bare "22" or "22%"/"22 percent". Original literal
+    # "22%" rejected models that follow the prompt's "one figure per line"
+    # rule strictly (the row is already labeled "(percent)"). \b22\b is
+    # token-bounded — won't match inside "228" or "1,842".
+    - check: response_matches_regex
+      all_of: ['\b22\b']
     - check: response_contains
       patterns: ["26.6"]     # Operating margin %
     - check: response_satisfies

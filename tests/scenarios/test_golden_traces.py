@@ -79,3 +79,71 @@ def test_golden_ordered_strict_schema_passes():
         ],
         '{"id": 42, "email": "a.kowalski@example.com", "name": "Anna Kowalska", "joined_at": "2024-03-12", "tier": "prime"}',
     )
+
+
+def test_golden_hard13_accepts_bare_22_per_prompt_convention():
+    """Models that strictly follow the prompt's 'one figure per line' rule emit
+    bare numbers (22, not "22%"). The percent-suffix variant must also pass."""
+    # Bare numbers — what the Qwen models actually emit. Pre-fix this failed
+    # req[4] because the rubric required the literal "22%".
+    _assert_pass(
+        "scenarios/hard/hard-13-lc-multi-fact-extraction.yaml",
+        [],
+        "487\n22\n26.6\n4,213\n1,842",
+    )
+    # Percent suffix — what MiniMax-NVFP4 emits. Must also pass.
+    _assert_pass(
+        "scenarios/hard/hard-13-lc-multi-fact-extraction.yaml",
+        [],
+        "487\n22%\n26.6%\n4,213\n1,842",
+    )
+
+
+def test_golden_hard03_polling_until_complete_passes():
+    """Submit + poll: first 2 status checks return pending, 3rd+ returns
+    complete. The bash_exec tool's 'command' arg key pairs with both the
+    mock match rules and the command_regex_match partial check."""
+    _assert_pass(
+        "scenarios/hard/hard-03-async-polling.yaml",
+        [
+            ToolCall(index=0, name="bash_exec", args={"command": "backup_script.sh start"}),
+            ToolCall(index=1, name="bash_exec", args={"command": "backup_script.sh status"}),
+            ToolCall(index=2, name="bash_exec", args={"command": "backup_script.sh status"}),
+            ToolCall(index=3, name="bash_exec", args={"command": "backup_script.sh status"}),
+        ],
+        "Backup job submitted and polled; it is now complete (14.2 GB written).",
+    )
+
+
+def test_golden_hard16_three_call_retry_sequence_passes():
+    """Correct behavior: 1 call to /zzz (404 → give up) + 2 calls to /main
+    (503 → retry → 200). The scenario's `match_index: 0` on the 503 rule
+    must fire on the first /main regardless of the prior /zzz call."""
+    base = "https://api.example.com"
+    _assert_pass(
+        "scenarios/hard/hard-16-api-status-handling.yaml",
+        [
+            ToolCall(index=0, name="http_get", args={"url": f"{base}/v1/projects/zzz"}),
+            ToolCall(index=1, name="http_get", args={"url": f"{base}/v1/projects/main"}),
+            ToolCall(index=2, name="http_get", args={"url": f"{base}/v1/projects/main"}),
+        ],
+        "Project 'zzz' does not exist. Project 'main' is the core product line — "
+        "primary backend, owned by platform-team.",
+    )
+
+
+def test_golden_medium22_accepts_qualified_table_name():
+    """The prompt says the table lives in the analytics schema, so a model
+    that uses the qualified name 'analytics.orders' (or the bare 'orders')
+    must both score full credit."""
+    sql = ("SELECT customer_id, AVG(amount_cents) FROM analytics.orders "
+           "WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY customer_id")
+    for describe_arg in ("orders", "analytics.orders"):
+        _assert_pass(
+            "scenarios/medium/medium-22-db-describe-then-query.yaml",
+            [
+                ToolCall(index=0, name="sql_describe", args={"table": describe_arg}),
+                ToolCall(index=1, name="sql_query", args={"sql": sql}),
+            ],
+            "Average order amount per customer over the last 30 days.",
+        )

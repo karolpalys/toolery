@@ -12,29 +12,34 @@ prompt: |
   Submit a backup job by running `backup_script.sh start`. It runs asynchronously.
   Then poll its status with `backup_script.sh status` until it reports complete,
   and tell me the result. Don't run more than 4 status checks.
-tools: [run_bash]
+# Use bash_exec (canonical shell primitive — args key "command:") instead of
+# run_bash (which uses "cmd:" and doesn't pair with command_regex_match).
+# Original used run_bash with match keyed on "command:" — model called with
+# "cmd:" per schema, mock fell through to "unknown cmd", scenario was unable
+# to test polling at all.
+tools: [bash_exec]
 budget:
   max_tool_calls: 5
   max_turns: 5
   timeout_seconds: 90
 tool_responses:
-  run_bash:
+  bash_exec:
     - match: { command: "backup_script.sh start" }
-      returns: { stdout: "submitted job_id=4271", stderr: "", returncode: 0 }
+      returns: { stdout: "submitted job_id=4271", stderr: "", exit_code: 0 }
+    # First two status polls report pending; third+ reports complete. Uses
+    # match_index (per-status-call counter) so models can poll robustly
+    # without the result depending on what other commands they ran first.
     - match: { command: "backup_script.sh status" }
-      call_index: 1
-      returns: { stdout: "pending", stderr: "", returncode: 0 }
+      match_index: ">=2"
+      returns: { stdout: "complete: 14.2 GB written", stderr: "", exit_code: 0 }
     - match: { command: "backup_script.sh status" }
-      call_index: 2
-      returns: { stdout: "pending", stderr: "", returncode: 0 }
-    - match: { command: "backup_script.sh status" }
-      returns: { stdout: "complete: 14.2 GB written", stderr: "", returncode: 0 }
+      returns: { stdout: "pending", stderr: "", exit_code: 0 }
     - match: any
-      returns: { stdout: "", stderr: "unknown cmd", returncode: 1 }
+      returns: { stdout: "", stderr: "unknown cmd", exit_code: 1 }
 scoring:
   required:
     - check: tool_called
-      tool: run_bash
+      tool: bash_exec
     - check: call_count_at_least
       n: 3
     - check: response_contains
@@ -46,10 +51,10 @@ scoring:
     - check: call_count_at_most
       n: 5
     - check: command_regex_match
-      tool: run_bash
+      tool: bash_exec
       pattern: "backup_script\\.sh start"
     - check: command_regex_match
-      tool: run_bash
+      tool: bash_exec
       pattern: "backup_script\\.sh status"
   weights:
     pass: 1.0
