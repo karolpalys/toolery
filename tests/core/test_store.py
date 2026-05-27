@@ -111,3 +111,33 @@ def test_mark_stale_aborted_clears_and_updates_status(tmp_results_dir):
     store.mark_stale_aborted(run_id)
     assert store.fetch_in_flight_for_run(run_id) == []
     assert store.fetch_run(run_id)["status"] == "aborted"
+
+
+def test_finish_run_clears_orphan_in_flight(tmp_results_dir):
+    store = Store(tmp_results_dir / "runs.db")
+    store.init_schema()
+    run_id = "ending-run"
+    store.create_run(run_id=run_id, model="m", base_url="http://x",
+                     started_at="2026-05-27T20:00:00Z",
+                     config_json="{}", scenarios_hash="x")
+    store.mark_in_flight(run_id, "easy-01", "raw", 0, "2026-05-27T20:00:01Z")
+    store.mark_in_flight(run_id, "easy-02", "raw", 0, "2026-05-27T20:00:02Z")
+
+    store.finish_run(run_id, finished_at="2026-05-27T20:05:00Z",
+                    duration_s=300.0, status="done")
+    assert store.fetch_in_flight_for_run(run_id) == []
+
+
+def test_reopen_run_clears_orphan_in_flight(tmp_results_dir):
+    store = Store(tmp_results_dir / "runs.db")
+    store.init_schema()
+    run_id = "resuming-run"
+    store.create_run(run_id=run_id, model="m", base_url="http://x",
+                     started_at="2026-05-27T20:00:00Z",
+                     config_json="{}", scenarios_hash="x")
+    store.finish_run(run_id, finished_at="2026-05-27T20:05:00Z",
+                    duration_s=300.0, status="aborted")
+    store.mark_in_flight(run_id, "easy-01", "raw", 0, "2026-05-27T20:00:01Z")
+
+    store.reopen_run(run_id)
+    assert store.fetch_in_flight_for_run(run_id) == []

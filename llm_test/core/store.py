@@ -119,6 +119,7 @@ class Store:
                 "WHERE run_id=?",
                 (finished_at, duration_s, status, run_id),
             )
+            c.execute("DELETE FROM in_flight_units WHERE run_id=?", (run_id,))
 
     def count_results_for_run(self, run_id: str) -> int:
         with self.conn() as c:
@@ -143,13 +144,15 @@ class Store:
         return {(r[0], r[1], int(r[2])) for r in rows}
 
     def reopen_run(self, run_id: str) -> None:
-        """Reset a finished/aborted run back to 'running' so resume can append more results."""
+        """Reset a finished/aborted run back to 'running' so resume can append more results.
+        Also clears any stale in_flight_units that might survive from a crashed prior session."""
         with self.conn() as c:
             c.execute(
                 "UPDATE runs SET status='running', finished_at=NULL, duration_s=NULL, "
                 "phase='scenarios' WHERE run_id=?",
                 (run_id,),
             )
+            c.execute("DELETE FROM in_flight_units WHERE run_id=?", (run_id,))
 
     def upsert_adapter(self, run_id, adapter, adapter_version):
         with self.conn() as c:
