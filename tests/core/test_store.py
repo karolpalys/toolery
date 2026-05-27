@@ -82,3 +82,32 @@ def test_in_flight_round_trip(tmp_results_dir):
     rows = store.fetch_in_flight_for_run(run_id)
     assert len(rows) == 1
     assert rows[0]["trial_index"] == 1
+
+
+def test_clear_all_in_flight_removes_only_target_run(tmp_results_dir):
+    store = Store(tmp_results_dir / "runs.db")
+    store.init_schema()
+    for rid in ("run-a", "run-b"):
+        store.create_run(run_id=rid, model="m", base_url="http://x",
+                         started_at="2026-05-27T20:00:00Z",
+                         config_json="{}", scenarios_hash="x")
+        store.mark_in_flight(rid, "easy-01", "raw", 0, "2026-05-27T20:00:01Z")
+        store.mark_in_flight(rid, "easy-01", "raw", 1, "2026-05-27T20:00:02Z")
+
+    store.clear_all_in_flight("run-a")
+    assert store.fetch_in_flight_for_run("run-a") == []
+    assert len(store.fetch_in_flight_for_run("run-b")) == 2
+
+
+def test_mark_stale_aborted_clears_and_updates_status(tmp_results_dir):
+    store = Store(tmp_results_dir / "runs.db")
+    store.init_schema()
+    run_id = "stale-run"
+    store.create_run(run_id=run_id, model="m", base_url="http://x",
+                     started_at="2026-05-27T20:00:00Z",
+                     config_json="{}", scenarios_hash="x")
+    store.mark_in_flight(run_id, "easy-01", "raw", 0, "2026-05-27T20:00:01Z")
+
+    store.mark_stale_aborted(run_id)
+    assert store.fetch_in_flight_for_run(run_id) == []
+    assert store.fetch_run(run_id)["status"] == "aborted"

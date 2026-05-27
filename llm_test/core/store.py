@@ -219,6 +219,22 @@ class Store:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def clear_all_in_flight(self, run_id: str) -> None:
+        """Bulk wipe of in-flight rows for a run. Used by finish_run, reopen_run,
+        CLI startup defensive cleanup, and stale detection."""
+        with self.conn() as c:
+            c.execute("DELETE FROM in_flight_units WHERE run_id=?", (run_id,))
+
+    def mark_stale_aborted(self, run_id: str) -> None:
+        """Atomically mark a run as aborted and clear any orphan in-flight rows.
+        Used by the TUI when heartbeat goes silent for STALE_HEARTBEAT_SECONDS."""
+        with self.conn() as c:
+            c.execute("DELETE FROM in_flight_units WHERE run_id=?", (run_id,))
+            c.execute(
+                "UPDATE runs SET status='aborted', phase='done' WHERE run_id=?",
+                (run_id,),
+            )
+
     def fetch_all_runs(self) -> list[dict]:
         with self.conn() as c:
             rows = c.execute("SELECT * FROM runs ORDER BY started_at DESC").fetchall()
