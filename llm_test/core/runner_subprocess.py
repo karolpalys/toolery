@@ -14,6 +14,7 @@ _spawn_child = asyncio.create_subprocess_exec
 
 Adapter = Literal["raw", "hermes", "claude_code", "codex"]
 Tier = Literal["easy", "medium", "hard", "very_hard", "all"]
+Cluster = Literal["single", "dual", "triple", "quad"]
 
 
 class RunArgs(BaseModel):
@@ -26,6 +27,7 @@ class RunArgs(BaseModel):
     with_perf: bool = False
     perf_only: bool = False
     category: str = "all"
+    cluster: Cluster = "single"
     # API-side model name (alias the served endpoint expects). If None or equal
     # to `model`, omit --served-model and let cli.py default to --model value.
     served_model: str | None = None
@@ -49,6 +51,8 @@ def build_argv(args: RunArgs, executable: str = "llm-test") -> list[str]:
         argv.append("--with-perf")
     if args.perf_only:
         argv.append("--perf-only")
+    if args.cluster and args.cluster != "single":
+        argv.extend(["--cluster", args.cluster])
     return argv
 
 

@@ -82,7 +82,8 @@ def run(
     perf_only: bool = typer.Option(False, "--perf-only",
                                    help="skip eval phase; run only llama-benchy"),
     cluster: str = typer.Option("single", "--cluster",
-                                help="single | dual (DGX Spark deployment topology)"),
+                                help="single | dual | triple | quad "
+                                     "(DGX Spark deployment topology: 1/2/3/4 nodes)"),
 ):
     """Run benchmark."""
     # Import tools to register them
@@ -150,7 +151,7 @@ def run(
 
     store = _store()
     total_units = 0 if perf_only else len(xs) * len(adapters) * trials
-    if cluster not in ("single", "dual"):
+    if cluster not in ("single", "dual", "triple", "quad"):
         console.print(f"[yellow]Unknown --cluster {cluster!r}, falling back to 'single'.[/yellow]")
         cluster = "single"
     cfg = {"model": model, "served_model": api_model, "adapter": list(adapters),
