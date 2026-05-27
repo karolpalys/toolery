@@ -56,6 +56,23 @@ UPCOMING_VISIBLE = 10
 FOLLOW_THRESHOLD_ROWS = 5
 STALE_HEARTBEAT_SECONDS = 300
 
+
+def _is_stale_run(run: dict) -> bool:
+    """A run is stale if status='running' and updated_at is older than
+    STALE_HEARTBEAT_SECONDS. Old runs without updated_at are never stale."""
+    from datetime import UTC, datetime
+    if run.get("status") != "running":
+        return False
+    updated_at = run.get("updated_at")
+    if not updated_at:
+        return False
+    try:
+        updated_dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return (datetime.now(UTC) - updated_dt).total_seconds() > STALE_HEARTBEAT_SECONDS
+
+
 _DIM_LABEL = {
     "hallucination": "calibration / hallucination resistance",
     "coding": "coding tasks",
@@ -614,6 +631,9 @@ class HomeTab(Container):
             return
         runs = store.fetch_all_runs()
         current = next((r for r in runs if r.get("status") == "running"), None)
+        if current is not None and _is_stale_run(current):
+            store.mark_stale_aborted(current["run_id"])
+            current = None
         if current is None and runs:
             current = runs[0]
 

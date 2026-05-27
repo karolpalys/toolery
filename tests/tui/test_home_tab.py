@@ -206,3 +206,32 @@ def test_detail_block_upcoming_includes_position():
     text = str(block)
     assert "upcoming" in text
     assert "12" in text
+
+
+from llm_test.tui.home_tab import _is_stale_run, STALE_HEARTBEAT_SECONDS
+
+
+def test_is_stale_run_when_updated_at_old():
+    from datetime import UTC, datetime, timedelta
+    old = (datetime.now(UTC) - timedelta(seconds=STALE_HEARTBEAT_SECONDS + 30)
+           ).isoformat().replace("+00:00", "Z")
+    run = {"status": "running", "updated_at": old}
+    assert _is_stale_run(run) is True
+
+
+def test_is_stale_run_when_fresh():
+    from datetime import UTC, datetime, timedelta
+    fresh = (datetime.now(UTC) - timedelta(seconds=10)
+             ).isoformat().replace("+00:00", "Z")
+    run = {"status": "running", "updated_at": fresh}
+    assert _is_stale_run(run) is False
+
+
+def test_is_stale_run_skips_old_runs_without_updated_at():
+    run = {"status": "running", "updated_at": None}
+    assert _is_stale_run(run) is False
+
+
+def test_is_stale_run_skips_finished_runs():
+    run = {"status": "done", "updated_at": None}
+    assert _is_stale_run(run) is False
