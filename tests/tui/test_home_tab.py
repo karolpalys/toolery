@@ -150,8 +150,7 @@ def test_classify_plan_caps_upcoming():
     assert all(r[0] == "upcoming" for r in rows)
 
 
-@pytest.mark.asyncio
-async def test_classify_plan_combined_with_build_plan(tmp_path):
+def test_classify_plan_combined_with_build_plan():
     """Compose _build_plan + _classify_plan to verify they cooperate."""
     plan = _build_plan(
         _json.dumps({"adapter": ["raw"], "trials": 2,
@@ -235,3 +234,48 @@ def test_is_stale_run_skips_old_runs_without_updated_at():
 def test_is_stale_run_skips_finished_runs():
     run = {"status": "done", "updated_at": None}
     assert _is_stale_run(run) is False
+
+
+@pytest.mark.asyncio
+async def test_refresh_from_db_aborts_stale_run(tmp_path, monkeypatch):
+    """End-to-end watchdog: a stale running run in the store gets marked
+    aborted on the next refresh_from_db tick."""
+    from datetime import UTC, datetime, timedelta
+    from llm_test.core.store import Store
+    from llm_test.tui.home_tab import HomeTab, STALE_HEARTBEAT_SECONDS
+    from textual.app import App
+
+    db = tmp_path / "runs.db"
+    store = Store(db)
+    store.init_schema()
+    run_id = "stale-watchdog-run"
+    store.create_run(run_id=run_id, model="m", base_url="http://x",
+                     started_at="2026-05-27T20:00:00Z",
+                     config_json="{}", scenarios_hash="x")
+    # backdate updated_at by > STALE_HEARTBEAT_SECONDS
+    stale = (datetime.now(UTC) - timedelta(seconds=STALE_HEARTBEAT_SECONDS + 30)
+             ).isoformat().replace("+00:00", "Z")
+    with store.conn() as c:
+        c.execute("UPDATE runs SET updated_at=? WHERE run_id=?", (stale, run_id))
+    # add an in_flight row to verify cleanup
+    store.mark_in_flight(run_id, "easy-01", "raw", 0, stale)
+
+    monkeypatch.setenv("LLM_TEST_RESULTS_DIR", str(tmp_path))
+
+    async def never_called(*_a, **_kw):
+        return []
+
+    class _Host(App):
+        def compose(self):
+            yield HomeTab(id="home-tab", scanner=never_called,
+                          known_models_provider=lambda: set())
+
+    app = _Host()
+    async with app.run_test(size=(120, 50)) as pilot:
+        await pilot.pause()
+        tab = app.query_one(HomeTab)
+        tab.refresh_from_db()
+
+    refreshed = store.fetch_run(run_id)
+    assert refreshed["status"] == "aborted"
+    assert store.fetch_in_flight_for_run(run_id) == []
