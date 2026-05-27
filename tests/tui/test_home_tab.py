@@ -179,3 +179,30 @@ def test_classify_plan_running_after_done_marks_live_edge():
 
     last_running = max(i for i, r in enumerate(rows) if r[0] == "running")
     assert last_running == 2
+
+
+from llm_test.tui.home_tab import _detail_block_running, _detail_block_upcoming
+
+
+def test_detail_block_running_includes_elapsed():
+    from datetime import UTC, datetime, timedelta
+    started = (datetime.now(UTC) - timedelta(seconds=14)).isoformat().replace("+00:00", "Z")
+    block = _detail_block_running(
+        scenario_id="easy-01", adapter="raw", trial=2,
+        started_at=started,
+    )
+    text = str(block)
+    assert "running" in text
+    assert "easy-01" in text
+    # Elapsed parses to a small mm:ss number
+    assert ":" in text
+
+
+def test_detail_block_upcoming_includes_position():
+    block = _detail_block_upcoming(
+        scenario_id="easy-09", adapter="raw", trial=0,
+        position_in_queue=12,
+    )
+    text = str(block)
+    assert "upcoming" in text
+    assert "12" in text

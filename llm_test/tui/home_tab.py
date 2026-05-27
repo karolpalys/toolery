@@ -175,6 +175,35 @@ def _detail_block(scenario_id: str, adapter: str, trial: int, status: str,
     return out
 
 
+def _detail_block_running(scenario_id: str, adapter: str, trial: int,
+                          started_at: str) -> Text:
+    from datetime import UTC, datetime
+    out = Text()
+    out.append(f"{scenario_id}\n", style="bold")
+    out.append(f"adapter: {adapter}  trial: {trial}\n", style="dim")
+    out.append("status: ⟳ running\n", style="magenta")
+    out.append(f"started: {started_at}\n", style="dim")
+    try:
+        started_dt = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        elapsed = datetime.now(UTC) - started_dt
+        secs = int(elapsed.total_seconds())
+        mm, ss = divmod(max(secs, 0), 60)
+        out.append(f"elapsed: {mm:02d}:{ss:02d}\n", style="dim")
+    except Exception:
+        out.append("elapsed: ?\n", style="dim")
+    return out
+
+
+def _detail_block_upcoming(scenario_id: str, adapter: str, trial: int,
+                           position_in_queue: int) -> Text:
+    out = Text()
+    out.append(f"{scenario_id}\n", style="bold")
+    out.append(f"adapter: {adapter}  trial: {trial}\n", style="dim")
+    out.append("status: ⌛ upcoming\n", style="grey50")
+    out.append(f"position in queue: {position_in_queue}\n", style="dim")
+    return out
+
+
 def _profile_run(results: list[dict]) -> Text:
     """Deterministic per-run profile: overall, per-tier, per-dimension top/bottom,
     derived recommended/avoid use-cases."""
@@ -524,21 +553,41 @@ class HomeTab(Container):
         await opener(endpoint)
 
     def _on_scenario_selected(self, idx: int | None) -> None:
-        if idx is None or idx >= len(self._results_cache):
+        if idx is None:
             return
-        r = self._results_cache[idx]
-        block = _detail_block(
-            scenario_id=r.get("scenario_id", "?"),
-            adapter=r.get("adapter", "?"),
-            trial=int(r.get("trial_index") or 0),
-            status=r.get("status") or "?",
-            failure_kind=r.get("failure_kind"),
-            latency_ms=r.get("latency_ms"),
-            call_count=r.get("call_count"),
-            budget_max=r.get("budget_max"),
-            trace_path=r.get("trace_path"),
-            checks_json=r.get("checks_json"),
-        )
+        completed = {
+            (r["scenario_id"], r["adapter"], r["trial_index"]): r
+            for r in self._results_cache
+        }
+        running = self._fetch_running_units()
+        rows = _classify_plan(self._plan, completed, running)
+        if idx >= len(rows):
+            return
+        state, key, payload = rows[idx]
+        scenario_id, adapter, trial_index = key
+        if state == "done":
+            block = _detail_block(
+                scenario_id=scenario_id, adapter=adapter, trial=trial_index,
+                status=payload.get("status") or "?",
+                failure_kind=payload.get("failure_kind"),
+                latency_ms=payload.get("latency_ms"),
+                call_count=payload.get("call_count"),
+                budget_max=payload.get("budget_max"),
+                trace_path=payload.get("trace_path"),
+                checks_json=payload.get("checks_json"),
+            )
+        elif state == "running":
+            block = _detail_block_running(
+                scenario_id=scenario_id, adapter=adapter, trial=trial_index,
+                started_at=payload.get("started_at") or "?",
+            )
+        else:  # upcoming
+            plan_index = self._plan.index(key)
+            position = max(plan_index - (len(completed) + len(running)), 0)
+            block = _detail_block_upcoming(
+                scenario_id=scenario_id, adapter=adapter, trial=trial_index,
+                position_in_queue=position,
+            )
         self.query_one("#detail-content", Static).update(block)
 
     # ---------------------------------------------------------- live + summary
