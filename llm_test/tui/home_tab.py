@@ -39,6 +39,10 @@ _STATUS_ICON = {
     "timeout": "⏱",
 }
 
+UPCOMING_VISIBLE = 10
+FOLLOW_THRESHOLD_ROWS = 5
+STALE_HEARTBEAT_SECONDS = 300
+
 _DIM_LABEL = {
     "hallucination": "calibration / hallucination resistance",
     "coding": "coding tasks",
@@ -79,6 +83,28 @@ def _build_plan(config_json: str, *,
             for t in range(trials):
                 plan.append((sid, ad, t))
     return plan
+
+
+def _classify_plan(plan: list[tuple[str, str, int]],
+                   completed: dict[tuple[str, str, int], dict],
+                   running: dict[tuple[str, str, int], dict],
+                   upcoming_visible: int = UPCOMING_VISIBLE,
+                   ) -> list[tuple[str, tuple, dict | None]]:
+    """Walk the plan and tag each entry as ('done'|'running'|'upcoming', key, payload).
+
+    Trims upcoming rows to at most `upcoming_visible` past the live edge.
+    """
+    rows: list[tuple[str, tuple, dict | None]] = []
+    upcoming_count = 0
+    for key in plan:
+        if key in completed:
+            rows.append(("done", key, completed[key]))
+        elif key in running:
+            rows.append(("running", key, running[key]))
+        elif upcoming_count < upcoming_visible:
+            rows.append(("upcoming", key, None))
+            upcoming_count += 1
+    return rows
 
 
 def _why_summary(status: str, failure_kind: str | None,
@@ -353,11 +379,10 @@ class HomeTab(Container):
         self._endpoints: list[EndpointInfo] = []
         self._current_run_id: str | None = None
         self._results_cache: list[dict] = []
-        # Track what's already rendered in the scenarios DataTable so we can
-        # append deltas instead of clear+repopulate (which resets cursor +
-        # scroll every 2s and makes long lists unclickable).
         self._displayed_run_id: str | None = None
-        self._displayed_count: int = 0
+        self._plan: list[tuple[str, str, int]] = []
+        self._last_signature: tuple | None = None
+        self._follow_mode: bool = True
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="top-row"):
@@ -626,39 +651,88 @@ class HomeTab(Container):
 
     def _refresh_scenarios_table(self) -> None:
         tbl = self.query_one("#scenarios-table", DataTable)
-        # Full reset only when run_id changes (new bench started) — preserves
-        # cursor + scroll within a single run so the user can actually click
-        # rows during a 315-trial sweep.
+
+        # Resolve plan once per run
         if self._displayed_run_id != self._current_run_id:
             tbl.clear()
             self._displayed_run_id = self._current_run_id
-            self._displayed_count = 0
-        # Append-only: render rows beyond what we've already shown.
-        new_rows = self._results_cache[self._displayed_count:]
-        _STATUS_DISPLAY = {
-            "pass": "✅ pass",
-            "fail": "❌ fail",
-            "partial": "⚠ partial",
-            "error": "💥 error",
-            "timeout": "⏱ timeout",
+            self._plan = self._resolve_plan_for_current_run()
+            self._last_signature = None
+
+        completed = {
+            (r["scenario_id"], r["adapter"], r["trial_index"]): r
+            for r in self._results_cache
         }
-        for i, r in enumerate(new_rows, start=self._displayed_count + 1):
-            status = r.get("status") or "?"
-            style = _STATUS_STYLE.get(status, "bold")
-            display = _STATUS_DISPLAY.get(status, status)
-            why = _why_summary(status, r.get("failure_kind"),
-                               r.get("checks_json"))
-            tbl.add_row(
-                Text(str(i), style=style),
-                Text(r.get("scenario_id", "?"), style=style),
-                Text(r.get("tier", "?"), style=style),
-                Text(r.get("adapter", "?"), style=style),
-                Text(str(r.get("trial_index") or 0), style=style),
-                Text(f"{r.get('score') or 0.0:.2f}", style=style),
-                Text(display, style=style),
-                Text(why, style=style),
-            )
-        self._displayed_count = len(self._results_cache)
+        running = self._fetch_running_units()
+        rows = _classify_plan(self._plan, completed, running)
+
+        signature = (len(completed), frozenset(running.keys()),
+                     sum(1 for r in rows if r[0] == "upcoming"))
+        if signature == self._last_signature:
+            return
+        self._last_signature = signature
+
+        tbl.clear()
+        for state, key, payload in rows:
+            tbl.add_row(*self._format_row(state, key, payload))
+        self._maybe_autoscroll()
+
+    def _resolve_plan_for_current_run(self) -> list[tuple[str, str, int]]:
+        store = self._resolve_store()
+        if store is None or self._current_run_id is None:
+            return []
+        run = store.fetch_run(self._current_run_id)
+        if not run:
+            return []
+        return self._plan_from_config(run.get("config_json") or "{}")
+
+    def _plan_from_config(self, config_json: str) -> list[tuple[str, str, int]]:
+        """Load scenarios using the same filtering CLI uses, then reconstruct the plan."""
+        from llm_test.core.scenario import load_all_scenarios
+        try:
+            cfg = json.loads(config_json or "{}")
+        except json.JSONDecodeError:
+            cfg = {}
+        tier = cfg.get("tier", "all")
+        category = cfg.get("category", "all")
+        scenarios_dir = Path(os.environ.get("LLM_TEST_SCENARIOS_DIR", "scenarios"))
+        try:
+            xs = load_all_scenarios(scenarios_dir)
+        except Exception:
+            return []
+        if tier != "all":
+            xs = [s for s in xs if s.tier.value == tier]
+        if category != "all":
+            xs = [s for s in xs if s.category.value == category]
+        return _build_plan(config_json, scenario_ids_in_loader_order=[s.id for s in xs])
+
+    def _fetch_running_units(self) -> dict[tuple[str, str, int], dict]:
+        store = self._resolve_store()
+        if store is None or self._current_run_id is None:
+            return {}
+        return {
+            (r["scenario_id"], r["adapter"], r["trial_index"]): r
+            for r in store.fetch_in_flight_for_run(self._current_run_id)
+        }
+
+    def _format_row(self, state: str, key: tuple[str, str, int],
+                    payload: dict | None) -> tuple:
+        """Stub — Task 9 fills this in with proper colors."""
+        scenario_id, adapter, trial_index = key
+        return (
+            Text(state),
+            Text(scenario_id),
+            Text("?"),                       # tier — filled by Task 9
+            Text(adapter),
+            Text(str(trial_index)),
+            Text(f"{(payload or {}).get('score') or 0.0:.2f}"),
+            Text(state),
+            Text("—"),
+        )
+
+    def _maybe_autoscroll(self) -> None:
+        """Stub — Task 10 fills this in."""
+        pass
 
     # ---------------------------------------------------------------- helpers
 

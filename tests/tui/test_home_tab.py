@@ -119,3 +119,49 @@ def test_build_plan_handles_single_adapter_string():
                                "category": "all"})
     plan = _build_plan(config_json, scenario_ids_in_loader_order=["easy-01"])
     assert plan == [("easy-01", "raw", 0), ("easy-01", "raw", 1)]
+
+
+from llm_test.tui.home_tab import _classify_plan
+
+
+def test_classify_plan_three_states():
+    plan = [
+        ("easy-01", "raw", 0), ("easy-01", "raw", 1), ("easy-01", "raw", 2),
+        ("easy-02", "raw", 0), ("easy-02", "raw", 1),
+        ("easy-03", "raw", 0), ("easy-03", "raw", 1),
+    ]
+    completed = {
+        ("easy-01", "raw", 0): {"status": "pass"},
+        ("easy-01", "raw", 1): {"status": "fail"},
+    }
+    running = {
+        ("easy-01", "raw", 2): {"started_at": "2026-05-27T20:00:00Z"},
+        ("easy-02", "raw", 0): {"started_at": "2026-05-27T20:00:01Z"},
+    }
+    rows = _classify_plan(plan, completed, running, upcoming_visible=3)
+    states = [r[0] for r in rows]
+    assert states == ["done", "done", "running", "running", "upcoming", "upcoming", "upcoming"]
+
+
+def test_classify_plan_caps_upcoming():
+    plan = [(f"easy-{i:02d}", "raw", 0) for i in range(50)]
+    rows = _classify_plan(plan, completed={}, running={}, upcoming_visible=5)
+    assert len(rows) == 5
+    assert all(r[0] == "upcoming" for r in rows)
+
+
+@pytest.mark.asyncio
+async def test_classify_plan_combined_with_build_plan(tmp_path):
+    """Compose _build_plan + _classify_plan to verify they cooperate."""
+    plan = _build_plan(
+        _json.dumps({"adapter": ["raw"], "trials": 2,
+                     "tier": "easy", "category": "all"}),
+        scenario_ids_in_loader_order=["easy-01", "easy-02"],
+    )
+    running = {("easy-01", "raw", 1): {"started_at": "2026-05-27T20:00:01Z"}}
+    completed = {("easy-01", "raw", 0): {"status": "pass", "score": 1.0,
+                                          "scenario_id": "easy-01", "adapter": "raw",
+                                          "trial_index": 0}}
+    rows = _classify_plan(plan, completed, running, upcoming_visible=10)
+    states = [r[0] for r in rows]
+    assert states == ["done", "running", "upcoming", "upcoming"]
