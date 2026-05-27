@@ -165,3 +165,17 @@ async def test_classify_plan_combined_with_build_plan(tmp_path):
     rows = _classify_plan(plan, completed, running, upcoming_visible=10)
     states = [r[0] for r in rows]
     assert states == ["done", "running", "upcoming", "upcoming"]
+
+
+def test_classify_plan_running_after_done_marks_live_edge():
+    """The live edge is the last running entry in the rendered rows."""
+    plan = [
+        ("easy-01", "raw", 0), ("easy-01", "raw", 1),
+        ("easy-02", "raw", 0), ("easy-02", "raw", 1),
+    ]
+    completed = {("easy-01", "raw", 0): {"status": "pass"}}
+    running = {("easy-01", "raw", 1): {}, ("easy-02", "raw", 0): {}}
+    rows = _classify_plan(plan, completed, running, upcoming_visible=10)
+
+    last_running = max(i for i, r in enumerate(rows) if r[0] == "running")
+    assert last_running == 2

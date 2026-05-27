@@ -764,8 +764,39 @@ class HomeTab(Container):
         )
 
     def _maybe_autoscroll(self) -> None:
-        """Stub — Task 10 fills this in."""
-        pass
+        if not self._follow_mode:
+            return
+        tbl = self.query_one("#scenarios-table", DataTable)
+        if tbl.row_count == 0:
+            return
+        live_edge = self._find_live_edge_index(tbl)
+        target = min(live_edge + FOLLOW_THRESHOLD_ROWS, tbl.row_count - 1)
+        try:
+            tbl.move_cursor(row=target, animate=False)
+        except Exception:
+            pass
+
+    def _find_live_edge_index(self, tbl: DataTable) -> int:
+        """Last running row index, or last done row index if no running rows."""
+        last_done = -1
+        last_running = -1
+        for i in range(tbl.row_count):
+            row_text = str(tbl.get_row_at(i)[6])  # status column index
+            if "running" in row_text:
+                last_running = i
+            elif "upcoming" not in row_text:
+                last_done = i
+        return last_running if last_running >= 0 else max(last_done, 0)
+
+    def _cursor_near_bottom(self, tbl: DataTable) -> bool:
+        if tbl.cursor_row is None:
+            return True
+        return (tbl.row_count - tbl.cursor_row) <= FOLLOW_THRESHOLD_ROWS
+
+    @on(DataTable.RowHighlighted, "#scenarios-table")
+    def _on_scenario_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        tbl = self.query_one("#scenarios-table", DataTable)
+        self._follow_mode = self._cursor_near_bottom(tbl)
 
     # ---------------------------------------------------------------- helpers
 
