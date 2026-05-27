@@ -4,6 +4,7 @@ import csv
 import io
 import json
 import math
+import os
 import re
 from collections.abc import Callable
 
@@ -11,6 +12,17 @@ import jsonschema
 import yaml
 
 from llm_test.core.models import CheckResult, ScoringCheck, ToolCall
+
+
+def _implicit_partial_gradient_enabled() -> bool:
+    """Read env at call time so tests / runs can toggle freely.
+
+    Default OFF: any failed required (when forbidden clean) → status="fail",
+    score = weights["fail"] (binary). Set LLM_TEST_PARTIAL_GRADIENT=on to
+    restore the previous behavior where partial credit was awarded
+    proportional to how many required checks passed.
+    """
+    return os.environ.get("LLM_TEST_PARTIAL_GRADIENT", "off").strip().lower() in {"1", "on", "true", "yes"}
 
 CheckFn = Callable[[list[ToolCall], ScoringCheck, str | None], CheckResult]
 
@@ -641,16 +653,15 @@ def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
 
     if not forbidden_clean or not required_all_pass:
         kind = _classify_failure(required, forbidden_raw, budget_violated, hallucinated)
-        # Implicit partial gradient: if forbidden is clean and the failure is
-        # only that some — but not all — required checks failed, give partial
-        # credit proportional to how many required passed (capped at
-        # weights["partial"]). This restores a gradient signal for the ~49%
-        # of scenarios that have no explicit partial: [] list and would
-        # otherwise be strictly binary 0/1. Budget violations and hallucinated
-        # tool calls remain hard fails — those are systemic disqualifiers.
         gradient_score = scenario.scoring.weights["fail"]
         gradient_status = "fail"
-        if (forbidden_clean
+        # Implicit partial gradient (opt-in, OFF by default):
+        # set LLM_TEST_PARTIAL_GRADIENT=on to award partial credit
+        # proportional to required-pass ratio when forbidden is clean,
+        # budget OK, no hallucinations. Off-by-default keeps the scoring
+        # binary on near-miss runs, restoring spread between models.
+        if (_implicit_partial_gradient_enabled()
+                and forbidden_clean
                 and not budget_violated
                 and not hallucinated
                 and required):
