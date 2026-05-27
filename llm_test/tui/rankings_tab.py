@@ -20,6 +20,16 @@ _RANKING_MODES = [
     ("raw_only", "Raw only", "raw adapter only"),
 ]
 
+# Cluster filter — restricts displayed rows by DGX Spark topology.
+# Order matches launch-modal radio set (1→4 sparks).
+_SPARKS_FILTERS = [
+    ("all",    "All"),
+    ("single", "1× single"),
+    ("dual",   "2× dual"),
+    ("triple", "3× triple"),
+    ("quad",   "4× quad"),
+]
+
 _STABILITY_COLS = ["mean", "worst", "pass_rate", "stddev"]
 _STABILITY_HEADERS = {
     "mean": "Avg",
@@ -229,38 +239,75 @@ class RankingsTab(Container):
     """Rankings matrix — clickable headers sort by that column (desc)."""
 
     DEFAULT_CSS = """
-    RankingsTab { padding: 0 1; }
+    RankingsTab {
+        layout: vertical;
+        padding: 1 2;
+        background: $surface;
+    }
+
     RankingsTab #rankings-intro {
+        height: auto;
         padding: 0 1;
         margin-bottom: 1;
         color: $text-muted;
     }
+
     RankingsTab #ranking-mode-tabs {
-        height: 3;
+        height: 4;
+        border: round $primary;
+        border-title-color: $primary;
+        background: $surface;
+        padding: 0 1;
         margin-bottom: 1;
     }
+
     RankingsTab .rank-mode {
         min-width: 16;
         margin-right: 1;
     }
-    RankingsTab .rank-mode-active {
+
+    RankingsTab .rank-mode-active,
+    RankingsTab .sparks-filter-active {
         text-style: bold reverse;
     }
-    RankingsTab #matrix-section {
-        height: auto;
-        max-height: 25;
+
+    RankingsTab .filter-separator {
+        width: auto;
+        padding: 1 1 0 1;
+        color: $text-muted;
+    }
+
+    RankingsTab .sparks-filter {
+        min-width: 11;
+        margin-right: 1;
+    }
+
+    RankingsTab #matrix-section,
+    RankingsTab #legend-section {
         border: round $primary;
+        border-title-color: $primary;
+        background: $surface;
         padding: 0 1;
+    }
+
+    RankingsTab #matrix-section {
+        height: 2fr;
         margin-bottom: 1;
     }
+
     RankingsTab #legend-section {
         height: 1fr;
-        border: round $primary;
         padding: 1 2;
     }
-    RankingsTab #rank-matrix {
+
+    RankingsTab #rank-summary {
         height: auto;
-        max-height: 23;
+        color: $text-muted;
+        margin-bottom: 1;
+    }
+
+    RankingsTab #rank-matrix {
+        height: 1fr;
         text-style: bold;
     }
     /* header_height=2 makes the header twice as tall (terminals can't scale
@@ -282,6 +329,8 @@ class RankingsTab(Container):
         self._rows_cache: list[dict] = []
         self._matrix_cache: list[dict] = []
         self._mode = "model_best"
+        # Cluster (sparks-count) filter — 'all' shows every row.
+        self._cluster_filter: str = "all"
         # Signature of the last rendered table. Lets the 5s polling skip the
         # clear+rebuild when nothing changed — otherwise `tbl.clear()` resets
         # the user's horizontal scroll position every 5 seconds.
@@ -289,13 +338,15 @@ class RankingsTab(Container):
 
     def compose(self):
         yield Static(
-            "Tier-weighted ranking across all scenarios. "
-            "Choose a ranking view; click headers to sort.",
+            "Rank models across scenarios, adapters, cluster topology, stability, and throughput.",
             id="rankings-intro",
         )
         with Horizontal(id="ranking-mode-tabs"):
             for key, label, _desc in _RANKING_MODES:
                 yield Button(label, id=f"rank-mode-{key}", classes="rank-mode")
+            yield Static("│  Sparks:", classes="filter-separator")
+            for key, label in _SPARKS_FILTERS:
+                yield Button(label, id=f"sparks-filter-{key}", classes="sparks-filter")
         with Vertical(id="matrix-section"):
             yield Static("", id="rank-summary")
             yield DataTable(
@@ -320,8 +371,9 @@ class RankingsTab(Container):
     def on_mount(self) -> None:
         self.reload()
         try:
-            self.query_one("#matrix-section").border_title = "🏆 Rankings matrix"
-            self.query_one("#legend-section").border_title = "📖 Column legend"
+            self.query_one("#ranking-mode-tabs").border_title = "View controls"
+            self.query_one("#matrix-section").border_title = "Rankings matrix"
+            self.query_one("#legend-section").border_title = "Column guide"
         except Exception:
             pass
         # Poll the DB so completed runs surface without needing the user to
@@ -384,10 +436,11 @@ class RankingsTab(Container):
 
         # Skip the clear+rebuild if nothing user-visible has changed —
         # preserves horizontal scroll position across the 5s polling loop.
-        sig = (self._mode,
+        sig = (self._mode, self._cluster_filter,
                tuple(self._signature_for_row(r) for r in self._rows_cache))
         if sig == self._last_render_sig:
             self._update_mode_buttons()
+            self._update_sparks_buttons()
             return
         self._last_render_sig = sig
 
@@ -411,7 +464,7 @@ class RankingsTab(Container):
             "adapter": lambda r: r["adapter"],
             "runs": lambda r: -(r.get("runs") or 0),
             "set": lambda r: 1 if r.get("stale") else 0,
-            "cluster": lambda r: {"dual": 0, "single": 1}.get(r.get("cluster"), 2),
+            "cluster": lambda r: {"quad": 0, "triple": 1, "dual": 2, "single": 3}.get(r.get("cluster"), 4),
         }
         for dim in _DIMENSIONS:
             d = dim
@@ -422,17 +475,28 @@ class RankingsTab(Container):
             self._sort_keys[f"stab:{s}"] = lambda r, s=s: -(r.get("stability", {}).get("overall", {}).get(s) or -1.0)
         self._populate_rows()
         self._update_mode_buttons()
+        self._update_sparks_buttons()
+        self._refresh_summary()
 
+    def _refresh_summary(self) -> None:
+        try:
+            summary = self.query_one("#rank-summary", Static)
+        except Exception:
+            return
         rows = self._rows_cache
+        if self._cluster_filter != "all":
+            rows = [r for r in rows if r.get("cluster") == self._cluster_filter]
         sources = sum(r["runs"] for r in rows)
         stale_n = sum(1 for r in rows if r.get("stale"))
         mode_desc = dict((k, desc) for k, _label, desc in _RANKING_MODES).get(self._mode, self._mode)
         stale_note = (f"  ·  [yellow]{stale_n} row(s) tested on an older "
                       f"scenario set — marked ⚠ in 'Set' column[/yellow]"
                       if stale_n else "")
+        filter_note = (f"  ·  [cyan]filter: {self._cluster_filter}[/cyan]"
+                       if self._cluster_filter != "all" else "")
         summary.update(
             f"[dim]{len(rows)} rows · {sources} runs · "
-            f"{mode_desc} · {len(_DIMENSIONS)} score dims + perf + stability{stale_note}[/dim]"
+            f"{mode_desc} · {len(_DIMENSIONS)} score dims + perf + stability{filter_note}{stale_note}[/dim]"
         )
 
     def _rows_for_mode(self, matrix: list[dict], canonical_hash: str | None) -> list[dict]:
@@ -452,12 +516,24 @@ class RankingsTab(Container):
             except Exception:
                 pass
 
+    def _update_sparks_buttons(self) -> None:
+        for key, _label in _SPARKS_FILTERS:
+            try:
+                btn = self.query_one(f"#sparks-filter-{key}", Button)
+                btn.set_class(key == self._cluster_filter, "sparks-filter-active")
+            except Exception:
+                pass
+
     def _populate_rows(self) -> None:
         """Re-sort + re-render. Reads self._rows_cache + self._sort_by/_desc."""
         tbl = self.query_one("#rank-matrix", DataTable)
         # Clear data rows only — keep columns.
         tbl.clear()
         rows = list(self._rows_cache)
+        # Apply cluster filter. 'all' is a no-op. Rank #, podium and sort all
+        # operate on the post-filter set so the visible table is self-contained.
+        if self._cluster_filter != "all":
+            rows = [r for r in rows if r.get("cluster") == self._cluster_filter]
 
         # Default sort = overall desc. User clicks override.
         sort_key = self._sort_by or "dim:overall"
@@ -502,9 +578,13 @@ class RankingsTab(Container):
             cells.append(_meta_cell(str(r.get("runs", 0))))
             cells.append(Text("⚠", style="bold yellow") if r.get("stale")
                          else Text("✓", style="bold dim green"))
-            # Cluster cell — bold colour-coded so single/dual stands out at a glance.
+            # Cluster cell — bold colour-coded so spark-count stands out at a glance.
             cluster = r.get("cluster")
-            if cluster == "dual":
+            if cluster == "quad":
+                cells.append(Text("⚡⚡⚡ quad", style="bold cyan"))
+            elif cluster == "triple":
+                cells.append(Text("⚡⚡ triple", style="bold cyan"))
+            elif cluster == "dual":
                 cells.append(Text("⚡ dual", style="bold cyan"))
             elif cluster == "single":
                 cells.append(Text("• single", style="bold"))
@@ -515,19 +595,31 @@ class RankingsTab(Container):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id or ""
-        if not bid.startswith("rank-mode-"):
+        if bid.startswith("rank-mode-"):
+            mode = bid.replace("rank-mode-", "", 1)
+            if mode == self._mode:
+                return
+            self._mode = mode
+            self._sort_by = "dim:overall"
+            self._sort_desc = True
+            if self._matrix_cache:
+                canonical_hash = _current_scenarios_hash()
+                self._rows_cache = self._rows_for_mode(self._matrix_cache, canonical_hash)
+                self._populate_rows()
+                self._update_mode_buttons()
             return
-        mode = bid.replace("rank-mode-", "", 1)
-        if mode == self._mode:
-            return
-        self._mode = mode
-        self._sort_by = "dim:overall"
-        self._sort_desc = True
-        if self._matrix_cache:
-            canonical_hash = _current_scenarios_hash()
-            self._rows_cache = self._rows_for_mode(self._matrix_cache, canonical_hash)
+        if bid.startswith("sparks-filter-"):
+            choice = bid.replace("sparks-filter-", "", 1)
+            valid = {k for k, _ in _SPARKS_FILTERS}
+            if choice not in valid or choice == self._cluster_filter:
+                return
+            self._cluster_filter = choice
+            # Invalidate render-skip signature so the next reload() rebuilds
+            # the summary line with the new filter note.
+            self._last_render_sig = None
             self._populate_rows()
-            self._update_mode_buttons()
+            self._update_sparks_buttons()
+            self._refresh_summary()
 
     # -- click-to-sort --
     def on_data_table_header_selected(self, event) -> None:

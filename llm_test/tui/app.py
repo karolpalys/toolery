@@ -22,7 +22,43 @@ from llm_test.tui.setup_tab import SetupTab
 
 class LLMTestApp(App):
     CSS = """
-    Screen { background: $surface; }
+    Screen {
+        background: $surface;
+    }
+
+    Header {
+        background: $primary;
+        color: $text;
+        text-style: bold;
+    }
+
+    Footer {
+        background: $surface;
+        color: $text-muted;
+    }
+
+    TabbedContent {
+        background: $surface;
+    }
+
+    TabPane {
+        padding: 0;
+    }
+
+    Button {
+        min-width: 12;
+    }
+
+    DataTable {
+        background: $surface;
+        color: $text;
+    }
+
+    DataTable > .datatable--header {
+        text-style: bold;
+        background: $primary;
+        color: $text;
+    }
     """
     BINDINGS = [("q", "quit", "Quit"), ("ctrl+r", "refresh", "Refresh")]
 

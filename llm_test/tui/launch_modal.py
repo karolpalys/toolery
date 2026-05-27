@@ -22,14 +22,49 @@ class LaunchModal(ModalScreen[RunArgs | None]):
     """Form modal: pre-filled flags + harness picker. dismiss() returns RunArgs or None."""
 
     DEFAULT_CSS = """
-    LaunchModal { align: center middle; }
-    LaunchModal > VerticalScroll { width: 100; max-height: 90%; padding: 1 2; background: $surface; border: thick $primary; }
-    LaunchModal #category-tier-row { height: auto; }
-    LaunchModal #category-col, LaunchModal #tier-col { width: 1fr; height: auto; }
-    LaunchModal #category-col { margin-right: 2; }
-    LaunchModal .row { height: auto; margin-top: 1; }
-    LaunchModal Input { width: 12; }
-    LaunchModal Button { margin-left: 2; }
+    LaunchModal {
+        align: center middle;
+    }
+
+    LaunchModal > VerticalScroll {
+        width: 104;
+        max-height: 90%;
+        padding: 1 2;
+        background: $surface;
+        border: thick $primary;
+        border-title-color: $primary;
+    }
+
+    LaunchModal #category-tier-row {
+        height: auto;
+        margin-top: 1;
+    }
+
+    LaunchModal #category-col,
+    LaunchModal #tier-col {
+        width: 1fr;
+        height: auto;
+        border: round $primary;
+        padding: 0 1;
+    }
+
+    LaunchModal #category-col {
+        margin-right: 2;
+    }
+
+    LaunchModal .row {
+        height: auto;
+        margin-top: 1;
+    }
+
+    LaunchModal Input {
+        width: 12;
+    }
+
+    LaunchModal Button {
+        margin-left: 2;
+        min-width: 12;
+    }
     """
 
     BINDINGS = [Binding("escape", "cancel", "Cancel", show=False)]
@@ -41,7 +76,7 @@ class LaunchModal(ModalScreen[RunArgs | None]):
 
     def compose(self) -> ComposeResult:
         with VerticalScroll():
-            yield Static("[b]Launch test[/b]")
+            yield Static("[b]Launch benchmark[/b]")
             yield Static(f"Model:      {self._endpoint.model_id}")
             yield Static(f"Endpoint:   {self._endpoint.base_url}")
 
@@ -76,6 +111,19 @@ class LaunchModal(ModalScreen[RunArgs | None]):
                 yield Input(value="5", id="trials")
                 yield Label("  Concurrency: ")
                 yield Input(value="4", id="concurrency")
+
+            yield Label("Cluster (DGX Spark topology):")
+            with RadioSet(id="cluster"):
+                for value, label in (
+                    ("single", "1 spark  (single)"),
+                    ("dual",   "2 sparks (dual)"),
+                    ("triple", "3 sparks (triple)"),
+                    ("quad",   "4 sparks (quad)"),
+                ):
+                    btn = RadioButton(label, id=f"cluster-{value}")
+                    if value == "single":
+                        btn.value = True
+                    yield btn
 
             yield Label("Harness:")
             with RadioSet(id="adapter"):
@@ -128,6 +176,12 @@ class LaunchModal(ModalScreen[RunArgs | None]):
             return "eval"
         return rs.pressed_button.id.removeprefix("mode-")
 
+    def _selected_cluster(self) -> str:
+        rs = self.query_one("#cluster", RadioSet)
+        if rs.pressed_button is None:
+            return "single"
+        return rs.pressed_button.id.removeprefix("cluster-")
+
     def _build_args(self) -> RunArgs | None:
         try:
             trials = int(self.query_one("#trials", Input).value)
@@ -153,6 +207,7 @@ class LaunchModal(ModalScreen[RunArgs | None]):
                 concurrency=concurrency,
                 with_perf=with_perf,
                 perf_only=perf_only,
+                cluster=self._selected_cluster(),
             )
         except Exception as e:
             self.app.notify(f"Invalid args: {e}", severity="error")

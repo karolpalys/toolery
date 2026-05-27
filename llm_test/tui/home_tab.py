@@ -197,49 +197,119 @@ class HomeTab(Container):
     """Combined endpoint scanner + live run dashboard + post-run model profile."""
 
     DEFAULT_CSS = """
-    HomeTab { layout: vertical; padding: 0 1; }
+    HomeTab {
+        layout: vertical;
+        padding: 1 2;
+        background: $surface;
+    }
+
+    HomeTab #top-row {
+        height: 13;
+        margin-bottom: 1;
+    }
+
+    HomeTab #scanner-strip,
+    HomeTab #live-strip,
+    HomeTab #main-split-wrapper,
+    HomeTab #summary-strip {
+        border: round $primary;
+        border-title-color: $primary;
+        background: $surface;
+        padding: 0 1;
+    }
+
     HomeTab #scanner-strip {
-        height: auto; max-height: 13;
-        border: round $primary;
-        border-title-color: $primary;
-        padding: 0 1;
-        margin-bottom: 1;
+        width: 1fr;
+        margin-right: 1;
     }
-    HomeTab #scanner-strip #buttons { height: 3; }
-    HomeTab #scanner-strip #scan-status { height: 1; color: $text-muted; }
-    HomeTab #scanner-strip Button { margin-right: 2; }
-    HomeTab #scanner-strip #endpoints { height: 6; }
+
+    HomeTab #scanner-strip #buttons {
+        height: 3;
+        align-vertical: middle;
+    }
+
+    HomeTab #scanner-strip Button {
+        margin-right: 2;
+    }
+
+    HomeTab #scanner-strip #scan-status {
+        height: 1;
+        color: $text-muted;
+        padding-left: 1;
+    }
+
+    HomeTab #scanner-strip #endpoints {
+        height: 7;
+    }
+
     HomeTab #live-strip {
-        height: auto;
-        border: round $primary;
-        border-title-color: $primary;
-        padding: 0 1;
-        margin-bottom: 1;
+        width: 1fr;
     }
+
     HomeTab #live-strip.active {
         border: round $success;
         border-title-color: $success;
     }
-    HomeTab #live-strip ProgressBar { margin-top: 1; }
-    HomeTab #main-split-wrapper {
-        border: round $primary;
-        border-title-color: $primary;
-        padding: 0 1;
-        height: 1fr;
-    }
-    HomeTab #main-split { height: 1fr; }
-    HomeTab #scenarios-pane { width: 2fr; padding-right: 1; }
-    HomeTab #scenarios-pane DataTable { height: 1fr; }
-    HomeTab #detail-pane { width: 1fr; border: solid $primary; padding: 0 1; }
-    HomeTab #detail-content { height: 1fr; }
-    HomeTab #summary-strip {
-        height: auto; max-height: 14;
-        border: round $success;
-        border-title-color: $success;
-        padding: 0 1;
+
+    HomeTab #live-strip ProgressBar {
         margin-top: 1;
     }
-    HomeTab #summary-strip.hidden { display: none; }
+
+    HomeTab #current-run {
+        margin-top: 1;
+    }
+
+    HomeTab #current-progress-text,
+    HomeTab #current-phase {
+        color: $text-muted;
+    }
+
+    HomeTab #main-split-wrapper {
+        height: 1fr;
+    }
+
+    HomeTab #main-split {
+        height: 1fr;
+    }
+
+    HomeTab #scenarios-pane {
+        width: 2fr;
+        padding-right: 1;
+    }
+
+    HomeTab #scenarios-title,
+    HomeTab #details-title {
+        height: 1;
+        text-style: bold;
+        color: $primary;
+    }
+
+    HomeTab #scenarios-pane DataTable {
+        height: 1fr;
+    }
+
+    HomeTab #detail-pane {
+        width: 1fr;
+        border-left: solid $primary;
+        padding: 0 1;
+    }
+
+    HomeTab #detail-content {
+        height: 1fr;
+        color: $text-muted;
+    }
+
+    HomeTab #summary-strip {
+        height: auto;
+        max-height: 12;
+        border: round $success;
+        border-title-color: $success;
+        margin-top: 1;
+    }
+
+    HomeTab #summary-strip.hidden {
+        display: none;
+    }
     """
 
     def __init__(
@@ -265,32 +335,32 @@ class HomeTab(Container):
         self._displayed_count: int = 0
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="scanner-strip"):
-            with Horizontal(id="buttons"):
-                yield Button("Scan endpoints", id="scan", variant="primary")
-                yield Static("Click Scan to discover endpoints",
-                             id="scan-status")
-            yield DataTable(id="endpoints", cursor_type="row")
+        with Horizontal(id="top-row"):
+            with Vertical(id="scanner-strip"):
+                with Horizontal(id="buttons"):
+                    yield Button("Scan endpoints", id="scan", variant="primary")
+                    yield Static("Ready to discover local model endpoints",
+                                 id="scan-status")
+                yield DataTable(id="endpoints", cursor_type="row")
 
-        with Vertical(id="live-strip"):
-            yield Static(
-                "[dim italic]No active run — pick an endpoint above to "
-                "launch one.[/dim italic]",
-                id="current-run",
-            )
-            yield Static("", id="current-progress-text")
-            yield ProgressBar(total=100, show_eta=False, id="current-progress")
-            yield Static("", id="current-phase")
+            with Vertical(id="live-strip"):
+                yield Static(
+                    "[dim italic]No run selected. Choose an endpoint to start.[/dim italic]",
+                    id="current-run",
+                )
+                yield Static("", id="current-progress-text")
+                yield ProgressBar(total=100, show_eta=False, id="current-progress")
+                yield Static("", id="current-phase")
 
         with Container(id="main-split-wrapper"):
             with Horizontal(id="main-split"):
                 with Vertical(id="scenarios-pane"):
-                    yield Static("[bold]Scenarios[/bold]")
+                    yield Static("Scenario Results", id="scenarios-title")
                     yield DataTable(id="scenarios-table", cursor_type="row")
                 with VerticalScroll(id="detail-pane"):
-                    yield Static("[bold]Details[/bold]")
+                    yield Static("Selected Scenario", id="details-title")
                     yield Static(
-                        "Click a scenario row to see failed checks and trace path.",
+                        "Select a row to inspect checks, latency, calls, and trace path.",
                         id="detail-content",
                     )
 
@@ -306,14 +376,14 @@ class HomeTab(Container):
         # Section border titles.
         try:
             self.query_one("#scanner-strip").border_title = (
-                "🔍 Endpoint Discovery"
+                "Endpoint discovery"
             )
-            self.query_one("#live-strip").border_title = "💤 Active Run"
+            self.query_one("#live-strip").border_title = "Run status"
             self.query_one("#main-split-wrapper").border_title = (
-                "📋 Per-scenario results"
+                "Evaluation workspace"
             )
             self.query_one("#summary-strip").border_title = (
-                "✓ Last run summary"
+                "Last run summary"
             )
         except Exception:
             pass
@@ -455,7 +525,7 @@ class HomeTab(Container):
             summary_w.add_class("hidden")
             live_strip.remove_class("active")
             try:
-                live_strip.border_title = "💤 Active Run"
+                live_strip.border_title = "Run status"
             except Exception:
                 pass
             self._current_run_id = None
@@ -468,7 +538,7 @@ class HomeTab(Container):
         if is_active:
             live_strip.add_class("active")
             try:
-                live_strip.border_title = "⚡ Active Run"
+                live_strip.border_title = "Run in progress"
             except Exception:
                 pass
             status_w.update(
@@ -478,7 +548,7 @@ class HomeTab(Container):
         else:
             live_strip.remove_class("active")
             try:
-                live_strip.border_title = "💤 Active Run"
+                live_strip.border_title = "Run status"
             except Exception:
                 pass
             status_w.update(

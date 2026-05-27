@@ -318,20 +318,54 @@ def _build_details_md(run: dict, results: list[dict],
 
 class HistoryTab(Container):
     DEFAULT_CSS = """
-    HistoryTab { padding: 0 1; }
+    HistoryTab {
+        layout: vertical;
+        padding: 1 2;
+        background: $surface;
+    }
+
     HistoryTab #history-intro {
+        height: auto;
         padding: 0 1;
         margin-bottom: 1;
         color: $text-muted;
     }
+
     HistoryTab #runs-section {
         height: 1fr;
         border: round $primary;
+        border-title-color: $primary;
+        background: $surface;
         padding: 0 1;
+    }
+
+    HistoryTab #history-actions {
+        height: 3;
         margin-bottom: 1;
     }
-    HistoryTab DataTable { height: 1fr; }
-    HistoryTab #hist-banner.has-anchor { color: $warning; text-style: bold; }
+
+    HistoryTab #history-actions Button {
+        margin-right: 2;
+    }
+
+    HistoryTab #hist-filter {
+        margin-bottom: 1;
+    }
+
+    HistoryTab DataTable {
+        height: 1fr;
+    }
+
+    HistoryTab #hist-banner {
+        height: auto;
+        color: $text-muted;
+        margin-bottom: 1;
+    }
+
+    HistoryTab #hist-banner.has-anchor {
+        color: $warning;
+        text-style: bold;
+    }
     """
 
     BINDINGS = [
@@ -348,18 +382,19 @@ class HistoryTab(Container):
 
     def compose(self) -> ComposeResult:
         yield Static(
-            "Past runs: click a row to view summary, compare, or remove. "
-            "Removal deletes traces and DB rows permanently.",
+            "Review past runs, open details, compare two selections, or remove stale records.",
             id="history-intro",
         )
         with Vertical(id="runs-section"):
             yield Static(
-                "[bold]All runs[/bold]  —  ↑↓ navigate  ·  "
-                "Enter = details  ·  d = diff (press on 2 rows)  ·  "
-                "Del = remove",
+                "Select a row, then use an action button or keyboard shortcut.",
                 id="hist-banner",
             )
-            yield Input(placeholder="filter (model name or run_id substring)",
+            with Horizontal(id="history-actions"):
+                yield Button("Details", id="history-details", variant="primary")
+                yield Button("Mark / compare", id="history-diff")
+                yield Button("Remove", id="history-remove", variant="error")
+            yield Input(placeholder="Filter by model or run_id",
                         id="hist-filter")
             yield DataTable(id="history-table", cursor_type="row")
 
@@ -368,7 +403,7 @@ class HistoryTab(Container):
         tbl.add_columns("#", "run_id", "model", "status", "started_at",
                         "duration (s)", "adapters")
         try:
-            self.query_one("#runs-section").border_title = "📜 Past runs"
+            self.query_one("#runs-section").border_title = "Past runs"
         except Exception:
             pass
         self.refresh_data()
@@ -397,6 +432,24 @@ class HistoryTab(Container):
             tbl.add_row(str(i), r["run_id"], r["model"], status_cell,
                         r["started_at"] or "", f"{r['duration_s'] or 0:.1f}",
                         ",".join(adapters))
+
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        bid = event.button.id or ""
+        if bid == "history-details":
+            tbl = self.query_one("#history-table", DataTable)
+            run_id = self._row_run_id(tbl.cursor_row)
+            if not run_id:
+                self.app.notify("No row selected", severity="warning", markup=False)
+                return
+            self._open_details(run_id)
+            return
+        if bid == "history-diff":
+            self.action_diff_run()
+            return
+        if bid == "history-remove":
+            self.action_remove_run()
+            return
 
     def on_input_changed(self, event) -> None:
         if event.input.id == "hist-filter":
@@ -494,9 +547,7 @@ class HistoryTab(Container):
             banner.add_class("has-anchor")
         else:
             banner.update(
-                "[bold]All runs[/bold]  —  ↑↓ navigate  ·  "
-                "Enter = details  ·  d = diff (press on 2 rows)  ·  "
-                "Del = remove"
+                "Select a row, then use an action button or keyboard shortcut."
             )
             banner.remove_class("has-anchor")
 

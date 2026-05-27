@@ -67,33 +67,60 @@ class CompareTab(Container):
     every other value is plain weight — no medal icons."""
 
     DEFAULT_CSS = """
-    CompareTab { padding: 0 1; }
+    CompareTab {
+        layout: vertical;
+        padding: 1 2;
+        background: $surface;
+    }
+
     CompareTab #compare-intro {
+        height: auto;
         padding: 0 1;
         margin-bottom: 1;
         color: $text-muted;
     }
+
+    CompareTab #picker-section,
+    CompareTab #actions-section,
+    CompareTab #matrix-section {
+        border: round $primary;
+        border-title-color: $primary;
+        background: $surface;
+        padding: 0 1;
+    }
+
     CompareTab #picker-section {
-        height: 14;
-        border: round $primary;
-        padding: 0 1;
+        height: 10;
         margin-bottom: 1;
     }
+
+    CompareTab #model-picker {
+        height: 1fr;
+    }
+
     CompareTab #actions-section {
-        height: 5;
-        border: round $primary;
-        padding: 0 1;
+        height: 4;
         margin-bottom: 1;
     }
-    CompareTab #actions-section Button { margin-right: 2; }
-    CompareTab #compare-status { height: 1; color: $text-muted; margin-bottom: 1; }
+
+    CompareTab #actions-section Button {
+        margin-right: 2;
+    }
+
+    CompareTab #compare-status {
+        height: 1;
+        color: $text-muted;
+        padding-left: 1;
+        margin-bottom: 1;
+    }
+
     CompareTab #matrix-section {
         height: 1fr;
-        border: round $primary;
-        padding: 0 1;
     }
-    CompareTab #model-picker { height: 1fr; }
-    CompareTab #compare-matrix { height: 1fr; }
+
+    CompareTab #compare-matrix {
+        height: 1fr;
+    }
     """
 
     def __init__(self, id: str | None = None) -> None:
@@ -102,17 +129,16 @@ class CompareTab(Container):
 
     def compose(self) -> ComposeResult:
         yield Static(
-            "Head-to-head comparison: pick 2+ models, click Compare to see the matrix. "
-            "Winner per column highlighted green.",
+            "Select models for a focused head-to-head view. Winners are highlighted per metric.",
             id="compare-intro",
         )
         with Vertical(id="picker-section"):
             yield SelectionList[str](id="model-picker")
         with Horizontal(id="actions-section"):
             yield Button("Compare", id="build", variant="primary")
-            yield Button("Reset", id="clear", variant="error")
+            yield Button("Reset", id="clear")
         yield Static(
-            "[dim italic]💤 Pick 2 or more models above, then click Compare.[/dim italic]",
+            "[dim italic]Pick models above, then compare.[/dim italic]",
             id="compare-status",
         )
         with Vertical(id="matrix-section"):
@@ -131,9 +157,9 @@ class CompareTab(Container):
         tbl.add_column("Runs", key="runs")
         tbl.add_column("Cluster", key="cluster")
         try:
-            self.query_one("#picker-section").border_title = "👥 Pick models to compare"
-            self.query_one("#actions-section").border_title = "🎬 Actions"
-            self.query_one("#matrix-section").border_title = "⚔ Head-to-head matrix"
+            self.query_one("#picker-section").border_title = "Models"
+            self.query_one("#actions-section").border_title = "Actions"
+            self.query_one("#matrix-section").border_title = "Head-to-head matrix"
         except Exception:
             pass
         self._populate_picker()
@@ -219,7 +245,7 @@ class CompareTab(Container):
         self._matrix_cache = []
         self.query_one("#compare-matrix", DataTable).clear()
         self.query_one("#compare-status", Static).update(
-            "[dim italic]💤 Pick 2 or more models above, then click Compare.[/dim italic]"
+            "[dim italic]Pick models above, then compare.[/dim italic]"
         )
 
     # ---------------------------------------------------------------- render
@@ -249,7 +275,11 @@ class CompareTab(Container):
                                        i in winners_perf[p]))
             cells.append(Text(str(r.get("runs", 0))))
             cluster = r.get("cluster")
-            if cluster == "dual":
+            if cluster == "quad":
+                cells.append(Text("⚡⚡⚡ quad", style="cyan"))
+            elif cluster == "triple":
+                cells.append(Text("⚡⚡ triple", style="cyan"))
+            elif cluster == "dual":
                 cells.append(Text("⚡ dual", style="cyan"))
             elif cluster == "single":
                 cells.append(Text("• single"))

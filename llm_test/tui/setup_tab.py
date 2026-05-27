@@ -37,35 +37,24 @@ _DIM_ORDER = [
     "context_state_tracking", "structured_output", "tool_selection",
     "long_context", "localization", "budget_efficiency", "hallucination",
 ]
-_GROUP_SIZE = 7
-_COL_WIDTH = 11
 
 
 def _format_weights_block(weights: dict[str, float] | None) -> str:
     if not weights:
-        return "[dim]No persona selected — all dimensions count 1.0 in Overall.[/dim]"
-    groups = [_DIM_ORDER[i:i + _GROUP_SIZE]
-              for i in range(0, len(_DIM_ORDER), _GROUP_SIZE)]
-    lines: list[str] = []
-    for g_idx, group in enumerate(groups):
-        if g_idx > 0:
-            lines.append("")
-        name_row = "".join(f"{_DIM_LABEL[d]:<{_COL_WIDTH}}" for d in group)
-        lines.append(f"[bold]{name_row}[/bold]")
-        vals = []
-        for d in group:
-            w = weights.get(d, 1.0)
-            raw = f"{w:.2f}".rstrip("0").rstrip(".")
-            if w >= 2.0:
-                cell = f"[green]{raw}[/green]"
-            elif w <= 0.5:
-                cell = f"[red]{raw}[/red]"
-            else:
-                cell = raw
-            pad = _COL_WIDTH - len(raw)
-            vals.append(cell + " " * pad)
-        lines.append("".join(vals))
-    return "\n".join(lines)
+        parts = [f"[bold]{_DIM_LABEL[d]}[/bold]=1" for d in _DIM_ORDER]
+        return "  |  ".join(parts)
+    parts: list[str] = []
+    for d in _DIM_ORDER:
+        w = weights.get(d, 1.0)
+        raw = f"{w:.2f}".rstrip("0").rstrip(".")
+        if w >= 2.0:
+            value = f"[green]{raw}[/green]"
+        elif w <= 0.5:
+            value = f"[red]{raw}[/red]"
+        else:
+            value = raw
+        parts.append(f"[bold]{_DIM_LABEL[d]}[/bold]={value}")
+    return "  |  ".join(parts)
 
 
 class SetupTab(Container):
@@ -75,29 +64,80 @@ class SetupTab(Container):
     """
 
     DEFAULT_CSS = """
-    SetupTab { padding: 0 1; }
+    SetupTab {
+        layout: vertical;
+        padding: 1 2;
+        background: $surface;
+    }
+
     SetupTab #setup-intro {
-        padding: 0 1; margin-bottom: 1; color: $text-muted;
+        height: auto;
+        padding: 0 1;
+        margin-bottom: 1;
+        color: $text-muted;
     }
-    SetupTab #selector-section {
-        height: auto; border: round $primary;
-        padding: 1 1; margin-bottom: 1;
-    }
-    SetupTab #persona-row { height: auto; }
-    SetupTab #persona-row Button { margin-right: 1; min-width: 12; }
+
+    SetupTab #ranking-section,
+    SetupTab #selector-section,
     SetupTab #weights-section {
-        height: auto; border: round $primary;
-        padding: 1 2; margin-bottom: 1;
+        border: round $primary;
+        border-title-color: $primary;
+        background: $surface;
+        padding: 0 1;
     }
-    SetupTab #weights-block { height: auto; }
-    SetupTab #apply-row { height: auto; margin-bottom: 1; }
-    SetupTab #setup-status { padding-left: 1; margin-bottom: 1; }
+
     SetupTab #ranking-section {
-        height: auto; border: round $primary;
-        padding: 1 1;
+        height: 1fr;
+        margin-bottom: 1;
     }
-    SetupTab #uc-rank-title { text-style: bold; margin-bottom: 1; }
-    SetupTab #uc-rank-table { height: auto; max-height: 18; }
+
+    SetupTab #uc-rank-title {
+        height: auto;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+    }
+
+    SetupTab #uc-rank-table {
+        height: 1fr;
+    }
+
+    SetupTab #selector-section {
+        height: 4;
+        margin-bottom: 1;
+    }
+
+    SetupTab #persona-row {
+        width: 1fr;
+        height: 3;
+    }
+
+    SetupTab #persona-row Button {
+        margin-right: 1;
+        min-width: 10;
+    }
+
+    SetupTab #apply-row {
+        width: auto;
+        height: 3;
+    }
+
+    SetupTab #weights-section {
+        height: 5;
+        margin-bottom: 1;
+    }
+
+    SetupTab #weights-block {
+        height: auto;
+        padding: 1 1;
+        color: $text;
+    }
+
+    SetupTab #setup-status {
+        height: 1;
+        color: $text-muted;
+        padding-left: 1;
+    }
     """
 
     def __init__(self, id: str | None = None) -> None:
@@ -112,35 +152,34 @@ class SetupTab(Container):
         self._active_key = self._read_active_use_case()
         self._previewed_key = self._active_key
         yield Static(
-            "Pick a use-case to preview its weights. Apply computes a model "
-            "ranking below — the global Rankings tab is never affected.",
+            "Choose a usage profile and apply it to compute a local ranking.",
             id="setup-intro",
         )
-        with Vertical(id="selector-section"):
-            with Horizontal(id="persona-row"):
-                yield Button("None", id="uc-none", variant=self._variant_for("none"))
-                for uc in USE_CASES:
-                    yield Button(uc.name, id=f"uc-{uc.key}",
-                                 variant=self._variant_for(uc.key))
-        with Vertical(id="weights-section"):
-            yield Static(self._render_weights(), id="weights-block")
-        with Horizontal(id="apply-row"):
-            yield Button("Apply", id="apply", variant="primary")
-        yield Static(self._status_text(), id="setup-status")
         with Vertical(id="ranking-section"):
-            yield Static("[dim]Click Apply to compute the ranking for the previewed persona.[/dim]",
+            yield Static("[dim]Apply a profile to compute this ranking.[/dim]",
                          id="uc-rank-title")
             yield DataTable(
                 id="uc-rank-table",
                 zebra_stripes=True,
                 cursor_type="row",
             )
+        with Horizontal(id="selector-section"):
+            with Horizontal(id="persona-row"):
+                yield Button("None", id="uc-none", variant=self._variant_for("none"))
+                for uc in USE_CASES:
+                    yield Button(uc.name, id=f"uc-{uc.key}",
+                                 variant=self._variant_for(uc.key))
+            with Horizontal(id="apply-row"):
+                yield Button("Apply profile", id="apply", variant="primary")
+        with Vertical(id="weights-section"):
+            yield Static(self._render_weights(), id="weights-block")
+        yield Static(self._status_text(), id="setup-status")
 
     def on_mount(self) -> None:
         try:
-            self.query_one("#selector-section").border_title = "🎯 Use-case selector"
-            self.query_one("#weights-section").border_title = "📊 Persona weights"
-            self.query_one("#ranking-section").border_title = "🏁 Ranking for selected persona"
+            self.query_one("#selector-section").border_title = "Use-case profiles"
+            self.query_one("#weights-section").border_title = "Weight preview"
+            self.query_one("#ranking-section").border_title = "Profile ranking"
         except Exception:
             pass
 

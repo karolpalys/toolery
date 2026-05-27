@@ -13,16 +13,54 @@ from llm_test.core.store import Store
 
 
 class ScenariosTab(Container):
-    DEFAULT_CSS = """ScenariosTab { padding: 1; }"""
+    DEFAULT_CSS = """
+    ScenariosTab {
+        layout: vertical;
+        padding: 1 2;
+        background: $surface;
+    }
+
+    ScenariosTab #scenario-browser {
+        height: 1fr;
+        border: round $primary;
+        border-title-color: $primary;
+        background: $surface;
+        padding: 0 1;
+    }
+
+    ScenariosTab #sc-heading {
+        height: 1;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+    }
+
+    ScenariosTab #sc-pick {
+        margin-bottom: 1;
+    }
+
+    ScenariosTab #sc-table {
+        height: 1fr;
+    }
+
+    ScenariosTab #sc-stats {
+        height: 1;
+        color: $text-muted;
+    }
+    """
 
     def compose(self):
-        with Vertical():
-            yield Static("[bold]🔎 Per-scenario cross-model view[/bold]")
+        with Vertical(id="scenario-browser"):
+            yield Static("Per-scenario cross-model view", id="sc-heading")
             yield Select(options=[], id="sc-pick")
             yield DataTable(id="sc-table")
             yield Static("", id="sc-stats")
 
     def on_mount(self) -> None:
+        try:
+            self.query_one("#scenario-browser").border_title = "Scenario browser"
+        except Exception:
+            pass
         sel = self.query_one("#sc-pick", Select)
         try:
             scenarios = load_all_scenarios(Path("scenarios"))
