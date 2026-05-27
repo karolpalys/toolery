@@ -26,6 +26,11 @@ def compare_runs(*, store: Store, run_a: str, run_b: str, out_path: Path) -> Non
     for r in rs_b:
         if r["adapter"] == common_adapter:
             b_by_scenario[r["scenario_id"]].append(r)
+    # Sort by trial_index so McNemar pairs the same trial across A and B,
+    # independent of how fetch_results_for_run orders rows.
+    for d in (a_by_scenario, b_by_scenario):
+        for s in d:
+            d[s].sort(key=lambda r: r["trial_index"])
     common_scenarios = sorted(set(a_by_scenario) & set(b_by_scenario))
 
     a_scores = [r["score"] for s in common_scenarios for r in a_by_scenario[s]]
