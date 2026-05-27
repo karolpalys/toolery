@@ -52,6 +52,13 @@ class ToolResponseRule(BaseModel):
     returns_with_injection: str | None = None
     depends_on: str | None = None
     call_index: int | str | None = None
+    # match_index gates on a per-args-match counter (counts how many prior
+    # invocations matched THIS rule's `match` discriminator), not on the
+    # global per-tool counter that call_index uses. Use match_index when you
+    # want "first time this specific URL/pid/command is hit, return X" —
+    # call_index breaks for that intent if the same tool is invoked with
+    # different args in between.
+    match_index: int | str | None = None
 
 
 class Scoring(BaseModel):
