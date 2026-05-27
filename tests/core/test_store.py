@@ -55,3 +55,30 @@ def test_init_schema_creates_in_flight_units(tmp_results_dir):
         assert cols_inflight == {
             "run_id", "scenario_id", "adapter", "trial_index", "started_at"
         }
+
+
+def test_in_flight_round_trip(tmp_results_dir):
+    store = Store(tmp_results_dir / "runs.db")
+    store.init_schema()
+    run_id = "2026-05-27T20-00_test"
+    store.create_run(run_id=run_id, model="m", base_url="http://x",
+                     started_at="2026-05-27T20:00:00Z",
+                     config_json="{}", scenarios_hash="x")
+
+    store.mark_in_flight(run_id, "easy-01", "raw", 0, "2026-05-27T20:00:01Z")
+    store.mark_in_flight(run_id, "easy-01", "raw", 1, "2026-05-27T20:00:02Z")
+
+    rows = store.fetch_in_flight_for_run(run_id)
+    assert len(rows) == 2
+    assert {r["trial_index"] for r in rows} == {0, 1}
+    assert all(r["scenario_id"] == "easy-01" for r in rows)
+    assert all(r["adapter"] == "raw" for r in rows)
+
+    # updated_at heartbeat fired on mark_in_flight
+    run = store.fetch_run(run_id)
+    assert run["updated_at"] is not None
+
+    store.clear_in_flight(run_id, "easy-01", "raw", 0)
+    rows = store.fetch_in_flight_for_run(run_id)
+    assert len(rows) == 1
+    assert rows[0]["trial_index"] == 1

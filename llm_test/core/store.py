@@ -183,6 +183,42 @@ class Store:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def mark_in_flight(self, run_id: str, scenario_id: str, adapter: str,
+                       trial_index: int, started_at: str) -> None:
+        """Record that (scenario_id, adapter, trial_index) just entered _run_one.
+        Also updates runs.updated_at as an implicit heartbeat — same transaction."""
+        with self.conn() as c:
+            c.execute(
+                "INSERT OR REPLACE INTO in_flight_units"
+                "(run_id, scenario_id, adapter, trial_index, started_at) "
+                "VALUES (?,?,?,?,?)",
+                (run_id, scenario_id, adapter, trial_index, started_at),
+            )
+            c.execute("UPDATE runs SET updated_at=? WHERE run_id=?",
+                      (started_at, run_id))
+
+    def clear_in_flight(self, run_id: str, scenario_id: str, adapter: str,
+                        trial_index: int) -> None:
+        """Remove the in-flight marker (task completed/failed/timed out).
+        Bumps runs.updated_at in the same transaction."""
+        from datetime import UTC, datetime
+        now = datetime.now(UTC).isoformat()
+        with self.conn() as c:
+            c.execute(
+                "DELETE FROM in_flight_units WHERE run_id=? AND scenario_id=? "
+                "AND adapter=? AND trial_index=?",
+                (run_id, scenario_id, adapter, trial_index),
+            )
+            c.execute("UPDATE runs SET updated_at=? WHERE run_id=?", (now, run_id))
+
+    def fetch_in_flight_for_run(self, run_id: str) -> list[dict]:
+        with self.conn() as c:
+            rows = c.execute(
+                "SELECT * FROM in_flight_units WHERE run_id=? ORDER BY started_at",
+                (run_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
     def fetch_all_runs(self) -> list[dict]:
         with self.conn() as c:
             rows = c.execute("SELECT * FROM runs ORDER BY started_at DESC").fetchall()
