@@ -1,7 +1,7 @@
 id: very-hard-07-iterative-replan
 title: "Replan after the first approach fails — don't loop, don't give up"
 tier: very_hard
-category: hard_mode
+category: error_recovery
 domain: dev_ops
 description: |
   User wants the average response latency for the "checkout" service across

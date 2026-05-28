@@ -1,7 +1,7 @@
 id: very-hard-04-long-context-multi-constraint
 title: "Long context + 4 simultaneous constraints"
 tier: very_hard
-category: hard_mode
+category: context_state_tracking
 domain: dev_ops
 description: |
   In-prompt multi-constraint instruction following: the model receives a

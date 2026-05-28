@@ -1,7 +1,7 @@
 id: very-hard-01-tdd-full-loop
 title: "Full TDD with branch + lint + scope"
 tier: very_hard
-category: hard_mode
+category: coding
 domain: dev_ops
 description: |
   Branch off main, rename a function across only the 4 code files (not CHANGELOG),
