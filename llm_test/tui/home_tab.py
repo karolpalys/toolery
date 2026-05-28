@@ -346,11 +346,6 @@ class HomeTab(Container):
         min-width: 18;
     }
 
-    HomeTab #scanner-strip #run-test.-ready {
-        background: $error;
-        color: $text;
-    }
-
     HomeTab #scanner-strip #scan-status {
         height: 1;
         color: $text-muted;
@@ -548,17 +543,21 @@ class HomeTab(Container):
 
     def _update_run_button_state(self) -> None:
         """Run button is gray+disabled until scan finds at least one endpoint;
-        then becomes red+enabled and stays that way until next scan."""
+        then becomes red+enabled and stays that way until next scan.
+
+        Uses the built-in `error` variant rather than a custom background
+        class so hover/focus/click feedback matches the Scan button.
+        """
         try:
             btn = self.query_one("#run-test", Button)
         except Exception:
             return
         if self._endpoints:
             btn.disabled = False
-            btn.add_class("-ready")
+            btn.variant = "error"
         else:
             btn.disabled = True
-            btn.remove_class("-ready")
+            btn.variant = "default"
 
     async def _launch_from_button(self) -> None:
         """Mimic double-click on the endpoints table — open the launch modal
