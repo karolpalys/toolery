@@ -26,13 +26,15 @@ budget:
 tool_responses: {}
 scoring:
   required:
-    - check: response_matches_regex
-      all_of:
-        - "\\{"
-        - "\"city\""
-        - "\"population_m\""
-        - "\"country\""
-        - "\\}"
+    - check: response_matches_schema
+      schema:
+        type: object
+        required: [city, population_m, country]
+        additionalProperties: true
+        properties:
+          city: { type: string }
+          population_m: { type: number }
+          country: { type: string }
     - check: response_satisfies
       any_of:
         - ["Tokyo"]
