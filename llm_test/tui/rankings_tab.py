@@ -21,13 +21,14 @@ _RANKING_MODES = [
 ]
 
 # Cluster filter — restricts displayed rows by DGX Spark topology.
-# Order matches launch-modal radio set (1→4 sparks).
+# Order matches launch-modal radio set (1→4 sparks, plus 8 octa).
 _SPARKS_FILTERS = [
     ("all",    "All"),
     ("single", "1× single"),
     ("dual",   "2× dual"),
     ("triple", "3× triple"),
     ("quad",   "4× quad"),
+    ("octa",   "8× octa"),
 ]
 
 _STABILITY_COLS = ["mean", "worst", "pass_rate", "stddev"]

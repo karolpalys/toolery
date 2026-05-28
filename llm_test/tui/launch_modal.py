@@ -69,10 +69,12 @@ class LaunchModal(ModalScreen[RunArgs | None]):
 
     BINDINGS = [Binding("escape", "cancel", "Cancel", show=False)]
 
-    def __init__(self, endpoint: EndpointInfo, adapters: dict[str, AdapterStatus]) -> None:
+    def __init__(self, endpoint: EndpointInfo, adapters: dict[str, AdapterStatus],
+                 interrupted_run: dict | None = None) -> None:
         super().__init__()
         self._endpoint = endpoint
         self._adapters = adapters
+        self._interrupted_run = interrupted_run
 
     def compose(self) -> ComposeResult:
         with VerticalScroll():
@@ -119,6 +121,7 @@ class LaunchModal(ModalScreen[RunArgs | None]):
                     ("dual",   "2 sparks (dual)"),
                     ("triple", "3 sparks (triple)"),
                     ("quad",   "4 sparks (quad)"),
+                    ("octa",   "8 sparks (octa)"),
                 ):
                     btn = RadioButton(label, id=f"cluster-{value}")
                     if value == "single":
