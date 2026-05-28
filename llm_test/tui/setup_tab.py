@@ -132,6 +132,17 @@ class SetupTab(Container):
         height: 3;
     }
 
+    SetupTab #adapter-row {
+        width: 1fr;
+        height: 3;
+        margin-left: 2;
+    }
+
+    SetupTab #adapter-row Button {
+        margin-right: 1;
+        min-width: 8;
+    }
+
     SetupTab #sparks-row Button {
         margin-right: 1;
         min-width: 6;
@@ -170,6 +181,15 @@ class SetupTab(Container):
         "8": "octa",
     }
 
+    # Adapter button id suffix → adapter value in DB. `claude` maps to
+    # `claude_code` (DB-canonical name). `all` clears the filter.
+    _ADAPTER_TO_DB = {
+        "all": None,
+        "cloud": "cloud",
+        "hermes": "hermes",
+        "claude": "claude_code",
+    }
+
     def __init__(self, id: str | None = None) -> None:
         super().__init__(id=id)
         self._results_dir = Path(
@@ -178,6 +198,7 @@ class SetupTab(Container):
         self._previewed_key: str | None = None
         self._active_key: str | None = None
         self._sparks_key: str = "all"  # SPARKS filter (default: ALL clusters)
+        self._adapter_key: str = "all"  # adapter filter (default: ALL adapters)
 
     def compose(self) -> ComposeResult:
         self._active_key = self._read_active_use_case()
@@ -197,14 +218,19 @@ class SetupTab(Container):
                 yield Button("Apply profile", id="apply", variant="primary")
         with Vertical(id="weights-section"):
             yield Static(self._render_weights(), id="weights-block")
-        # SPARKS filter — controls which cluster topology contributes to the
-        # ranking table below.
+        # SPARKS + adapter filters side-by-side — both narrow which runs
+        # contribute to the ranking table below.
         with Horizontal(id="sparks-section"):
             with Horizontal(id="sparks-row"):
                 for key in ("all", "1", "2", "3", "4", "8"):
                     label = "ALL" if key == "all" else key
                     yield Button(label, id=f"sparks-{key}",
                                  variant=self._sparks_variant_for(key))
+            with Horizontal(id="adapter-row"):
+                for key in ("all", "cloud", "hermes", "claude"):
+                    label = "ALL" if key == "all" else key
+                    yield Button(label, id=f"adapter-filter-{key}",
+                                 variant=self._adapter_variant_for(key))
         # Ranking table below (the output the user inspects).
         with Vertical(id="ranking-section"):
             yield Static("[dim]Apply a profile to compute this ranking.[/dim]",
@@ -221,7 +247,7 @@ class SetupTab(Container):
             self.query_one("#selector-section").border_title = "Use-case profiles"
             self.query_one("#weights-section").border_title = "Weight preview"
             self.query_one("#sparks-section").border_title = (
-                "SPARKS — cluster filter (DGX Spark nodes)"
+                "SPARKS (cluster nodes) — adapter (run harness)"
             )
             self.query_one("#ranking-section").border_title = "Profile ranking"
         except Exception:
@@ -239,6 +265,10 @@ class SetupTab(Container):
     def _sparks_variant_for(self, key: str) -> str:
         """Highlight the active SPARKS filter button."""
         return "success" if self._sparks_key == key else "default"
+
+    def _adapter_variant_for(self, key: str) -> str:
+        """Highlight the active adapter filter button."""
+        return "success" if self._adapter_key == key else "default"
 
     def _render_weights(self) -> str:
         if self._previewed_key is None:
@@ -293,9 +323,16 @@ class SetupTab(Container):
                 return
             self._sparks_key = key
             self._refresh_sparks_buttons()
-            # Re-render the ranking table with the new cluster filter, but
-            # only if a persona is currently applied — otherwise the table
-            # is empty by design.
+            if self._active_key is not None:
+                self._render_ranking_table(self._active_key)
+            self._refresh_status()
+            return
+        if bid.startswith("adapter-filter-"):
+            key = bid.removeprefix("adapter-filter-")
+            if key not in self._ADAPTER_TO_DB:
+                return
+            self._adapter_key = key
+            self._refresh_adapter_buttons()
             if self._active_key is not None:
                 self._render_ranking_table(self._active_key)
             self._refresh_status()
@@ -330,6 +367,14 @@ class SetupTab(Container):
                 continue
             btn.variant = self._sparks_variant_for(bid.removeprefix("sparks-"))
 
+    def _refresh_adapter_buttons(self) -> None:
+        for btn in self.query("#adapter-row Button"):
+            bid = btn.id or ""
+            if not bid.startswith("adapter-filter-"):
+                continue
+            btn.variant = self._adapter_variant_for(
+                bid.removeprefix("adapter-filter-"))
+
     def _refresh_weights_block(self) -> None:
         self.query_one("#weights-block", Static).update(self._render_weights())
 
@@ -358,11 +403,13 @@ class SetupTab(Container):
         store = Store(db)
         store.init_schema()
         cluster_filter = self._SPARKS_TO_CLUSTER.get(self._sparks_key)
+        adapter_filter = self._ADAPTER_TO_DB.get(self._adapter_key)
         try:
             matrix = compute_matrix(
                 store=store, dimensions=["overall"],
                 use_case_weights=dict(uc.weights),
                 cluster_filter=cluster_filter,
+                adapter_filter=adapter_filter,
             )
         except Exception as e:
             title.update(f"[red]compute failed: {e}[/red]")

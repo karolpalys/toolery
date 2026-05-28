@@ -393,6 +393,7 @@ def compute_matrix(
     history_window_runs: int = 5, half_life_days: float = 14.0,
     use_case_weights: dict[str, float] | None = None,
     cluster_filter: str | None = None,
+    adapter_filter: str | None = None,
 ) -> list[dict]:
     """Compute per-(model, adapter) scores across all ranking dimensions.
 
@@ -425,6 +426,8 @@ def compute_matrix(
 
     with store.conn() as c:
         all_results = [dict(r) for r in c.execute("SELECT * FROM scenario_results").fetchall()]
+    if adapter_filter is not None:
+        all_results = [r for r in all_results if r.get("adapter") == adapter_filter]
 
     # (model, adapter) -> dim -> list of {run_id, started_at, score, tier}
     pairs: dict[tuple[str, str], dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))

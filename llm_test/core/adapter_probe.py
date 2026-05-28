@@ -20,6 +20,13 @@ def available_adapters(
     out: dict[str, AdapterStatus] = {
         "raw": AdapterStatus(available=True),
     }
+    # Cloud needs an API key — without it, a cloud-API call will 401.
+    if env.get("OPENAI_API_KEY") or env.get("ANTHROPIC_API_KEY"):
+        out["cloud"] = AdapterStatus(available=True)
+    else:
+        out["cloud"] = AdapterStatus(
+            available=False, reason="set OPENAI_API_KEY or ANTHROPIC_API_KEY"
+        )
     out["hermes"] = (
         AdapterStatus(available=True)
         if path_lookup("hermes")

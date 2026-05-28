@@ -12,9 +12,12 @@ from llm_test.core.models import Category
 from llm_test.core.runner_subprocess import RunArgs
 
 _ADAPTER_LABELS = {
-    "raw": "raw                - direct OpenAI port",
-    "hermes": "hermes             - CLI subprocess",
-    "claude_code": "claude_code        - Claude Code CLI",
+    "raw":         "raw                - local OpenAI-compatible port",
+    "cloud":       "cloud              - remote OpenAI-compatible API (needs key)",
+    "hermes":      "hermes             - CLI subprocess",
+    "claude":      "claude             - Claude Code CLI",
+    # claude_code kept as legacy alias for older configs/DB rows.
+    "claude_code": "claude             - Claude Code CLI",
 }
 
 
@@ -130,13 +133,24 @@ class LaunchModal(ModalScreen[RunArgs | None]):
 
             yield Label("Harness:")
             with RadioSet(id="adapter"):
-                for name in ("raw", "hermes", "claude_code"):
-                    status = self._adapters[name]
-                    text = _ADAPTER_LABELS[name]
+                # UI exposes 4 options: raw / cloud / hermes / claude. The
+                # `claude` key is what the user sees; internal lookups still
+                # accept claude_code as the canonical adapter status key.
+                for ui_name, status_key in (
+                    ("raw",    "raw"),
+                    ("cloud",  "cloud"),
+                    ("hermes", "hermes"),
+                    ("claude", "claude_code"),
+                ):
+                    status = self._adapters.get(status_key) or self._adapters.get(ui_name)
+                    if status is None:
+                        continue
+                    text = _ADAPTER_LABELS[ui_name]
                     if not status.available:
                         text = f"{text}  - disabled ({status.reason})"
-                    btn = RadioButton(text, id=f"adapter-{name}", disabled=not status.available)
-                    if name == "raw":
+                    btn = RadioButton(text, id=f"adapter-{ui_name}",
+                                      disabled=not status.available)
+                    if ui_name == "raw":
                         btn.value = True
                     yield btn
 

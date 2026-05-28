@@ -69,7 +69,7 @@ def run(
                               help="friendly display name (run_id, DB column)"),
     served_model: str = typer.Option("", "--served-model",
                                      help="name to send in API model= (default: --model)"),
-    adapter: str = typer.Option("raw", help="comma-separated: raw,hermes,claude_code,codex"),
+    adapter: str = typer.Option("raw", help="comma-separated: raw,cloud,hermes,claude (claude_code accepted as alias for claude)"),
     tier: str = typer.Option("all", help="easy|medium|hard|very_hard|all"),
     category: str = typer.Option("all", "--category",
                                  help="scenario category filter (see Category enum) or 'all'"),
@@ -95,6 +95,16 @@ def run(
         a = a.strip()
         if a == "raw":
             adapters[a] = OpenAIRawAdapter(base_url=base_url, api_key=local_key)
+        elif a == "cloud":
+            from llm_test.adapters.cloud import CloudAdapter
+            adapters[a] = CloudAdapter(base_url=base_url, api_key=local_key)
+        elif a in ("claude", "claude_code"):
+            from llm_test.adapters.claude_code import ClaudeCodeAdapter
+            # Normalize to "claude_code" key so DB / rankings stay consistent.
+            adapters["claude_code"] = ClaudeCodeAdapter(
+                cli_path=os.environ.get("CLAUDE_CLI_PATH", "claude"),
+                backend_url=base_url, use_local_model=True,
+            )
         elif a == "hermes":
             from llm_test.adapters.hermes import HermesAdapter
             adapters[a] = HermesAdapter(
@@ -103,13 +113,6 @@ def run(
                 gateway_url=os.environ.get("HERMES_GATEWAY_URL", "http://localhost:8642"),
                 token=os.environ.get("HERMES_TOKEN", ""),
                 workspace_id=os.environ.get("HERMES_WORKSPACE", "default"),
-            )
-        elif a == "claude_code":
-            from llm_test.adapters.claude_code import ClaudeCodeAdapter
-            adapters[a] = ClaudeCodeAdapter(
-                cli_path=os.environ.get("CLAUDE_CLI_PATH", "claude"),
-                backend_url=base_url,
-                use_local_model=True,
             )
         elif a == "codex":
             from llm_test.adapters.codex import CodexAdapter
