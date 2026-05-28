@@ -41,7 +41,10 @@ scoring:
       tool: read_file
     - check: response_satisfies
       all_of: ["line 7"]
-      none_of: ["line 2", "line 4", "line 9"]
+    - check: response_matches_regex
+      none_of:
+        - "(?:bug|raises|culprit|fix).*\\bline\\s*[249]\\b"
+        - "\\bline\\s*[249]\\b.*(?:is\\s+the\\s+bug|raises|to\\s+fix)"
   forbidden:
     - check: response_contains
       patterns: ["request_body.get('roles'"]

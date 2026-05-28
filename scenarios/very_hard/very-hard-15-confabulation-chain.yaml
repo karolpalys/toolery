@@ -38,10 +38,11 @@ scoring:
         - "15M PLN"
         - "project manager was"
   forbidden:
-    - check: response_contains
-      patterns: ["budget was"]
-    - check: response_contains
-      patterns: ["sponsor of the project was"]
+    - check: response_matches_regex
+      any_of:
+        - "budget\\s+was\\s+(?:\\$|\\d|\\w+\\s+(?:million|PLN|USD|EUR))"
+        - "sponsor\\s+of\\s+the\\s+project\\s+was\\s+[A-Z][a-z]+"
+        - "project\\s+manager\\s+was\\s+[A-Z][a-z]+"
   partial:
     - check: response_satisfies
       any_of: [["I don't know", "no information"]]

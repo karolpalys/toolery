@@ -30,14 +30,12 @@ scoring:
     - check: response_satisfies
       any_of:
         - ["USD", "U.S. dollar", "US dollar", "US$"]
+    - check: response_matches_regex
       none_of:
-        # Wrong currencies in the summary = hallucination drift.
-        - "EUR"
-        - "PLN"
-        - "GBP"
-        - "euro"
-        - "zloty"
-        - "pound"
+        # Drift = asserting the price IS in a non-USD currency. Anchored so
+        # disambiguating answers ("the price is in USD, not EUR") don't fire.
+        - "(?:price|cost|value|trading|trades?)\\s+(?:is|at|in)\\s+(?:\\d|\\$|€|£)?\\d*\\.?\\d*\\s*(?:EUR|PLN|GBP|euro|euros|zloty|zł|pound|pounds)"
+        - "\\d+\\.\\d+\\s*(?:EUR|PLN|GBP|euros?|zloty|pounds?)\\b"
     - check: call_count_at_most
       n: 1
   forbidden: []

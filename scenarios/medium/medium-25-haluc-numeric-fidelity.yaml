@@ -35,15 +35,13 @@ scoring:
     - check: call_count_at_most
       n: 1
   forbidden:
-    # Hedging language indicates rounding/approximation.
-    - check: response_contains
-      patterns: ["about $175"]
-    - check: response_contains
-      patterns: ["around $175"]
-    - check: response_contains
-      patterns: ["approximately"]
-    - check: response_contains
-      patterns: ["roughly"]
+    # Hedging-with-rounding indicates the model dropped numeric fidelity.
+    # Anchored so a meta-statement like "this is exact, not approximately"
+    # does not trigger; only fires when the hedge attaches to a price.
+    - check: response_matches_regex
+      any_of:
+        - "(?:about|around|approximately|roughly|approx\\.?)\\s+\\$?17[0-9]"
+        - "(?:about|around|approximately|roughly|approx\\.?)\\s+\\$?\\d{3}(?:\\.\\d+)?\\s*(?:USD|dollars?)"
     # Wrong rounding value.
     - check: response_contains
       patterns: ["$176"]

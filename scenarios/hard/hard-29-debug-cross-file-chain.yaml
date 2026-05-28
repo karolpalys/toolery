@@ -62,8 +62,11 @@ scoring:
       tool: read_file
     - check: response_satisfies
       all_of: ["config.py"]
-      none_of: ["cache.py:14 is the bug", "fix cache.py:14",
-                "the bug is in cache.py"]
+    - check: response_matches_regex
+      none_of:
+        - "(?:^|\\.\\s+|\\bso\\s+)the\\s+bug\\s+is\\s+in\\s+cache\\.py(?!'s)"
+        - "fix.*cache\\.py:14"
+        - "cache\\.py:14\\s+is\\s+the\\s+bug"
     - check: response_satisfies
       any_of:
         - ["line 6", "get_ttl", "return None", "default"]

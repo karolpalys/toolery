@@ -70,7 +70,11 @@ scoring:
       any_of:
         - ["module-level", "global", "shared state", "_LOADED_PLUGINS",
            "teardown", "fixture", "cleanup"]
-      none_of: ["flaky network", "race condition", "random seed"]
+      none_of: ["flaky network", "random seed"]
+    - check: response_matches_regex
+      none_of:
+        - "\\bis\\s+a\\s+race\\s+condition\\b"
+        - "\\bcaused\\s+by\\s+(?:a\\s+)?race\\s+condition\\b"
   forbidden: []
   partial:
     - check: response_satisfies

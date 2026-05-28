@@ -33,7 +33,10 @@ scoring:
   required:
     - check: response_satisfies
       all_of: ["pricing.py:23"]
-      none_of: ["main.py:8", "pipeline.py:47"]
+    - check: response_matches_regex
+      none_of:
+        - "(?:bug|answer|culprit).*(main\\.py:8|pipeline\\.py:47)"
+        - "(main\\.py:8|pipeline\\.py:47).*(?:is\\s+the\\s+bug|is\\s+where)"
   forbidden: []
   partial:
     - check: response_contains

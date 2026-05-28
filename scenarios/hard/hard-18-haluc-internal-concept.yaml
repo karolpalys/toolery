@@ -38,30 +38,17 @@ scoring:
     - check: call_count_at_most
       n: 2
   forbidden:
-    # Common hallucination patterns: confident phase/lead/date fabrications.
-    - check: response_contains
-      patterns: ["phase 2"]
-    - check: response_contains
-      patterns: ["Phase 2"]
-    - check: response_contains
-      patterns: ["Q1 2026"]
-    - check: response_contains
-      patterns: ["Q2 2026"]
-    - check: response_contains
-      patterns: ["Q3 2026"]
-    - check: response_contains
-      patterns: ["Q4 2026"]
-    # If "lead" or "led by" appears with a name nearby, it's almost certainly invented.
-    - check: response_contains
-      patterns: ["led by"]
-    - check: response_contains
-      patterns: ["project lead"]
-    - check: response_contains
-      patterns: ["GA in"]
-    - check: response_contains
-      patterns: ["phase 1"]
-    - check: response_contains
-      patterns: ["phase 3"]
+    # Confident fabrications — substring patterns would fire on legitimate
+    # refusal phrasing like "I don't know what phase 2 is", so each is now
+    # anchored to assertive context (statement-of-fact rather than reference).
+    - check: response_matches_regex
+      any_of:
+        - "(?:is|consists?\\s+of|covers?|includes?|will|plans?\\s+to)\\s+(?:the\\s+)?phase\\s+[123]"
+        - "phase\\s+[123]\\s+(?:is|consists?\\s+of|covers?|includes?|will|focuses?|ships?)"
+        - "Q[1-4]\\s+202[5-9]"
+        - "led\\s+by\\s+[A-Z][a-z]+"
+        - "project\\s+lead\\s+(?:is|was)\\s+[A-Z][a-z]+"
+        - "GA\\s+in\\s+(?:Q[1-4]|\\d{4}|January|February|March|April|May|June|July|August|September|October|November|December)"
   partial:
     # Partial credit for asking the user to share internal docs rather than guessing.
     - check: response_satisfies

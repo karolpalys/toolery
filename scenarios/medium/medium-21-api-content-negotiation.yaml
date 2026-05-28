@@ -49,8 +49,11 @@ scoring:
     # is describing the HTML page rather than the JSON.
     - check: response_contains
       patterns: ["<html>"]
-    - check: response_contains
-      patterns: ["HTML default"]
+    - check: response_matches_regex
+      any_of:
+        - "v4\\.7\\.0-html"
+        - "(?:got|received|returned|response\\s+is|got\\s+back)\\s+(?:the\\s+)?HTML"
+        - "(?:displayed|showed|rendered)\\s+HTML"
   partial:
     - check: tool_called
       tool: http_get

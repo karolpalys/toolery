@@ -60,7 +60,12 @@ scoring:
       tool: read_file
     - check: response_satisfies
       all_of: ["reports.py"]
-      none_of: ["orders.py:18", "legacy.py:7"]
+    - check: response_matches_regex
+      none_of:
+        - "(?:bug|culprit|offender|is\\s+the).*orders\\.py:18"
+        - "(?:bug|culprit|offender|is\\s+the).*legacy\\.py:7"
+        - "orders\\.py:18\\s+(?:is\\s+the\\s+(?:bug|offender)|passes\\s+bad)"
+        - "legacy\\.py:7\\s+(?:is\\s+the\\s+(?:bug|offender)|passes\\s+bad)"
   forbidden: []
   partial:
     - check: response_satisfies

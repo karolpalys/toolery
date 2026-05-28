@@ -35,17 +35,15 @@ scoring:
     - check: call_count_at_most
       n: 2
   forbidden:
-    # If model invents a DOI it hallucinated. Real DOIs match 10.NNNN/...
-    - check: response_contains
-      patterns: ["doi:10."]
-    - check: response_contains
-      patterns: ["10.1038"]      # Nature
-    - check: response_contains
-      patterns: ["10.1145"]      # ACM
-    - check: response_contains
-      patterns: ["10.1109"]      # IEEE
-    - check: response_contains
-      patterns: ["arxiv.org/abs/"]
+    # If model invents a DOI/arxiv it hallucinated. Patterns anchored so
+    # legitimate "no DOI in the form doi:10.xxxx exists" doesn't trip them.
+    - check: response_matches_regex
+      any_of:
+        - "doi:10\\.\\d{4,}/[\\w.-]+"
+        - "10\\.1038/[\\w.-]+"
+        - "10\\.1145/[\\w.-]+"
+        - "10\\.1109/[\\w.-]+"
+        - "arxiv\\.org/abs/\\d{4}\\.\\d{4,5}"
     # Common fabricated journal names.
     - check: response_contains
       patterns: ["Journal of Quantum"]
