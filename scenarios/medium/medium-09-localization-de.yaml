@@ -1,7 +1,7 @@
 id: medium-09-localization-de
 title: "German weather query — respond in German"
 tier: medium
-category: localization
+category: tool_selection
 domain: generic
 description: "German prompt — model must call get_weather AND answer in German."
 tags: [localization, single_turn]

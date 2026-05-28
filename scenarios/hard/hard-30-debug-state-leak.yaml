@@ -1,0 +1,88 @@
+id: hard-30-debug-state-leak
+title: "Test passes alone, fails when run after another (global state)"
+tier: hard
+category: debugging
+domain: dev_ops
+description: |
+  test_b passes when invoked alone, fails when invoked after test_a. Bug:
+  test_a mutates a module-level cache (`_LOADED_PLUGINS`) that test_b
+  assumes is empty. Model must read both tests + module, identify shared
+  mutable state.
+tags: [debugging, state_leak, test_isolation]
+ranking_dimensions: [overall, debugging, coding, context_state_tracking]
+prompt: |
+  When I run `pytest tests/test_plugins.py` everything passes. When I run
+  `pytest tests/test_plugins.py tests/test_runtime.py` then test_runtime.py
+  fails. Both tests pass in isolation. Find the root cause and propose the
+  fix (one or two sentences).
+tools: [read_file, run_tests]
+budget:
+  max_tool_calls: 5
+  max_turns: 5
+  timeout_seconds: 90
+tool_responses:
+  run_tests:
+    - match: { args_contains: "test_runtime.py" }
+      call_index: 0
+      returns: |
+        PASSED tests/test_runtime.py (run alone)
+    - match: any
+      call_index: 0
+      returns: |
+        PASSED tests/test_plugins.py::test_register
+        FAILED tests/test_runtime.py::test_clean_runtime
+          assert _LOADED_PLUGINS == []
+          AssertionError: assert ['stripe'] == []
+    - match: any
+      returns: "PASSED"
+  read_file:
+    - match: { path: "src/plugins.py" }
+      returns: |
+        _LOADED_PLUGINS: list[str] = []  # module-level mutable state
+
+        def register(name: str):
+            _LOADED_PLUGINS.append(name)
+
+        def loaded() -> list[str]:
+            return _LOADED_PLUGINS
+    - match: { path: "tests/test_plugins.py" }
+      returns: |
+        from src.plugins import register, loaded
+
+        def test_register():
+            register("stripe")
+            assert "stripe" in loaded()
+        # No teardown!
+    - match: { path: "tests/test_runtime.py" }
+      returns: |
+        from src.plugins import _LOADED_PLUGINS
+
+        def test_clean_runtime():
+            # Assumes fresh module state
+            assert _LOADED_PLUGINS == []
+    - match: any
+      returns: { error: "not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: read_file
+    - check: response_satisfies
+      any_of:
+        - ["module-level", "global", "shared state", "_LOADED_PLUGINS",
+           "teardown", "fixture", "cleanup"]
+      none_of: ["flaky network", "race condition", "random seed"]
+  forbidden: []
+  partial:
+    - check: response_satisfies
+      any_of:
+        - ["test_register", "register('stripe')", "register(\"stripe\")"]
+    - check: response_satisfies
+      any_of:
+        - ["fixture", "teardown", "monkeypatch", "_LOADED_PLUGINS.clear()",
+           "isolation"]
+    - check: call_count_at_most
+      n: 4
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

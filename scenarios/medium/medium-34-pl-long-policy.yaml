@@ -1,7 +1,7 @@
 id: medium-34-pl-long-policy
 title: "PL: paragraf 7 — zwrot po 14 dniach?"
 tier: medium
-category: localization
+category: context_state_tracking
 domain: generic
 description: |
   Polish 1500-token regulamin embedded in prompt. Question targets §7

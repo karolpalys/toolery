@@ -1,0 +1,78 @@
+id: medium-37-debug-bad-caller
+title: "Find which caller passes a bad format to parse_date()"
+tier: medium
+category: debugging
+domain: dev_ops
+description: |
+  `parse_date()` raises ValueError for some inputs. Function itself is correct
+  (validates ISO 8601). Bug is in ONE of the callers passing US-format dates.
+  Model must grep for callers and identify the offender.
+tags: [debugging, caller_analysis, grep]
+ranking_dimensions: [overall, debugging, coding]
+prompt: |
+  Users report intermittent crashes from `parse_date()` in src/dates.py with
+  `ValueError: invalid isoformat string`. The function itself is correct.
+  Find which caller is passing bad input. Use grep to enumerate callers and
+  read the offending file. Report the file:line of the bug.
+tools: [grep, read_file]
+budget:
+  max_tool_calls: 4
+  max_turns: 4
+  timeout_seconds: 60
+tool_responses:
+  grep:
+    - match: { pattern_regex: "parse_date" }
+      returns: |
+        src/api/orders.py:18:    created = parse_date(order["created_at"])
+        src/api/reports.py:42:    parse_date(row["timestamp"])
+        src/api/legacy.py:7:    return parse_date(record.get("ts", ""))
+        src/dates.py:3:def parse_date(s: str) -> datetime:
+    - match: any
+      returns: ""
+  read_file:
+    - match: { path: "src/api/orders.py" }
+      returns: |
+        # src/api/orders.py
+        def store_order(order):
+            # order["created_at"] is already ISO 8601 from validator
+            created = parse_date(order["created_at"])
+            return created
+    - match: { path: "src/api/reports.py" }
+      returns: |
+        # src/api/reports.py
+        def daily_report(rows):
+            for row in rows:
+                # row["timestamp"] is "MM/DD/YYYY" from the old CSV export
+                parse_date(row["timestamp"])
+    - match: { path: "src/api/legacy.py" }
+      returns: |
+        # src/api/legacy.py
+        def migrate(record):
+            # record.get returns "" if missing — parse_date raises on empty
+            return parse_date(record.get("ts", ""))
+    - match: any
+      returns: { error: "not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: grep
+    - check: tool_called
+      tool: read_file
+    - check: response_satisfies
+      all_of: ["reports.py"]
+      none_of: ["orders.py:18", "legacy.py:7"]
+  forbidden: []
+  partial:
+    - check: response_satisfies
+      any_of:
+        - ["MM/DD"]
+        - ["US format", "us-format", "American", "non-ISO"]
+    - check: response_satisfies
+      any_of:
+        - ["reports.py:42", "line 42"]
+    - check: call_count_at_most
+      n: 4
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

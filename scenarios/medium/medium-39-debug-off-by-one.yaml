@@ -1,0 +1,65 @@
+id: medium-39-debug-off-by-one
+title: "Off-by-one in pagination slice"
+tier: medium
+category: debugging
+domain: dev_ops
+description: |
+  Function `paginate(items, page, page_size)` drops the last item on the
+  final page. Test output + function source provided. Model must identify
+  the off-by-one and propose the one-line fix.
+tags: [debugging, off_by_one, numeric_reasoning]
+ranking_dimensions: [overall, debugging, coding, parameter_precision]
+prompt: |
+  Test tests/test_paginate.py::test_last_page fails. Read the test and the
+  function. Identify the off-by-one in src/paginate.py and give the corrected
+  line.
+tools: [read_file, run_tests]
+budget:
+  max_tool_calls: 3
+  max_turns: 3
+  timeout_seconds: 60
+tool_responses:
+  run_tests:
+    - match: any
+      returns: |
+        FAILED tests/test_paginate.py::test_last_page
+          assert paginate([1,2,3,4,5], page=2, page_size=3) == [4, 5]
+          AssertionError: got [4] != [4, 5]
+  read_file:
+    - match: { path: "src/paginate.py" }
+      returns: |
+        def paginate(items, page, page_size):
+            start = (page - 1) * page_size
+            # BUG below this line
+            end = start + page_size - 1
+            return items[start:end]
+    - match: { path: "tests/test_paginate.py" }
+      returns: |
+        from src.paginate import paginate
+
+        def test_last_page():
+            assert paginate([1,2,3,4,5], page=2, page_size=3) == [4, 5]
+    - match: any
+      returns: { error: "not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: read_file
+    - check: response_satisfies
+      any_of:
+        - ["start + page_size", "page_size", "minus 1", "- 1"]
+      none_of: ["random", "page is wrong"]
+    - check: response_satisfies
+      any_of:
+        - ["off-by-one", "off by one", "exclusive", "slice end"]
+        - ["end = start + page_size"]
+  forbidden: []
+  partial:
+    - check: response_contains
+      patterns: ["end = start + page_size"]
+    - check: call_count_at_most
+      n: 2
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

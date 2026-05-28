@@ -1,0 +1,96 @@
+id: very-hard-25-debug-race-condition
+title: "Race condition: non-deterministic test failures"
+tier: very_hard
+category: debugging
+domain: dev_ops
+description: |
+  Async function increments a shared counter from N concurrent tasks.
+  Reads counter, computes new value, writes — classic check-then-act race.
+  Logs from 3 runs show different final values. Model must reason about
+  ordering (not just code) and propose a lock/atomic fix.
+tags: [debugging, concurrency, race_condition, async]
+ranking_dimensions: [overall, debugging, coding, hallucination]
+prompt: |
+  Test tests/test_counter.py::test_concurrent_inc fails sometimes — about
+  3 in 10 runs. I attached logs from 3 runs (logs/run1.log, run2.log,
+  run3.log) showing different counter values each time. Read the source
+  and the logs, diagnose the issue (one sentence), and propose the minimal
+  fix.
+tools: [read_file]
+budget:
+  max_tool_calls: 6
+  max_turns: 6
+  timeout_seconds: 120
+tool_responses:
+  read_file:
+    - match: { path: "src/counter.py" }
+      returns: |
+        import asyncio
+
+        class Counter:
+            def __init__(self):
+                self.value = 0
+
+            async def increment(self, by: int = 1):
+                # READ
+                current = self.value
+                # simulated I/O — context switch point
+                await asyncio.sleep(0)
+                # WRITE
+                self.value = current + by
+    - match: { path: "tests/test_counter.py" }
+      returns: |
+        import asyncio
+        from src.counter import Counter
+
+        async def main():
+            c = Counter()
+            await asyncio.gather(*(c.increment() for _ in range(100)))
+            return c.value
+
+        def test_concurrent_inc():
+            assert asyncio.run(main()) == 100
+    - match: { path: "logs/run1.log" }
+      returns: |
+        Run 1: final counter value = 87
+        FAILED
+    - match: { path: "logs/run2.log" }
+      returns: |
+        Run 2: final counter value = 100
+        PASSED
+    - match: { path: "logs/run3.log" }
+      returns: |
+        Run 3: final counter value = 73
+        FAILED
+    - match: any
+      returns: { error: "not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: read_file
+    - check: response_satisfies
+      any_of:
+        - ["race", "concurrent", "interleav", "check-then-act",
+           "read-modify-write", "atomic"]
+      none_of: ["random seed", "flaky network", "timezone"]
+    - check: response_satisfies
+      any_of:
+        - ["asyncio.Lock", "Lock()", "lock", "async with"]
+        - ["atomic"]
+  forbidden:
+    - check: response_contains
+      patterns: ["increase the sleep", "use time.sleep"]
+  partial:
+    - check: response_satisfies
+      any_of:
+        - ["context switch", "await asyncio.sleep", "interleav"]
+    - check: response_satisfies
+      any_of:
+        - ["asyncio.Lock"]
+        - ["async with self.lock"]
+    - check: call_count_at_most
+      n: 5
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

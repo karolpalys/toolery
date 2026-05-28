@@ -1,0 +1,62 @@
+id: medium-40-debug-symptom-vs-cause
+title: "Distinguish symptom from root cause in error logs"
+tier: medium
+category: debugging
+domain: dev_ops
+description: |
+  Production logs show a TypeError that masks the real root cause: a config
+  file failed to load earlier, leaving a None where a dict was expected.
+  Model must NOT name the TypeError as the cause — it must scan back for
+  the earlier ERROR line.
+tags: [debugging, symptom_vs_cause, log_analysis]
+ranking_dimensions: [overall, debugging, hallucination]
+prompt: |
+  The on-call engineer says the bug is the `TypeError: 'NoneType' is not
+  subscriptable` at the bottom of the log. Are they right, or is something
+  else causing it? Read the log and answer in 2 sentences.
+tools: [read_file]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 60
+tool_responses:
+  read_file:
+    - match: { path: "app.log" }
+      returns: |
+        2026-05-28T09:00:01 INFO  Starting service
+        2026-05-28T09:00:01 INFO  Loading config from /etc/app/config.yaml
+        2026-05-28T09:00:01 ERROR Config load failed: PermissionError /etc/app/config.yaml
+        2026-05-28T09:00:01 WARN  Continuing with config=None
+        2026-05-28T09:00:02 INFO  Server listening on :8080
+        2026-05-28T09:00:14 INFO  Request GET /healthz
+        2026-05-28T09:00:14 INFO  Request POST /orders
+        2026-05-28T09:00:14 ERROR TypeError: 'NoneType' object is not subscriptable
+          at handlers/orders.py:31 -> config['db_url']
+    - match: any
+      returns: { error: "not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: read_file
+    - check: response_satisfies
+      any_of:
+        - ["config", "permission", "PermissionError"]
+      none_of: ["TypeError is the root", "the TypeError is the cause",
+                "the engineer is right"]
+    - check: response_satisfies
+      any_of:
+        - ["not", "wrong", "symptom", "actually", "root cause"]
+  forbidden:
+    - check: response_contains
+      patterns: ["engineer is correct", "TypeError is the bug"]
+  partial:
+    - check: response_satisfies
+      any_of:
+        - ["symptom"]
+        - ["PermissionError", "config load", "config=None"]
+    - check: call_count_at_most
+      n: 1
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

@@ -1,0 +1,48 @@
+id: easy-33-debug-traceback-locate
+title: "Locate bug from Python traceback"
+tier: easy
+category: debugging
+domain: dev_ops
+description: |
+  Given a Python traceback, name the file and line where the bug originates
+  (deepest user frame, not the framework frame). Tests basic trace reading —
+  the model should NOT need to read code to answer.
+tags: [debugging, trace_reading, single_turn]
+ranking_dimensions: [overall, debugging, coding]
+prompt: |
+  This traceback was reported in production. Which file and line contains the
+  bug? Answer in the form `path/file.py:LINE`.
+
+  Traceback (most recent call last):
+    File "/app/main.py", line 12, in <module>
+      run()
+    File "/app/main.py", line 8, in run
+      process(orders)
+    File "/app/orders/pipeline.py", line 47, in process
+      total = sum_prices(o.items)
+    File "/app/orders/pricing.py", line 23, in sum_prices
+      return sum(i.price for i in items)
+  TypeError: unsupported operand type(s) for +: 'int' and 'NoneType'
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 30
+tool_responses: {}
+scoring:
+  required:
+    - check: response_satisfies
+      all_of: ["pricing.py:23"]
+      none_of: ["main.py:8", "pipeline.py:47"]
+  forbidden: []
+  partial:
+    - check: response_contains
+      patterns: ["pricing.py:23"]
+    - check: response_satisfies
+      any_of:
+        - ["pricing.py"]
+        - ["line 23"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

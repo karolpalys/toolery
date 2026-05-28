@@ -10,30 +10,34 @@ from pathlib import Path
 
 from llm_test.core.scenario import load_all_scenarios
 
-# Expected counts after all 33 new scenarios land. Per spec "Final balance".
+# Expected counts after debugging category landed (+13 scenarios).
+# Baseline was the "Final balance" from docs/superpowers/specs/
+# 2026-05-26-ranking-balance-design.md; debugging additions are documented
+# in commit history (feat: debugging category).
 EXPECTED_COUNTS = {
-    "overall": 116,
-    "agentic": 39,
-    "coding": 15,
+    "overall": 129,
+    "agentic": 41,
+    "coding": 27,
+    "debugging": 13,
     "safety": 15,
     "terminal": 14,
     "budget_efficiency": 18,
-    "parameter_precision": 17,
+    "parameter_precision": 18,
     "restraint": 13,
-    "hallucination": 13,
+    "hallucination": 15,
     "tool_selection": 13,
     "long_context": 13,
-    "error_recovery": 13,
+    "error_recovery": 14,
     "structured_output": 14,
-    "context_state_tracking": 14,
+    "context_state_tracking": 15,
     "localization": 13,
 }
 
 EXPECTED_TIER_COUNTS = {
-    "easy": 32,
-    "medium": 36,
-    "hard": 26,
-    "very_hard": 22,
+    "easy": 35,
+    "medium": 40,
+    "hard": 30,
+    "very_hard": 24,
 }
 
 

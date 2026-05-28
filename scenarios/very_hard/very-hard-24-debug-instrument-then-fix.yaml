@@ -1,0 +1,105 @@
+id: very-hard-24-debug-instrument-then-fix
+title: "Add instrumentation, re-run, then fix"
+tier: very_hard
+category: debugging
+domain: dev_ops
+description: |
+  Failure mode is invisible from existing logs (computed wrong total, no
+  exception). Model must (1) read code, (2) add print/log to expose the
+  intermediate value, (3) re-run with instrumentation, (4) identify the
+  bug from the new output, (5) fix and re-run to verify. Multi-cycle.
+tags: [debugging, instrumentation, multi_cycle, agentic]
+ranking_dimensions: [overall, debugging, coding, agentic]
+prompt: |
+  Our `compute_total(invoice)` returns the wrong number — users see 100.00
+  but the expected total is 120.00. No exception, no warning. Existing logs
+  are silent. Read the code, add temporary instrumentation to expose what's
+  happening, re-run with the instrumentation, identify the bug, fix it, and
+  verify the test passes. The expected answer is 120.00.
+tools: [read_file, edit_file, run_tests]
+budget:
+  max_tool_calls: 8
+  max_turns: 8
+  timeout_seconds: 180
+tool_responses:
+  read_file:
+    - match: { path: "src/invoice.py" }
+      returns: |
+        def compute_total(invoice):
+            subtotal = 0
+            for item in invoice["items"]:
+                subtotal += item["price"]  # silently skips quantity
+            tax = subtotal * 0.20
+            return round(subtotal + tax, 2)
+    - match: { path: "tests/test_invoice.py" }
+      returns: |
+        from src.invoice import compute_total
+
+        INVOICE = {"items": [
+            {"name": "widget", "price": 50.0, "quantity": 2},
+        ]}
+
+        def test_total():
+            # Expected: 50 * 2 = 100 subtotal, +20% tax = 120.00
+            assert compute_total(INVOICE) == 120.00
+    - match: any
+      returns: { error: "not found" }
+  edit_file:
+    - match: { args_contains: "print" }
+      call_index: 0
+      returns: { ok: true, lines_changed: 2 }
+    - match: { args_contains: "log" }
+      call_index: 0
+      returns: { ok: true, lines_changed: 2 }
+    - match: { args_contains: "quantity" }
+      returns: { ok: true, lines_changed: 1 }
+    - match: any
+      returns: { ok: true, lines_changed: 1 }
+  run_tests:
+    - match: any
+      call_index: 0
+      returns: |
+        FAILED tests/test_invoice.py::test_total
+          assert compute_total(INVOICE) == 120.00
+          AssertionError: assert 60.0 == 120.00
+    - match: any
+      call_index: 1
+      returns: |
+        FAILED tests/test_invoice.py::test_total
+        STDOUT:
+          subtotal after item widget: 50.0
+          tax: 10.0
+          total: 60.0
+        AssertionError: assert 60.0 == 120.00
+    - match: any
+      returns: "PASSED tests/test_invoice.py::test_total"
+scoring:
+  required:
+    - check: tool_called_in_order
+      sequence: [read_file, edit_file, run_tests, edit_file, run_tests]
+    - check: tool_args_match_regex
+      tool: edit_file
+      arg: path
+      pattern: "src/invoice.py"
+    - check: response_satisfies
+      any_of:
+        - ["quantity"]
+      none_of: ["the tax rate is wrong", "20% should be 50%"]
+  forbidden:
+    - check: tool_args_match_regex
+      tool: edit_file
+      arg: path
+      pattern: "tests/"
+  partial:
+    - check: response_satisfies
+      any_of:
+        - ["item['price'] * item['quantity']", "item[\"price\"] * item[\"quantity\"]",
+           "price * quantity", "multiply by quantity"]
+    - check: call_count_at_most
+      n: 7
+    - check: tool_called_in_order
+      sequence: [edit_file, run_tests, edit_file, run_tests]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

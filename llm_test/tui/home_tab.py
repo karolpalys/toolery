@@ -76,6 +76,7 @@ def _is_stale_run(run: dict) -> bool:
 _DIM_LABEL = {
     "hallucination": "calibration / hallucination resistance",
     "coding": "coding tasks",
+    "debugging": "debugging / root-cause analysis",
     "agentic": "agentic / multi-step workflows",
     "safety": "safety-critical flows",
     "restraint": "knowing when NOT to act",

@@ -1,0 +1,85 @@
+id: hard-29-debug-cross-file-chain
+title: "Error visible in cache.py, root cause in config.py"
+tier: hard
+category: debugging
+domain: dev_ops
+description: |
+  TypeError is raised in cache.py but the actual bug is in config.py — an
+  env-var override that returns int instead of int|None. Model must follow
+  the data flow across files to identify the real cause (not blame cache.py).
+tags: [debugging, cross_file, root_cause]
+ranking_dimensions: [overall, debugging, coding]
+prompt: |
+  Production keeps crashing with this error in src/cache.py:14:
+    TypeError: unsupported operand type(s) for +: 'NoneType' and 'int'
+  The cache code looks fine to me. Investigate where the None comes from
+  and tell me the file:line of the actual fix.
+tools: [read_file, grep]
+budget:
+  max_tool_calls: 6
+  max_turns: 6
+  timeout_seconds: 120
+tool_responses:
+  read_file:
+    - match: { path: "src/cache.py" }
+      returns: |
+        from src.config import get_ttl
+
+        class Cache:
+            def __init__(self):
+                self.ttl = get_ttl()
+
+            def expires_at(self, now: int) -> int:
+                # Line 14
+                return now + self.ttl
+    - match: { path: "src/config.py" }
+      returns: |
+        import os
+
+        def get_ttl():
+            raw = os.environ.get("CACHE_TTL")
+            if raw is None:
+                # Line 6 — BUG: returns None when env var is unset
+                # instead of returning a default like 60.
+                return None
+            return int(raw)
+    - match: { path: "src/main.py" }
+      returns: |
+        from src.cache import Cache
+        cache = Cache()
+    - match: any
+      returns: { error: "not found" }
+  grep:
+    - match: { pattern_regex: "get_ttl" }
+      returns: |
+        src/cache.py:5:        self.ttl = get_ttl()
+        src/config.py:3:def get_ttl():
+    - match: any
+      returns: ""
+scoring:
+  required:
+    - check: tool_called
+      tool: read_file
+    - check: response_satisfies
+      all_of: ["config.py"]
+      none_of: ["cache.py:14 is the bug", "fix cache.py:14",
+                "the bug is in cache.py"]
+    - check: response_satisfies
+      any_of:
+        - ["line 6", "get_ttl", "return None", "default"]
+  forbidden:
+    - check: response_contains
+      patterns: ["cache.py:14 is the root cause"]
+  partial:
+    - check: response_satisfies
+      any_of:
+        - ["config.py:6", "line 6", "get_ttl"]
+    - check: response_satisfies
+      any_of:
+        - ["default", "60", "fallback"]
+    - check: call_count_at_most
+      n: 5
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

@@ -1,0 +1,71 @@
+id: hard-31-debug-version-drift
+title: "Dependency API change broke our code"
+tier: hard
+category: debugging
+domain: dev_ops
+description: |
+  Code calls `httpx.Client(timeout=30, retries=3)`. In httpx ≥0.27 the
+  `retries=` kwarg was moved to `Transport`. Model must check requirements,
+  read CHANGELOG/library hint, and identify the API drift — not blame our
+  code as wrong-syntax.
+tags: [debugging, dependency_drift, version_mismatch]
+ranking_dimensions: [overall, debugging, coding, error_recovery]
+prompt: |
+  After upgrading dependencies, this used to work and now raises:
+    TypeError: Client.__init__() got an unexpected keyword argument 'retries'
+  Read requirements.txt, the failing file, and the CHANGELOG snippet I left
+  in vendor/httpx_changelog.md. Tell me what changed and the minimal fix.
+tools: [read_file]
+budget:
+  max_tool_calls: 4
+  max_turns: 4
+  timeout_seconds: 90
+tool_responses:
+  read_file:
+    - match: { path: "requirements.txt" }
+      returns: |
+        httpx==0.27.2
+        pydantic>=2.0
+        typer
+    - match: { path: "src/http_client.py" }
+      returns: |
+        import httpx
+
+        def make_client():
+            # Used to work on httpx 0.24.x
+            return httpx.Client(timeout=30, retries=3)
+    - match: { path: "vendor/httpx_changelog.md" }
+      returns: |
+        # httpx 0.27.0 — breaking changes
+
+        - The `retries=` argument to `httpx.Client(...)` was REMOVED.
+          Pass an `httpx.HTTPTransport(retries=N)` as `transport=` instead.
+
+        # httpx 0.26.0
+        - Added `event_hooks` parameter.
+    - match: any
+      returns: { error: "not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: read_file
+    - check: response_satisfies
+      any_of:
+        - ["HTTPTransport", "transport=", "Transport(retries"]
+      none_of: ["downgrade only", "your code is wrong syntax"]
+    - check: response_satisfies
+      any_of:
+        - ["0.27", "breaking", "removed", "moved"]
+  forbidden: []
+  partial:
+    - check: response_contains
+      patterns: ["transport=httpx.HTTPTransport(retries"]
+    - check: response_satisfies
+      any_of:
+        - ["CHANGELOG", "httpx 0.27", "v0.27"]
+    - check: call_count_at_most
+      n: 3
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

@@ -1,0 +1,53 @@
+id: easy-35-debug-attrerror-typo
+title: "AttributeError: typo in attribute name"
+tier: easy
+category: debugging
+domain: dev_ops
+description: |
+  AttributeError reports `lenght` instead of `length`. Model reads the source
+  and proposes the one-line fix. Tests trivial error-message → fix mapping.
+tags: [debugging, typo, single_turn]
+ranking_dimensions: [overall, debugging, coding]
+prompt: |
+  Got this error: `AttributeError: 'Order' object has no attribute 'lenght'`.
+  Read src/orders.py and tell me the line number with the bug and what the
+  attribute should be.
+tools: [read_file]
+budget:
+  max_tool_calls: 2
+  max_turns: 2
+  timeout_seconds: 30
+tool_responses:
+  read_file:
+    - match: { path: "src/orders.py" }
+      returns: |
+        class Order:
+            def __init__(self, items):
+                self.items = items
+                self.length = len(items)
+
+        def is_bulk(order: Order) -> bool:
+            return order.lenght > 10
+    - match: any
+      returns: { error: "not found" }
+scoring:
+  required:
+    - check: tool_called
+      tool: read_file
+    - check: response_satisfies
+      all_of: ["length"]
+      none_of: ["spelling is correct", "no typo"]
+    - check: response_satisfies
+      any_of:
+        - ["line 7", "orders.py:7"]
+        - ["is_bulk"]
+  forbidden: []
+  partial:
+    - check: response_contains
+      patterns: ["lenght → length"]
+    - check: call_count_at_most
+      n: 1
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

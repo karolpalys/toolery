@@ -1,0 +1,66 @@
+id: medium-38-debug-flaky-timezone
+title: "Flaky test: passes locally, fails in CI (timezone)"
+tier: medium
+category: debugging
+domain: dev_ops
+description: |
+  A test computes `today()` and compares against a hardcoded date. Local dev
+  passes (Europe/Warsaw), CI fails (UTC). Model must read code + CI log and
+  identify the timezone dependence.
+tags: [debugging, env_dependence, flaky_test]
+ranking_dimensions: [overall, debugging, coding]
+prompt: |
+  Test tests/test_billing.py::test_invoice_date passes on my laptop but
+  fails in CI. Read the test and the CI failure log and tell me the root
+  cause. One-sentence diagnosis is enough.
+tools: [read_file]
+budget:
+  max_tool_calls: 3
+  max_turns: 3
+  timeout_seconds: 60
+tool_responses:
+  read_file:
+    - match: { path: "tests/test_billing.py" }
+      returns: |
+        from datetime import date
+        from src.billing import invoice_date
+
+        def test_invoice_date():
+            # Invoice cuts at midnight local; on 2026-05-28 evening CET
+            # the expected date is still May 28.
+            assert invoice_date() == date(2026, 5, 28)
+    - match: { path: "src/billing.py" }
+      returns: |
+        from datetime import datetime
+
+        def invoice_date():
+            # Uses naive UTC clock
+            return datetime.utcnow().date()
+    - match: { path: "ci.log" }
+      returns: |
+        Running tests at 2026-05-28T23:30:15+02:00 (CEST)
+        CI host TZ: UTC
+        ======== test_invoice_date ========
+        AssertionError: assert date(2026, 5, 29) == date(2026, 5, 28)
+        FAILED tests/test_billing.py::test_invoice_date
+    - match: any
+      returns: { error: "not found" }
+scoring:
+  required:
+    - check: response_satisfies
+      any_of:
+        - ["timezone", "UTC", "utcnow"]
+      none_of: ["random", "flaky network", "import error"]
+  forbidden: []
+  partial:
+    - check: response_satisfies
+      any_of:
+        - ["utcnow", "local time", "CET", "CEST"]
+    - check: tool_called
+      tool: read_file
+    - check: call_count_at_most
+      n: 3
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

@@ -218,6 +218,7 @@ _TIER_WEIGHTS = {"easy": 1.0, "medium": 2.0, "hard": 3.0, "very_hard": 4.0}
 # (fallback 1.0 if none of its dims are in this map).
 _DIM_WEIGHTS: dict[str, float] = {
     "coding": 2.0,
+    "debugging": 2.0,
     "terminal": 2.0,
     "agentic": 2.0,
     "localization": 0.5,
