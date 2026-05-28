@@ -208,6 +208,18 @@ def run(
                 trace_path=f"traces/{trace_filename}",
             )
             store.update_phase(run_id, "scenarios", current_scenario=r.scenario_id)
+            # External-abort check: if the TUI flipped runs.status to
+            # 'paused' or 'failed' (via Pause / STOP), exit the subprocess
+            # so no further scenarios get scheduled. In-flight scenarios
+            # at the moment of pause will still complete their current
+            # turn but their results are written above before this check.
+            external = store.get_run_status(run_id)
+            if external in ("paused", "failed"):
+                console.print(
+                    f"[yellow]Run externally marked {external!r} — "
+                    "aborting subprocess.[/yellow]"
+                )
+                raise SystemExit(0)
 
         results = asyncio.run(runner.run(xs, on_result=_on_result))
 

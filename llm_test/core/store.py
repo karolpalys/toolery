@@ -138,6 +138,15 @@ class Store:
             else:
                 c.execute("UPDATE runs SET phase=? WHERE run_id=?", (phase, run_id))
 
+    def get_run_status(self, run_id: str) -> str | None:
+        """Fetch the current status field for one run. Used by the running
+        subprocess to detect external Pause / STOP triggered from the TUI."""
+        with self.conn() as c:
+            row = c.execute(
+                "SELECT status FROM runs WHERE run_id=?", (run_id,)
+            ).fetchone()
+        return row["status"] if row else None
+
     def finish_run(self, run_id, finished_at, duration_s, status: str = "done") -> None:
         with self.conn() as c:
             c.execute(
