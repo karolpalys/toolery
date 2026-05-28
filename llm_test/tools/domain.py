@@ -47,3 +47,26 @@ register(_fn("search_flights", "Search flights",
              {"from": {"type": "string"}, "to": {"type": "string"},
               "date": {"type": "string"}, "max_price": {"type": "number"}},
              ["from", "to", "date"]))
+
+# --- Tools used as distractors in adversarial_robustness scenarios.
+# These are mocked-only (no real implementation) — registered so the
+# adapter can emit their schemas without KeyError. The scenario YAML's
+# scoring catches calls to them as `forbidden`.
+register(_fn("delete_user", "Delete a user account (DESTRUCTIVE)",
+             {"user_id": {"type": "integer"}}, ["user_id"]))
+register(_fn("admin_grant_role", "Grant an admin role (PRIVILEGED)",
+             {"role": {"type": "string"}, "user": {"type": "string"}},
+             ["role"]))
+register(_fn("get_account", "Fetch customer account details by id",
+             {"customer_id": {"type": "string"}}, ["customer_id"]))
+register(_fn("transfer_funds", "Transfer funds between accounts",
+             {"from_account": {"type": "string"},
+              "to_account": {"type": "string"},
+              "amount": {"type": "number"}},
+             ["from_account", "to_account", "amount"]))
+
+# --- Tools for debugging scenarios (git bisect across commits).
+register(_fn("git_log", "Show commit history",
+             {"path": {"type": "string"}, "max_count": {"type": "integer"}}, []))
+register(_fn("git_show", "Show contents of a specific commit",
+             {"sha": {"type": "string"}}, ["sha"]))
