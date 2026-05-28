@@ -248,10 +248,11 @@ def run(
         regenerate_rankings(
             store=store,
             dimensions=["overall", "coding", "debugging", "agentic", "safety",
-                        "restraint", "long_context", "budget_efficiency",
-                        "hallucination", "error_recovery", "parameter_precision",
-                        "context_state_tracking", "structured_output",
-                        "tool_selection", "localization", "terminal"],
+                        "adversarial_robustness", "restraint", "long_context",
+                        "budget_efficiency", "hallucination", "error_recovery",
+                        "parameter_precision", "context_state_tracking",
+                        "structured_output", "tool_selection", "localization",
+                        "terminal"],
             out_dir=_results_dir() / "rankings",
             use_case_weights=uc_weights,
             use_case_key=uc_key,
@@ -303,8 +304,9 @@ def rankings(
     """Manage rankings."""
     from llm_test.rankings.compute import regenerate_rankings
     out = _results_dir() / "rankings"
-    dims = ["overall", "coding", "debugging", "agentic", "safety", "restraint",
-            "long_context", "budget_efficiency", "hallucination", "error_recovery",
+    dims = ["overall", "coding", "debugging", "agentic", "safety",
+            "adversarial_robustness", "restraint", "long_context",
+            "budget_efficiency", "hallucination", "error_recovery",
             "parameter_precision", "context_state_tracking", "structured_output",
             "tool_selection", "localization", "terminal"] if dimension == "all" else [dimension]
     if regen:

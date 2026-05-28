@@ -26,6 +26,7 @@ class Category(StrEnum):
     CODING = "coding"
     DEBUGGING = "debugging"
     SAFETY_BOUNDARIES = "safety_boundaries"
+    ADVERSARIAL_ROBUSTNESS = "adversarial_robustness"
     TOOLSET_SCALE = "toolset_scale"
     AUTONOMOUS_PLANNING = "autonomous_planning"
     CREATIVE_COMPOSITION = "creative_composition"

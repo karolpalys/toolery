@@ -79,6 +79,7 @@ _DIM_LABEL = {
     "debugging": "debugging / root-cause analysis",
     "agentic": "agentic / multi-step workflows",
     "safety": "safety-critical flows",
+    "adversarial_robustness": "adversarial / prompt-injection resistance",
     "restraint": "knowing when NOT to act",
     "error_recovery": "recovering from tool errors",
     "parameter_precision": "precise argument extraction",

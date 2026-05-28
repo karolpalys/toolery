@@ -15,28 +15,29 @@ from llm_test.core.scenario import load_all_scenarios
 # 2026-05-26-ranking-balance-design.md; debugging additions are documented
 # in commit history (feat: debugging category).
 EXPECTED_COUNTS = {
-    "overall": 129,
+    "overall": 135,
     "agentic": 41,
     "coding": 27,
     "debugging": 13,
-    "safety": 15,
+    "safety": 21,
+    "adversarial_robustness": 10,
     "terminal": 14,
     "budget_efficiency": 18,
     "parameter_precision": 18,
     "restraint": 13,
-    "hallucination": 15,
+    "hallucination": 17,
     "tool_selection": 13,
     "long_context": 13,
     "error_recovery": 14,
     "structured_output": 14,
-    "context_state_tracking": 15,
+    "context_state_tracking": 16,
     "localization": 13,
 }
 
 EXPECTED_TIER_COUNTS = {
-    "easy": 35,
-    "medium": 40,
-    "hard": 30,
+    "easy": 37,
+    "medium": 42,
+    "hard": 32,
     "very_hard": 24,
 }
 
