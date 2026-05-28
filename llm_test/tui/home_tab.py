@@ -10,7 +10,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from rich.text import Text
-from textual import on
+from textual import on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
@@ -653,13 +653,13 @@ class HomeTab(Container):
             self._set_follow_mode(False)
             return
         if event.button.id == "run-pause":
-            await self._handle_pause_pressed()
+            self._handle_pause_pressed()
             return
         if event.button.id == "run-resume":
-            await self._handle_resume_pressed()
+            self._handle_resume_pressed()
             return
         if event.button.id == "run-stop":
-            await self._handle_stop_pressed()
+            self._handle_stop_pressed()
             return
         if self._scanning:
             return
@@ -773,6 +773,7 @@ class HomeTab(Container):
         stop_btn.disabled = not active
         resume_btn.disabled = active or not self._has_resumable_run()
 
+    @work
     async def _handle_pause_pressed(self) -> None:
         if not self._is_run_active():
             return
@@ -792,6 +793,7 @@ class HomeTab(Container):
             self.app.notify("Run paused. Click Resume to continue.")
         self._update_trening_buttons()
 
+    @work
     async def _handle_resume_pressed(self) -> None:
         if self._is_run_active() or not self._has_resumable_run():
             return
@@ -808,6 +810,7 @@ class HomeTab(Container):
         await self._call_app_action("resume_current_run")
         self._update_trening_buttons()
 
+    @work
     async def _handle_stop_pressed(self) -> None:
         if not self._is_run_active():
             return
