@@ -1,0 +1,42 @@
+id: easy-39-if-negative-keyword
+title: "Describe pandas (Python) without saying 'library' or 'package'"
+tier: easy
+category: instruction_following
+domain: generic
+description: |
+  Negative keyword constraint — describe a topic while avoiding 2 specific
+  words. Tests strict adherence to "do not use" clauses (common failure
+  mode: model mentions the forbidden word once "just to define it").
+tags: [instruction_following, negative_constraint, single_turn]
+ranking_dimensions: [overall, instruction_following]
+prompt: |
+  In 2-4 sentences, describe what pandas (the Python data tool) is and
+  why it's useful. Do NOT use the word "library" or the word "package"
+  anywhere in your answer.
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 30
+tool_responses: {}
+scoring:
+  required:
+    - check: response_not_contains
+      patterns: ["library", "package", "Library", "Package",
+                 "LIBRARY", "PACKAGE"]
+    - check: response_satisfies
+      any_of:
+        - ["DataFrame", "dataframe", "data frame", "tabular", "Series",
+           "CSV", "data analysis", "data manipulation"]
+  forbidden: []
+  partial:
+    - check: response_not_contains
+      patterns: ["library", "package"]
+    - check: response_satisfies
+      any_of:
+        - ["pandas"]
+        - ["data"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

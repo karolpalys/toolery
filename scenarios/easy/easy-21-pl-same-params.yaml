@@ -1,7 +1,7 @@
 id: easy-21-pl-same-params
 title: "PL: użyj tej samej lokalizacji co poprzednio"
 tier: easy
-category: instruction_following
+category: context_state_tracking
 domain: generic
 description: |
   Tests single-turn instruction following (the harness presents both turns as

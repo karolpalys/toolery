@@ -86,6 +86,7 @@ _DIM_LABEL = {
     "context_state_tracking": "tracking state across turns",
     "structured_output": "structured / JSON output",
     "tool_selection": "picking the right tool",
+    "instruction_following": "strict instruction following (format/length/negative)",
     "long_context": "long-context retrieval",
     "localization": "non-English / localization",
     "budget_efficiency": "staying within tool-call budget",

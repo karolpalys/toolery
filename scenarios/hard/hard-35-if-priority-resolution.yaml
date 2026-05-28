@@ -1,0 +1,59 @@
+id: hard-35-if-priority-resolution
+title: "Pick exactly one option and clearly say which"
+tier: hard
+category: instruction_following
+domain: generic
+description: |
+  User asks for help choosing between two roughly equivalent options
+  and gives explicit instructions: pick exactly ONE, clearly mark which,
+  and justify in 2 sentences. Tests resistance to the model's default
+  "here are the pros/cons of both, you decide" hedging mode.
+tags: [instruction_following, decisive, anti_hedging]
+ranking_dimensions: [overall, instruction_following, restraint]
+prompt: |
+  I need help choosing a Python web framework: Flask or FastAPI for a
+  small internal REST API (one developer, ~20 endpoints, mostly JSON).
+
+  CONSTRAINTS:
+    - Pick exactly ONE — Flask or FastAPI.
+    - State your pick in the first line as: "Pick: <Flask|FastAPI>"
+    - Justify in exactly 2 sentences after that line.
+    - Do NOT give both options. Do NOT say "it depends" or "either works".
+
+  I want a recommendation, not a comparison.
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 45
+tool_responses: {}
+scoring:
+  required:
+    - check: response_matches_regex
+      all_of:
+        - "^Pick:\\s+(Flask|FastAPI)\\s*\\n"
+      none_of:
+        - "(?i)it depends"
+        - "(?i)either (would|works|is fine)"
+        - "(?i)both are"
+    - check: response_satisfies
+      any_of:
+        - ["Flask"]
+        - ["FastAPI"]
+  forbidden:
+    - check: response_contains
+      patterns: ["both Flask and FastAPI", "either Flask or FastAPI",
+                 "depends on your"]
+  partial:
+    - check: response_matches_regex
+      any_of:
+        - "Pick:\\s+(Flask|FastAPI)"
+        - "^(Flask|FastAPI)\\s"
+    - check: response_satisfies
+      any_of:
+        - ["Flask"]
+        - ["FastAPI"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

@@ -251,8 +251,8 @@ def run(
                         "adversarial_robustness", "restraint", "long_context",
                         "budget_efficiency", "hallucination", "error_recovery",
                         "parameter_precision", "context_state_tracking",
-                        "structured_output", "tool_selection", "localization",
-                        "terminal"],
+                        "structured_output", "tool_selection",
+                        "instruction_following", "localization", "terminal"],
             out_dir=_results_dir() / "rankings",
             use_case_weights=uc_weights,
             use_case_key=uc_key,
@@ -308,7 +308,8 @@ def rankings(
             "adversarial_robustness", "restraint", "long_context",
             "budget_efficiency", "hallucination", "error_recovery",
             "parameter_precision", "context_state_tracking", "structured_output",
-            "tool_selection", "localization", "terminal"] if dimension == "all" else [dimension]
+            "tool_selection", "instruction_following", "localization",
+            "terminal"] if dimension == "all" else [dimension]
     if regen:
         from llm_test.rankings.compute import load_active_use_case
         uc_key, uc_weights = load_active_use_case(_results_dir())

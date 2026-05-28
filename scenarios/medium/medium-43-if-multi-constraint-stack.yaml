@@ -1,0 +1,48 @@
+id: medium-43-if-multi-constraint-stack
+title: "Four simultaneous constraints in one prompt"
+tier: medium
+category: instruction_following
+domain: generic
+description: |
+  4 stacked constraints: (a) exactly 4 items, (b) bullet format, (c) each
+  starts with a capital letter, (d) max 5 words per bullet. Tests
+  composition of independent constraints — typical IFEval pattern.
+tags: [instruction_following, multi_constraint, composition]
+ranking_dimensions: [overall, instruction_following]
+prompt: |
+  Give me a packing checklist for a 3-day hiking trip. Constraints:
+    1. Exactly 4 bullets — not 3, not 5.
+    2. Use "- " (dash space) as the bullet marker.
+    3. Each bullet must start with a capital letter.
+    4. Each bullet must be 5 words or fewer.
+  Output ONLY the 4 bullets, nothing else.
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 45
+tool_responses: {}
+scoring:
+  required:
+    - check: response_matches_regex
+      all_of:
+        - "^-\\s+[A-Z]"
+        - "\\n-\\s+[A-Z].*\\n-\\s+[A-Z].*\\n-\\s+[A-Z]"
+      none_of:
+        - "\\n-\\s+[A-Z].*\\n-\\s+[A-Z].*\\n-\\s+[A-Z].*\\n-\\s+[A-Z].*\\n-\\s+[A-Z]"
+  forbidden:
+    - check: response_contains
+      patterns: ["Here is", "Here are", "Below"]
+  partial:
+    - check: response_matches_regex
+      all_of:
+        - "^-\\s+"
+        - "\\n-\\s+"
+    - check: response_satisfies
+      any_of:
+        - ["water", "tent", "food", "boots", "map", "jacket", "compass",
+           "first aid", "sleeping", "backpack"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

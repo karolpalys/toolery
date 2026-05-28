@@ -1,0 +1,53 @@
+id: easy-40-if-format-only-list
+title: "Output exactly 5 prime numbers as bullets, no preamble"
+tier: easy
+category: instruction_following
+domain: generic
+description: |
+  Strict format — only a 5-item bulleted list, no introduction, no
+  trailing explanation. Tests whether the model can suppress its
+  default conversational scaffolding when asked.
+tags: [instruction_following, format_only, single_turn]
+ranking_dimensions: [overall, instruction_following, structured_output]
+prompt: |
+  List the first 5 prime numbers greater than 10. Output ONLY a bulleted
+  list (5 bullets, one number each), nothing else. No preamble like
+  "Here are the primes:", no trailing commentary. Just the 5 bullets.
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 30
+tool_responses: {}
+scoring:
+  required:
+    - check: response_matches_regex
+      all_of:
+        - "^[-*•]\\s*11\\b"
+      none_of:
+        - "^[A-Z][a-z].*:\\s*\\n"
+        - "Here are"
+        - "prime numbers (are|greater)"
+    - check: response_matches_regex
+      all_of:
+        - "\\b11\\b"
+        - "\\b13\\b"
+        - "\\b17\\b"
+        - "\\b19\\b"
+        - "\\b23\\b"
+  forbidden:
+    - check: response_contains
+      patterns: ["Here are", "Below are", "The first 5"]
+  partial:
+    - check: response_matches_regex
+      all_of:
+        - "\\b11\\b"
+        - "\\b13\\b"
+    - check: response_matches_regex
+      any_of:
+        - "[-*•]\\s*11"
+        - "[-*•]\\s*13"
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

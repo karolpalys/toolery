@@ -222,6 +222,7 @@ _DIM_WEIGHTS: dict[str, float] = {
     "terminal": 2.0,
     "agentic": 2.0,
     "adversarial_robustness": 2.0,
+    "instruction_following": 2.0,
     "localization": 0.5,
     "long_context": 0.5,
 }

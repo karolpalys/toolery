@@ -1,0 +1,52 @@
+id: medium-44-if-conditional-format
+title: "Conditional output format based on input value"
+tier: medium
+category: instruction_following
+domain: generic
+description: |
+  Conditional instruction — the OUTPUT FORMAT depends on a property of
+  the input. User asks about a city; if population > 10M model returns
+  JSON, otherwise plain prose. Tests reading and applying a conditional
+  rule (megacity in this case → JSON).
+tags: [instruction_following, conditional, format_branching]
+ranking_dimensions: [overall, instruction_following, structured_output]
+prompt: |
+  Tell me about Tokyo. Output rules:
+    - If the city's population is greater than 10 million (megacity),
+      respond as a JSON object: {"city": ..., "population_m": ..., "country": ...}
+    - If the city's population is 10 million or fewer, respond in 1-2
+      sentences of plain prose.
+
+  Use the rule that matches Tokyo's actual population.
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 45
+tool_responses: {}
+scoring:
+  required:
+    - check: response_matches_regex
+      all_of:
+        - "\\{"
+        - "\"city\""
+        - "\"population_m\""
+        - "\"country\""
+        - "\\}"
+    - check: response_satisfies
+      any_of:
+        - ["Tokyo"]
+        - ["Japan"]
+  forbidden: []
+  partial:
+    - check: response_matches_regex
+      any_of:
+        - "\\{.*Tokyo.*\\}"
+        - "\"population\""
+    - check: response_satisfies
+      any_of:
+        - ["Tokyo", "37", "38", "Japan"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

@@ -1,0 +1,52 @@
+id: medium-45-if-stylistic-constraints
+title: "Stylistic constraints — past tense + each line starts with 'The'"
+tier: medium
+category: instruction_following
+domain: generic
+description: |
+  Two stylistic constraints stacked: (a) all sentences in past tense,
+  (b) each numbered item must start with the word "The". Tests
+  consistent stylistic discipline across multiple items.
+tags: [instruction_following, stylistic, grammar]
+ranking_dimensions: [overall, instruction_following]
+prompt: |
+  Briefly summarize 3 events from World War II. Constraints:
+    - Use 3 numbered items (1., 2., 3.)
+    - Each item MUST start with the literal word "The" (e.g., "The Battle of...", "The invasion of...", "The bombing of...")
+    - Each item MUST be written in PAST TENSE only (no present, no future).
+  Output the 3 items, nothing else.
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 45
+tool_responses: {}
+scoring:
+  required:
+    - check: response_matches_regex
+      all_of:
+        - "^\\s*1\\.\\s+The\\s"
+        - "\\n\\s*2\\.\\s+The\\s"
+        - "\\n\\s*3\\.\\s+The\\s"
+      none_of:
+        - "\\bwill\\s"
+        - "\\bis\\s+going\\s"
+    - check: response_satisfies
+      any_of:
+        - ["Allied", "Axis", "Hitler", "Stalin", "Churchill", "Roosevelt",
+           "Normandy", "Pearl Harbor", "Stalingrad", "D-Day", "Berlin",
+           "Pacific", "invasion", "bombing", "liberation"]
+  forbidden: []
+  partial:
+    - check: response_matches_regex
+      all_of:
+        - "1\\.\\s+The\\s"
+        - "2\\.\\s+The\\s"
+    - check: response_satisfies
+      any_of:
+        - ["1939", "1940", "1941", "1942", "1943", "1944", "1945"]
+        - ["war", "battle", "army"]
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0

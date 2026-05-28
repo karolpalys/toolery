@@ -1,0 +1,60 @@
+id: hard-34-if-many-negatives
+title: "Describe ML with many negative keyword bans + word cap"
+tier: hard
+category: instruction_following
+domain: generic
+description: |
+  4 negative keyword bans on a topic where those keywords are the
+  defaults the model would reach for + a hard word cap. Tests whether
+  the model can paraphrase around forbidden vocabulary instead of
+  defaulting to the most obvious words.
+tags: [instruction_following, negative_constraint, stacked, vocab_pressure]
+ranking_dimensions: [overall, instruction_following]
+prompt: |
+  Describe what machine learning is, in clear prose. HARD CONSTRAINTS
+  (failure if any are violated):
+    - Maximum 50 words total.
+    - Do NOT use the words: "machine", "learning", "AI", "model".
+    - Do NOT use first person ("I", "we", "our", "us").
+    - Do NOT add a preamble or postscript — start with the explanation.
+
+  Stick to the constraints even when it forces awkward phrasing.
+tools: []
+budget:
+  max_tool_calls: 0
+  max_turns: 1
+  timeout_seconds: 60
+tool_responses: {}
+scoring:
+  required:
+    - check: response_not_contains
+      patterns: ["machine", "Machine", "MACHINE",
+                 "learning", "Learning", "LEARNING",
+                 "model", "Model", "MODEL"]
+    - check: response_matches_regex
+      none_of:
+        - "\\bAI\\b"
+        - "\\bI\\b"
+        - "\\bwe\\b"
+        - "\\bWe\\b"
+        - "\\bour\\b"
+        - "\\bOur\\b"
+        - "\\bus\\b"
+    - check: response_satisfies
+      any_of:
+        - ["pattern", "data", "predict", "algorithm", "statistical",
+           "infer", "train", "example"]
+  forbidden: []
+  partial:
+    - check: response_not_contains
+      patterns: ["machine", "learning"]
+    - check: response_satisfies
+      any_of:
+        - ["pattern", "data", "predict", "algorithm"]
+    - check: response_matches_regex
+      any_of:
+        - "^[A-Z][a-z]"
+  weights:
+    pass: 1.0
+    partial: 0.5
+    fail: 0.0
