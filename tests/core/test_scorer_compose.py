@@ -75,7 +75,10 @@ def test_evaluate_fail_on_forbidden():
     assert r.failure_kind == "forbidden_action"
 
 
-def test_evaluate_partial_score():
+def test_partial_does_not_demote_full_required_pass():
+    """Required+forbidden all-pass should always score `pass` regardless of
+    partial — partial is a bonus signal during failure gradient, never a
+    penalty against a clean correct response. Audit Phase 5 fix."""
     scoring = Scoring(
         required=[ScoringCheck.model_validate({"check": "tool_called", "tool": "get_weather"})],
         forbidden=[],
@@ -86,8 +89,8 @@ def test_evaluate_partial_score():
     )
     tr = _trace(("get_weather", {}), response="It's sunny.")
     r = evaluate(_scenario(scoring), tr)
-    assert r.status == "partial"
-    assert 0.0 < r.score < 1.0
+    assert r.status == "pass"
+    assert r.score == 1.0
 
 
 def _two_required_one_pass_scoring() -> Scoring:
@@ -130,7 +133,9 @@ def test_implicit_gradient_can_be_re_enabled(monkeypatch, flag_value):
 
 
 def test_implicit_gradient_off_does_not_affect_full_pass_path(monkeypatch):
-    """All-required-pass + partial scoring must still produce the partial gradient."""
+    """LLM_TEST_PARTIAL_GRADIENT off: clean required-pass remains a full pass
+    regardless of partial outcome (post-Phase-5 semantics — partial is bonus
+    in failure mode only, never a demotion against a correct required-pass)."""
     monkeypatch.delenv("LLM_TEST_PARTIAL_GRADIENT", raising=False)
     scoring = Scoring(
         required=[ScoringCheck.model_validate({"check": "tool_called", "tool": "get_weather"})],
@@ -142,8 +147,8 @@ def test_implicit_gradient_off_does_not_affect_full_pass_path(monkeypatch):
     )
     tr = _trace(("get_weather", {}), response="It's sunny.")
     r = evaluate(_scenario(scoring), tr)
-    assert r.status == "partial"
-    assert 0.0 < r.score < 1.0
+    assert r.status == "pass"
+    assert r.score == 1.0
 
 
 def test_schema_check_tolerates_think_tag_wrapped_json():

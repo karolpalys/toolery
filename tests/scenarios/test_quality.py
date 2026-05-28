@@ -90,3 +90,24 @@ def test_required_is_not_empty_and_partial_is_not_only_guardrail():
         if "response_matches_schema" in partial_checks and "response_matches_schema" not in req_checks:
             offenders.append(f"{path.relative_to(ROOT.parent)}: schema only in partial")
     assert not offenders, "scenario scoring quality issues:\n" + "\n".join(offenders)
+
+
+def test_tool_responses_keys_match_scenario_tools():
+    """Loader-level sanity: every key in `tool_responses` must appear in `tools`.
+
+    Catches drift where a YAML mocks a tool name that the scenario doesn't
+    declare (silent — adapter sends only declared tools, model never sees the
+    mocked one), or vice versa (tool declared but no mock — adapter calls hit
+    the registry's default response shape and may not match expected schema).
+    """
+    offenders = []
+    for path, data in _scenarios():
+        tools = set(data.get("tools") or [])
+        responses = set((data.get("tool_responses") or {}).keys())
+        orphan_mocks = responses - tools
+        if orphan_mocks:
+            offenders.append(
+                f"{path.relative_to(ROOT.parent)}: {data['id']} mocks "
+                f"{sorted(orphan_mocks)} but doesn't declare them in `tools`")
+    assert not offenders, (
+        "tool_responses keys must subset `tools`:\n" + "\n".join(offenders))

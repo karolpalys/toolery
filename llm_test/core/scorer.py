@@ -259,7 +259,13 @@ def _pattern_found(text: str, pattern: object) -> bool:
     needle = pat.lower()
 
     if re.fullmatch(r"[+-]?\d+(?:\.\d+)?", pat):
-        return re.search(rf"(?<![\w.]){re.escape(pat)}(?!\.\d)(?!\w)", text, re.IGNORECASE) is not None
+        # Match the integer value as a standalone number OR as the integer
+        # part of an exact-equal decimal — e.g., pattern "1025" matches both
+        # "1025" and "1025.00" / "1025.0", but NOT "1025.5" (different value)
+        # and not "21025" (digit continuation handled by lookbehind).
+        # The lookahead `(?!\.\d*[1-9])` rejects only decimals containing a
+        # non-zero digit anywhere after the dot — pure-zero suffixes pass.
+        return re.search(rf"(?<![\w.]){re.escape(pat)}(?!\.\d*[1-9])(?!\w)", text, re.IGNORECASE) is not None
 
     if len(pat) <= 2 and re.search(r"[A-Za-z]", pat):
         return re.search(rf"(?<![A-Za-z]){re.escape(pat)}(?![A-Za-z])", text, re.IGNORECASE) is not None
@@ -684,27 +690,11 @@ def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
             checks=all_checks, trace=trace,
         )
 
-    if partial:
-        n_pass = sum(1 for p in partial if p.result == "pass")
-        ratio = n_pass / len(partial)
-        if ratio == 1.0:
-            return ScenarioResult(
-                scenario_id=scenario.id, adapter=trace.adapter, trial_index=trace.trial_index,
-                status="pass", score=scenario.scoring.weights["pass"],
-                call_count=len(calls), budget_max=scenario.budget.max_tool_calls,
-                latency_ms=trace.duration_ms, failure_kind=None,
-                checks=all_checks, trace=trace,
-            )
-        partial_weight = scenario.scoring.weights["partial"]
-        pass_weight = scenario.scoring.weights["pass"]
-        score = partial_weight + (pass_weight - partial_weight) * ratio
-        return ScenarioResult(
-            scenario_id=scenario.id, adapter=trace.adapter, trial_index=trace.trial_index,
-            status="partial", score=score, call_count=len(calls),
-            budget_max=scenario.budget.max_tool_calls, latency_ms=trace.duration_ms,
-            failure_kind=None, checks=all_checks, trace=trace,
-        )
-
+    # Required + forbidden all-pass → status="pass" with full score, regardless
+    # of partial. Partial is used ONLY in the failure-gradient mode above
+    # (LLM_TEST_PARTIAL_GRADIENT=on, when required is incomplete). A lean
+    # correct answer must NOT be demoted because it didn't trigger optional
+    # bonus checks — partial is reward, never penalty.
     return ScenarioResult(
         scenario_id=scenario.id, adapter=trace.adapter, trial_index=trace.trial_index,
         status="pass", score=scenario.scoring.weights["pass"],
