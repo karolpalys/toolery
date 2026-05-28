@@ -25,6 +25,7 @@ tool_responses: {}
 scoring:
   required:
     - check: response_matches_regex
+      case_sensitive: true
       all_of:
         - "^-\\s+[A-Z]"
         - "\\n-\\s+[A-Z].*\\n-\\s+[A-Z].*\\n-\\s+[A-Z]"

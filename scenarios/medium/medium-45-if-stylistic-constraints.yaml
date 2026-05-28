@@ -24,6 +24,7 @@ tool_responses: {}
 scoring:
   required:
     - check: response_matches_regex
+      case_sensitive: true
       all_of:
         - "^\\s*1\\.\\s+The\\s"
         - "\\n\\s*2\\.\\s+The\\s"

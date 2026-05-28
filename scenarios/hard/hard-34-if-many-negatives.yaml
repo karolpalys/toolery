@@ -27,11 +27,14 @@ budget:
 tool_responses: {}
 scoring:
   required:
+    # response_not_contains is already case-insensitive — redundant case
+    # variants removed.
     - check: response_not_contains
-      patterns: ["machine", "Machine", "MACHINE",
-                 "learning", "Learning", "LEARNING",
-                 "model", "Model", "MODEL"]
+      patterns: ["machine", "learning", "model"]
+    # First-person pronoun bans need case_sensitive so `\bI\b` doesn't fire
+    # on bare lowercase "i" (e.g. "i.e."). "AI" stays case-sensitive too.
     - check: response_matches_regex
+      case_sensitive: true
       none_of:
         - "\\bAI\\b"
         - "\\bI\\b"
