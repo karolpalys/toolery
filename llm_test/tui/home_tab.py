@@ -460,7 +460,28 @@ class HomeTab(Container):
         margin-right: 1;
         border: none;
         padding: 0 1;
-        color: white;
+        color: $text 100%;
+        text-style: bold;
+    }
+
+    /* Explicit hover effects per variant — the default button :hover relies
+     * on the border swap which we removed; without these rules the warning
+     * and error variants stay flat under the cursor. Use lighten so each
+     * variant brightens on hover instead of darkening. */
+    HomeTab #follow-on:hover { background: $primary-lighten-1; }
+    HomeTab #follow-off:hover { background: $boost; }
+    HomeTab #run-pause:hover { background: $warning-lighten-1; }
+    HomeTab #run-resume:hover { background: $success-lighten-1; }
+    HomeTab #run-stop:hover { background: $error-lighten-1; }
+
+    /* Force pure-white labels on every variant — Textual's variant CSS
+     * sets `color: $text` which on warning/error backgrounds renders
+     * grey/muted. Pin per-id so variant rules don't win on specificity.
+     * No :disabled override: keep disabled buttons readable too (Textual
+     * adds its own opacity reduction for disabled state). */
+    HomeTab #follow-on, HomeTab #follow-off,
+    HomeTab #run-pause, HomeTab #run-resume, HomeTab #run-stop {
+        color: #ffffff;
         text-style: bold;
     }
 
