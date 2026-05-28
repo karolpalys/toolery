@@ -441,7 +441,7 @@ class HomeTab(Container):
     HomeTab #eval-control,
     HomeTab #trening-control {
         width: 1fr;
-        height: 5;
+        height: 3;
         border: round $primary;
         border-title-color: $primary;
         background: $surface;
@@ -455,8 +455,11 @@ class HomeTab(Container):
 
     HomeTab #eval-control Button,
     HomeTab #trening-control Button {
-        margin-right: 1;
+        height: 1;
         min-width: 18;
+        margin-right: 1;
+        border: none;
+        padding: 0 1;
     }
 
     HomeTab #main-split-wrapper {
