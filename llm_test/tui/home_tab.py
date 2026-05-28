@@ -453,6 +453,11 @@ class HomeTab(Container):
         margin-right: 0;
     }
 
+    /* Flat-button system for the 5 controls-row buttons. Textual's stock
+     * variants assume a 3-line button with border swap on hover; we run
+     * height: 1 with border: none so we own every visual state ourselves.
+     * Base style is shared; per-id rules paint the role color and its
+     * lighter hover/focus + dimmer disabled forms. */
     HomeTab #eval-control Button,
     HomeTab #trening-control Button {
         height: 1;
@@ -460,30 +465,29 @@ class HomeTab(Container):
         margin-right: 1;
         border: none;
         padding: 0 1;
-        color: $text 100%;
-        text-style: bold;
-    }
-
-    /* Explicit hover effects per variant — the default button :hover relies
-     * on the border swap which we removed; without these rules the warning
-     * and error variants stay flat under the cursor. Use lighten so each
-     * variant brightens on hover instead of darkening. */
-    HomeTab #follow-on:hover { background: $primary-lighten-1; }
-    HomeTab #follow-off:hover { background: $boost; }
-    HomeTab #run-pause:hover { background: $warning-lighten-1; }
-    HomeTab #run-resume:hover { background: $success-lighten-1; }
-    HomeTab #run-stop:hover { background: $error-lighten-1; }
-
-    /* Force pure-white labels on every variant — Textual's variant CSS
-     * sets `color: $text` which on warning/error backgrounds renders
-     * grey/muted. Pin per-id so variant rules don't win on specificity.
-     * No :disabled override: keep disabled buttons readable too (Textual
-     * adds its own opacity reduction for disabled state). */
-    HomeTab #follow-on, HomeTab #follow-off,
-    HomeTab #run-pause, HomeTab #run-resume, HomeTab #run-stop {
         color: #ffffff;
         text-style: bold;
     }
+
+    HomeTab #follow-on { background: #1e88e5; }
+    HomeTab #follow-on:hover, HomeTab #follow-on:focus { background: #42a5f5; }
+    HomeTab #follow-on:disabled { background: #2a3441; color: #8a96a3; }
+
+    HomeTab #follow-off { background: #546e7a; }
+    HomeTab #follow-off:hover, HomeTab #follow-off:focus { background: #78909c; }
+    HomeTab #follow-off:disabled { background: #2a3441; color: #8a96a3; }
+
+    HomeTab #run-pause { background: #f57c00; }
+    HomeTab #run-pause:hover, HomeTab #run-pause:focus { background: #ffa726; }
+    HomeTab #run-pause:disabled { background: #3a2f24; color: #8a7a6a; }
+
+    HomeTab #run-resume { background: #2e7d32; }
+    HomeTab #run-resume:hover, HomeTab #run-resume:focus { background: #4caf50; }
+    HomeTab #run-resume:disabled { background: #243024; color: #6a7a6a; }
+
+    HomeTab #run-stop { background: #c62828; }
+    HomeTab #run-stop:hover, HomeTab #run-stop:focus { background: #ef5350; }
+    HomeTab #run-stop:disabled { background: #3a2424; color: #8a6a6a; }
 
     HomeTab #main-split-wrapper {
         height: 1fr;
@@ -575,17 +579,17 @@ class HomeTab(Container):
                 yield Static("", id="current-phase")
                 with Horizontal(id="controls-row"):
                     with Horizontal(id="eval-control"):
+                        # No `variant=` on these — full visual control lives
+                        # in the per-id CSS rules above (flat backgrounds +
+                        # hover/focus/disabled). Variants would inject
+                        # 3-line-border styling that fights height: 1.
                         yield Button("Follow upcoming", id="follow-on",
-                                     variant="primary", disabled=True)
-                        yield Button("Pause follow", id="follow-off",
-                                     variant="default")
+                                     disabled=True)
+                        yield Button("Pause follow", id="follow-off")
                     with Horizontal(id="trening-control"):
-                        yield Button("Pause", id="run-pause",
-                                     variant="warning", disabled=True)
-                        yield Button("Resume", id="run-resume",
-                                     variant="success", disabled=True)
-                        yield Button("STOP", id="run-stop",
-                                     variant="error", disabled=True)
+                        yield Button("Pause", id="run-pause", disabled=True)
+                        yield Button("Resume", id="run-resume", disabled=True)
+                        yield Button("STOP", id="run-stop", disabled=True)
 
         with Container(id="main-split-wrapper"):
             with Horizontal(id="main-split"):
