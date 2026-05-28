@@ -740,8 +740,24 @@ class HomeTab(Container):
     # ----------------------------------------------------- trening control
 
     def _is_run_active(self) -> bool:
+        """A run is 'active' if either:
+          (a) the TUI owns a live subprocess (this session started the run), or
+          (b) the DB shows a status='running' row — covers TUI-restart-after-
+              crash where the subprocess is alive but detached from the TUI.
+        Either case the user can meaningfully Pause / STOP."""
         proc = getattr(self.app, "run_subprocess", None)
-        return proc is not None and proc.returncode is None
+        if proc is not None and proc.returncode is None:
+            return True
+        if self._store is None:
+            return False
+        try:
+            with self._store.conn() as c:
+                row = c.execute(
+                    "SELECT 1 FROM runs WHERE status='running' LIMIT 1"
+                ).fetchone()
+            return bool(row)
+        except Exception:
+            return False
 
     def _has_resumable_run(self) -> bool:
         """A resumable run exists if the latest run was paused (status='paused')
