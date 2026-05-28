@@ -12,12 +12,67 @@ from pathlib import Path
 from rich.text import Text
 from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
-from textual.widgets import Button, DataTable, ProgressBar, Static
+from textual.screen import ModalScreen
+from textual.widgets import Button, DataTable, Label, ProgressBar, Static
 
 from llm_test.core import endpoint_scanner
 from llm_test.core.endpoint_scanner import EndpointInfo
 from llm_test.core.store import Store
+
+
+class ConfirmRunActionModal(ModalScreen[bool]):
+    """Reusable confirm dialog for Pause / Resume / STOP run controls.
+
+    Returns True on confirm, False on cancel. Title + body + button label
+    are constructor params so the same modal serves all three actions.
+    """
+
+    DEFAULT_CSS = """
+    ConfirmRunActionModal { align: center middle; }
+    ConfirmRunActionModal > Vertical {
+        width: 72; padding: 1 2;
+        background: $surface; border: thick $warning;
+    }
+    ConfirmRunActionModal.danger > Vertical { border: thick $error; }
+    ConfirmRunActionModal .row { height: auto; margin-top: 1; }
+    ConfirmRunActionModal Button { margin-right: 2; min-width: 18; }
+    """
+
+    BINDINGS = [
+        Binding("y", "confirm", "Yes"),
+        Binding("n", "cancel", "No"),
+        Binding("escape", "cancel", "Cancel", show=False),
+    ]
+
+    def __init__(self, title: str, body: str, confirm_label: str,
+                 *, danger: bool = False) -> None:
+        super().__init__()
+        self._title = title
+        self._body = body
+        self._confirm_label = confirm_label
+        if danger:
+            self.add_class("danger")
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label(f"[bold]{self._title}[/bold]")
+            yield Label(self._body)
+            with Horizontal(classes="row"):
+                yield Button("Cancel (n)", id="cancel")
+                variant = "error" if self.has_class("danger") else "warning"
+                yield Button(f"{self._confirm_label} (y)",
+                             id="confirm", variant=variant)
+
+    def action_confirm(self) -> None:
+        self.dismiss(True)
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "confirm")
 
 DEFAULT_PORTS = sorted({5000, 5001, 11434, *range(8000, 9001)})
 
@@ -30,7 +85,7 @@ _STATUS_STYLE = {
     "fail": "red",
     "error": "bold red",
     "timeout": "red dim",
-    "running": "magenta",
+    "running": "bold cyan",
     "upcoming": "grey50",
 }
 _STATUS_ICON = {
@@ -201,7 +256,7 @@ def _detail_block_running(scenario_id: str, adapter: str, trial: int,
     out = Text()
     out.append(f"{scenario_id}\n", style="bold")
     out.append(f"adapter: {adapter}  trial: {trial}\n", style="dim")
-    out.append("status: ⟳ running\n", style="magenta")
+    out.append("status: ⟳ running\n", style="bold cyan")
     out.append(f"started: {started_at}\n", style="dim")
     try:
         started_dt = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
@@ -378,6 +433,32 @@ class HomeTab(Container):
         color: $text-muted;
     }
 
+    HomeTab #controls-row {
+        height: auto;
+        margin-top: 1;
+    }
+
+    HomeTab #eval-control,
+    HomeTab #trening-control {
+        width: 1fr;
+        height: 5;
+        border: round $primary;
+        border-title-color: $primary;
+        background: $surface;
+        padding: 0 1;
+        margin-right: 1;
+    }
+
+    HomeTab #trening-control {
+        margin-right: 0;
+    }
+
+    HomeTab #eval-control Button,
+    HomeTab #trening-control Button {
+        margin-right: 1;
+        min-width: 18;
+    }
+
     HomeTab #main-split-wrapper {
         height: 1fr;
     }
@@ -466,6 +547,19 @@ class HomeTab(Container):
                 yield Static("", id="current-progress-text")
                 yield ProgressBar(total=100, show_eta=False, id="current-progress")
                 yield Static("", id="current-phase")
+                with Horizontal(id="controls-row"):
+                    with Horizontal(id="eval-control"):
+                        yield Button("Follow upcoming", id="follow-on",
+                                     variant="primary", disabled=True)
+                        yield Button("Pause follow", id="follow-off",
+                                     variant="default")
+                    with Horizontal(id="trening-control"):
+                        yield Button("Pause", id="run-pause",
+                                     variant="warning", disabled=True)
+                        yield Button("Resume", id="run-resume",
+                                     variant="success", disabled=True)
+                        yield Button("STOP", id="run-stop",
+                                     variant="error", disabled=True)
 
         with Container(id="main-split-wrapper"):
             with Horizontal(id="main-split"):
@@ -486,14 +580,28 @@ class HomeTab(Container):
         ep = self.query_one("#endpoints", DataTable)
         ep.add_columns("Port", "Model ID", "Status", "Server")
         sc = self.query_one("#scenarios-table", DataTable)
-        sc.add_columns("#", "Scenario", "Tier", "Adapter", "Trial", "Score",
-                       "Status", "Why")
+        # Explicit widths so WHY doesn't collapse to 1-char "—" when the
+        # currently visible window is dominated by pass/running/upcoming rows.
+        sc.add_column("#", width=4)
+        sc.add_column("Scenario", width=30)
+        sc.add_column("Tier", width=6)
+        sc.add_column("Adapter", width=10)
+        sc.add_column("Trial", width=5)
+        sc.add_column("Score", width=6)
+        sc.add_column("Status", width=12)
+        sc.add_column("Why", width=40)
         # Section border titles.
         try:
             self.query_one("#scanner-strip").border_title = (
                 "Endpoint discovery"
             )
             self.query_one("#live-strip").border_title = "Run status"
+            self.query_one("#eval-control").border_title = (
+                "evaluation workspace control"
+            )
+            self.query_one("#trening-control").border_title = (
+                "trening control"
+            )
             self.query_one("#main-split-wrapper").border_title = (
                 "Evaluation workspace"
             )
@@ -508,6 +616,21 @@ class HomeTab(Container):
     # ------------------------------------------------------------------ scanner
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "follow-on":
+            self._set_follow_mode(True)
+            return
+        if event.button.id == "follow-off":
+            self._set_follow_mode(False)
+            return
+        if event.button.id == "run-pause":
+            await self._handle_pause_pressed()
+            return
+        if event.button.id == "run-resume":
+            await self._handle_resume_pressed()
+            return
+        if event.button.id == "run-stop":
+            await self._handle_stop_pressed()
+            return
         if self._scanning:
             return
         if event.button.id == "scan":
@@ -516,6 +639,19 @@ class HomeTab(Container):
         if event.button.id == "run-test":
             await self._launch_from_button()
             return
+
+    def _set_follow_mode(self, on: bool) -> None:
+        self._follow_mode = on
+        try:
+            self.query_one("#follow-on", Button).disabled = on
+            self.query_one("#follow-off", Button).disabled = not on
+        except Exception:
+            pass
+        if on:
+            # Re-engage follow immediately: refresh from DB will rebuild and
+            # scroll_end to the live edge on this tick.
+            self._last_signature = None
+            self.refresh_from_db()
 
     async def _run_scan(self, ports: list[int]) -> None:
         self._scanning = True
@@ -570,6 +706,113 @@ class HomeTab(Container):
         except Exception:
             idx = 0
         await self._on_endpoint_selected(idx)
+
+    # ----------------------------------------------------- trening control
+
+    def _is_run_active(self) -> bool:
+        proc = getattr(self.app, "run_subprocess", None)
+        return proc is not None and proc.returncode is None
+
+    def _has_resumable_run(self) -> bool:
+        """A resumable run exists if the latest run was paused (status='paused')
+        or has any in_flight rows that were cleared without a clean finish."""
+        if self._is_run_active():
+            return False
+        if self._store is None:
+            return False
+        try:
+            with self._store.conn() as c:
+                row = c.execute(
+                    "SELECT status FROM runs ORDER BY started_at DESC LIMIT 1"
+                ).fetchone()
+            return bool(row) and row["status"] == "paused"
+        except Exception:
+            return False
+
+    def _update_trening_buttons(self) -> None:
+        """Pause enabled iff a run is active; Stop same; Resume iff a paused
+        run exists in the DB and no run is currently active."""
+        try:
+            pause_btn = self.query_one("#run-pause", Button)
+            resume_btn = self.query_one("#run-resume", Button)
+            stop_btn = self.query_one("#run-stop", Button)
+        except Exception:
+            return
+        active = self._is_run_active()
+        pause_btn.disabled = not active
+        stop_btn.disabled = not active
+        resume_btn.disabled = active or not self._has_resumable_run()
+
+    async def _handle_pause_pressed(self) -> None:
+        if not self._is_run_active():
+            return
+        confirm = await self.app.push_screen_wait(
+            ConfirmRunActionModal(
+                title="Pause the run?",
+                body=("Terminates the running subprocess. Already-completed "
+                      "scenario results stay in the DB; any scenarios currently "
+                      "in-flight will be treated as not-yet-run on resume."),
+                confirm_label="Pause",
+            )
+        )
+        if not confirm:
+            return
+        ok = await self._call_app_action("pause_current_run")
+        if ok:
+            self.app.notify("Run paused. Click Resume to continue.")
+        self._update_trening_buttons()
+
+    async def _handle_resume_pressed(self) -> None:
+        if self._is_run_active() or not self._has_resumable_run():
+            return
+        confirm = await self.app.push_screen_wait(
+            ConfirmRunActionModal(
+                title="Resume the paused run?",
+                body=("Continues the last paused run from the next not-yet-run "
+                      "scenario in the original schedule."),
+                confirm_label="Resume",
+            )
+        )
+        if not confirm:
+            return
+        await self._call_app_action("resume_current_run")
+        self._update_trening_buttons()
+
+    async def _handle_stop_pressed(self) -> None:
+        if not self._is_run_active():
+            return
+        confirm = await self.app.push_screen_wait(
+            ConfirmRunActionModal(
+                title="STOP the run permanently?",
+                body=("Terminates the subprocess immediately. All scenarios not "
+                      "yet completed are recorded with status=error. The run is "
+                      "marked failed and CANNOT be resumed afterwards."),
+                confirm_label="STOP",
+                danger=True,
+            )
+        )
+        if not confirm:
+            return
+        ok = await self._call_app_action("stop_current_run")
+        if ok:
+            self.app.notify("Run stopped. Remaining scenarios marked as error.")
+        self._update_trening_buttons()
+
+    async def _call_app_action(self, method_name: str) -> bool:
+        fn = getattr(self.app, method_name, None)
+        if fn is None:
+            self.app.notify(f"App does not support {method_name}.",
+                            severity="error")
+            return False
+        try:
+            result = fn()
+            if asyncio.iscoroutine(result):
+                await result
+            return True
+        except Exception as e:
+            self.app.notify(f"{method_name} failed: {e}",
+                            severity="error", markup=False)
+            return False
 
     def _refresh_endpoints_table(self) -> None:
         tbl = self.query_one("#endpoints", DataTable)
@@ -667,6 +910,9 @@ class HomeTab(Container):
             return None
 
     def refresh_from_db(self) -> None:
+        # Trening-control button state depends on subprocess + DB and changes
+        # independently of run progress — refresh on every tick.
+        self._update_trening_buttons()
         store = self._resolve_store()
         if store is None:
             return
@@ -775,12 +1021,20 @@ class HomeTab(Container):
     def _refresh_scenarios_table(self) -> None:
         tbl = self.query_one("#scenarios-table", DataTable)
 
-        # Resolve plan once per run
-        if self._displayed_run_id != self._current_run_id:
+        # New run started — always rebuild even if paused (otherwise an old
+        # snapshot from a different run lingers).
+        run_changed = self._displayed_run_id != self._current_run_id
+        if run_changed:
             tbl.clear()
             self._displayed_run_id = self._current_run_id
             self._plan = self._resolve_plan_for_current_run()
             self._last_signature = None
+
+        # Pause mode: freeze the table so the user can scroll the snapshot
+        # without it jumping back to the live edge every 2s. Skipped on a
+        # genuine new-run change so the user sees the new run's plan.
+        if not self._follow_mode and not run_changed:
+            return
 
         completed = {
             (r["scenario_id"], r["adapter"], r["trial_index"]): r
@@ -879,10 +1133,13 @@ class HomeTab(Container):
         tbl = self.query_one("#scenarios-table", DataTable)
         if tbl.row_count == 0:
             return
-        live_edge = self._find_live_edge_index(tbl)
-        target = min(live_edge + FOLLOW_THRESHOLD_ROWS, tbl.row_count - 1)
+        # Scroll the viewport directly (not the cursor) so the move doesn't
+        # fire RowHighlighted and accidentally disable follow mode. Bottom of
+        # the table is naturally where running + the capped upcoming rows
+        # sit, since _classify_plan trims upcoming to UPCOMING_VISIBLE rows
+        # past the live edge.
         try:
-            tbl.move_cursor(row=target, animate=False)
+            tbl.scroll_end(animate=False, force=True, immediate=True)
         except Exception:
             pass
 
@@ -902,11 +1159,6 @@ class HomeTab(Container):
         if tbl.cursor_row is None:
             return True
         return (tbl.row_count - tbl.cursor_row) <= FOLLOW_THRESHOLD_ROWS
-
-    @on(DataTable.RowHighlighted, "#scenarios-table")
-    def _on_scenario_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
-        tbl = self.query_one("#scenarios-table", DataTable)
-        self._follow_mode = self._cursor_near_bottom(tbl)
 
     # ---------------------------------------------------------------- helpers
 

@@ -119,7 +119,9 @@ class LLMTestApp(App):
 
     @work
     async def _launch_modal_worker(self, endpoint: EndpointInfo) -> None:
-        args = await self.push_screen_wait(LaunchModal(endpoint, self._adapters_cache))
+        interrupted = self._find_interrupted_run(endpoint)
+        args = await self.push_screen_wait(
+            LaunchModal(endpoint, self._adapters_cache, interrupted_run=interrupted))
         if args is None:
             return
         try:
@@ -128,9 +130,201 @@ class LLMTestApp(App):
             self.notify(f"Failed to launch: {e}", severity="error",
                         markup=False)
             return
-        self.notify(f"Run started: {args.model} / {args.adapter}")
+        if args.resume:
+            self.notify(f"Resuming run: {args.resume}")
+        else:
+            self.notify(f"Run started: {args.model} / {args.adapter}")
         self.query_one(TabbedContent).active = "home"
         self._watch_subprocess_worker(args)
+
+    def _find_interrupted_run(self, endpoint: EndpointInfo) -> dict | None:
+        """Return the most recent runs row for this endpoint that did not finish.
+
+        Match by base_url so we only suggest a resume when the user has clearly
+        re-selected the same endpoint that hosted the dead run. status='done'
+        runs are excluded; status='running' is included (stale state from a
+        crash leaves it that way).
+        """
+        store = self._resolve_store()
+        if store is None:
+            return None
+        try:
+            runs = store.fetch_all_runs()
+        except Exception:
+            return None
+        for r in runs:
+            if r.get("base_url") != endpoint.base_url:
+                continue
+            if r.get("status") == "done":
+                continue
+            done = store.count_results_for_run(r["run_id"])
+            total = r.get("total_units") or 0
+            # If everything's been processed AND phase==done was never reached,
+            # we still allow resume (it'll re-run only perf if --with-perf).
+            r = dict(r)
+            r["_done_count"] = done
+            r["_total"] = total
+            return r
+        return None
+
+    def _resolve_store(self) -> Store | None:
+        if self._store is not None:
+            return self._store
+        try:
+            results_dir = Path(
+                os.environ.get("LLM_TEST_RESULTS_DIR", "./results"))
+            self._store = Store(results_dir / "runs.db")
+            self._store.init_schema()
+            return self._store
+        except Exception:
+            return None
+
+    async def spawn_resume(self, run_id: str) -> None:
+        """Spawn `llm-test run --resume <run_id>`. Used from History tab."""
+        if self.run_subprocess is not None and self.run_subprocess.returncode is None:
+            self.notify(
+                "A run is already in progress. Wait for it or abort externally.",
+                severity="warning")
+            return
+        # Build a RunArgs that satisfies validation; CLI re-hydrates from DB.
+        args = runner_subprocess.RunArgs(
+            model="resume", base_url="http://placeholder",
+            adapter="raw", tier="all", trials=1, concurrency=1,
+            with_perf=False, cluster="single", resume=run_id,
+        )
+        try:
+            self.run_subprocess = await runner_subprocess.spawn_run(args)
+        except (FileNotFoundError, PermissionError) as e:
+            self.notify(f"Failed to resume: {e}", severity="error",
+                        markup=False)
+            return
+        self.notify(f"Resuming run: {run_id}")
+        self.query_one(TabbedContent).active = "home"
+        self._watch_subprocess_worker(args)
+
+    # ------------------------------------------------------------ run control
+
+    def _latest_running_run_id(self) -> str | None:
+        store = self._resolve_store_safe()
+        if store is None:
+            return None
+        try:
+            with store.conn() as c:
+                row = c.execute(
+                    "SELECT run_id FROM runs WHERE status='running' "
+                    "ORDER BY started_at DESC LIMIT 1"
+                ).fetchone()
+            return row["run_id"] if row else None
+        except Exception:
+            return None
+
+    def _latest_paused_run_id(self) -> str | None:
+        store = self._resolve_store_safe()
+        if store is None:
+            return None
+        try:
+            with store.conn() as c:
+                row = c.execute(
+                    "SELECT run_id FROM runs WHERE status='paused' "
+                    "ORDER BY started_at DESC LIMIT 1"
+                ).fetchone()
+            return row["run_id"] if row else None
+        except Exception:
+            return None
+
+    async def _terminate_subprocess(self, *, kill_after: float = 5.0) -> None:
+        proc = self.run_subprocess
+        if proc is None or proc.returncode is not None:
+            return
+        try:
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=kill_after)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+        except ProcessLookupError:
+            pass
+
+    async def pause_current_run(self) -> None:
+        """Stop the subprocess gracefully and mark the run as paused so Resume
+        can pick up later. Any scenarios with in_flight rows are cleared so
+        they re-run on resume rather than being recorded as failed."""
+        run_id = self._latest_running_run_id()
+        await self._terminate_subprocess()
+        if run_id is None:
+            return
+        from datetime import UTC, datetime
+        store = self._resolve_store_safe()
+        if store is None:
+            return
+        try:
+            store.clear_all_in_flight(run_id)
+            with store.conn() as c:
+                c.execute(
+                    "UPDATE runs SET status='paused', updated_at=? "
+                    "WHERE run_id=?",
+                    (datetime.now(UTC).isoformat().replace("+00:00", "Z"), run_id),
+                )
+        except Exception as e:
+            self.notify(f"Pause cleanup failed: {e}",
+                        severity="warning", markup=False)
+
+    async def resume_current_run(self) -> None:
+        """Re-spawn `llm-test run --resume <run_id>` on the latest paused run.
+        Reuses the existing spawn_resume code path."""
+        run_id = self._latest_paused_run_id()
+        if run_id is None:
+            self.notify("No paused run to resume.", severity="warning")
+            return
+        # Flip status back to running so the resume subprocess sees a live row.
+        store = self._resolve_store_safe()
+        if store is not None:
+            try:
+                with store.conn() as c:
+                    c.execute(
+                        "UPDATE runs SET status='running' WHERE run_id=?",
+                        (run_id,),
+                    )
+            except Exception:
+                pass
+        await self.spawn_resume(run_id)
+
+    async def stop_current_run(self) -> None:
+        """Terminate the subprocess and mark every not-yet-recorded scenario
+        with status=error so the run is permanently closed. The run is then
+        marked failed; resume is no longer offered for it."""
+        run_id = self._latest_running_run_id()
+        await self._terminate_subprocess()
+        if run_id is None:
+            return
+        from datetime import UTC, datetime
+        store = self._resolve_store_safe()
+        if store is None:
+            return
+        try:
+            store.clear_all_in_flight(run_id)
+            with store.conn() as c:
+                c.execute(
+                    "UPDATE runs SET status='failed', finished_at=? "
+                    "WHERE run_id=?",
+                    (datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                     run_id),
+                )
+        except Exception as e:
+            self.notify(f"Stop cleanup failed: {e}",
+                        severity="warning", markup=False)
+
+    def _resolve_store_safe(self) -> "Store | None":
+        if self._store is None:
+            try:
+                results_dir = Path(
+                    os.environ.get("LLM_TEST_RESULTS_DIR", "./results"))
+                self._store = Store(results_dir / "runs.db")
+                self._store.init_schema()
+            except Exception:
+                return None
+        return self._store
 
     @work
     async def _watch_subprocess_worker(self, args: "runner_subprocess.RunArgs") -> None:
