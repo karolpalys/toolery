@@ -343,6 +343,12 @@ class HomeTab(Container):
 
     HomeTab #scanner-strip Button {
         margin-right: 2;
+        min-width: 18;
+    }
+
+    HomeTab #scanner-strip #run-test.-ready {
+        background: $error;
+        color: $text;
     }
 
     HomeTab #scanner-strip #scan-status {
@@ -451,6 +457,8 @@ class HomeTab(Container):
             with Vertical(id="scanner-strip"):
                 with Horizontal(id="buttons"):
                     yield Button("Scan endpoints", id="scan", variant="primary")
+                    yield Button("RUN TEST", id="run-test", variant="default",
+                                 disabled=True)
                     yield Static("Ready to discover local model endpoints",
                                  id="scan-status")
                 yield DataTable(id="endpoints", cursor_type="row")
@@ -509,6 +517,10 @@ class HomeTab(Container):
             return
         if event.button.id == "scan":
             await self._run_scan(DEFAULT_PORTS)
+            return
+        if event.button.id == "run-test":
+            await self._launch_from_button()
+            return
 
     async def _run_scan(self, ports: list[int]) -> None:
         self._scanning = True
@@ -522,6 +534,7 @@ class HomeTab(Container):
             self._set_buttons_disabled(False)
         elapsed = time.monotonic() - started
         self._refresh_endpoints_table()
+        self._update_run_button_state()
         if not self._endpoints:
             self._set_scan_status(
                 f"Scanned {len(ports)} ports in {elapsed:.1f}s — "
@@ -532,6 +545,32 @@ class HomeTab(Container):
                 f"Last scan: {elapsed:.1f}s — {len(self._endpoints)} endpoint(s). "
                 "Pick a row to launch."
             )
+
+    def _update_run_button_state(self) -> None:
+        """Run button is gray+disabled until scan finds at least one endpoint;
+        then becomes red+enabled and stays that way until next scan."""
+        try:
+            btn = self.query_one("#run-test", Button)
+        except Exception:
+            return
+        if self._endpoints:
+            btn.disabled = False
+            btn.add_class("-ready")
+        else:
+            btn.disabled = True
+            btn.remove_class("-ready")
+
+    async def _launch_from_button(self) -> None:
+        """Mimic double-click on the endpoints table — open the launch modal
+        for the currently highlighted row (or row 0 if none highlighted)."""
+        if not self._endpoints:
+            return
+        try:
+            tbl = self.query_one("#endpoints", DataTable)
+            idx = tbl.cursor_row if tbl.cursor_row is not None else 0
+        except Exception:
+            idx = 0
+        await self._on_endpoint_selected(idx)
 
     def _refresh_endpoints_table(self) -> None:
         tbl = self.query_one("#endpoints", DataTable)
@@ -877,3 +916,10 @@ class HomeTab(Container):
 
     def _set_buttons_disabled(self, disabled: bool) -> None:
         self.query_one("#scan", Button).disabled = disabled
+        # Run button: disable while scanning; after scan, _update_run_button_state
+        # restores it to red+enabled iff endpoints were found.
+        run_btn = self.query_one("#run-test", Button)
+        if disabled:
+            run_btn.disabled = True
+        elif not self._endpoints:
+            run_btn.disabled = True
