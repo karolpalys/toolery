@@ -11,7 +11,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
   run_id TEXT PRIMARY KEY, model TEXT NOT NULL, base_url TEXT,
   started_at TIMESTAMP NOT NULL, finished_at TIMESTAMP, duration_s REAL,
-  status TEXT CHECK(status IN ('running','done','aborted','failed')),
+  status TEXT CHECK(status IN ('running','done','aborted','failed','paused')),
   config_json TEXT, llm_test_version TEXT, scenarios_hash TEXT
 );
 CREATE TABLE IF NOT EXISTS adapters_in_run (
@@ -89,6 +89,32 @@ class Store:
                 col = stmt.rsplit(" ADD COLUMN ", 1)[1].split(" ", 1)[0]
                 if col not in existing:
                     c.execute(stmt)
+            # Migration: old DBs created before 'paused' was a valid status
+            # need their runs.status CHECK constraint relaxed. SQLite can't
+            # ALTER a CHECK in place; recreate the table preserving data.
+            sql_row = c.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='runs'"
+            ).fetchone()
+            if sql_row and "'paused'" not in (sql_row[0] or ""):
+                cols = [r[1] for r in c.execute(
+                    "PRAGMA table_info(runs)").fetchall()]
+                col_list = ", ".join(cols)
+                c.execute("PRAGMA foreign_keys=OFF")
+                c.executescript(f"""
+                    CREATE TABLE runs_new (
+                      run_id TEXT PRIMARY KEY, model TEXT NOT NULL, base_url TEXT,
+                      started_at TIMESTAMP NOT NULL, finished_at TIMESTAMP,
+                      duration_s REAL,
+                      status TEXT CHECK(status IN ('running','done','aborted','failed','paused')),
+                      config_json TEXT, llm_test_version TEXT, scenarios_hash TEXT,
+                      total_units INTEGER, phase TEXT, current_scenario TEXT,
+                      cluster TEXT, updated_at TEXT
+                    );
+                    INSERT INTO runs_new ({col_list}) SELECT {col_list} FROM runs;
+                    DROP TABLE runs;
+                    ALTER TABLE runs_new RENAME TO runs;
+                """)
+                c.execute("PRAGMA foreign_keys=ON")
 
     def create_run(self, run_id, model, base_url, started_at, config_json, scenarios_hash,
                    llm_test_version: str = "0.1.0", total_units: int | None = None,
