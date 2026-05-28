@@ -460,6 +460,8 @@ class HomeTab(Container):
         margin-right: 1;
         border: none;
         padding: 0 1;
+        color: white;
+        text-style: bold;
     }
 
     HomeTab #main-split-wrapper {
