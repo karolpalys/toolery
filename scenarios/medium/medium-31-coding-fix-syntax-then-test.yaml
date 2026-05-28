@@ -51,7 +51,9 @@ scoring:
     - check: tool_args_match_regex
       tool: write_file
       arg: content
-      pattern: 'def add\(a, b\):'
+      # Accept type-hinted/annotated/return-type-annotated variants the
+      # model may add when "fixing" the function signature.
+      pattern: 'def add\(\s*a\s*(?::\s*\w+\s*)?,\s*b\s*(?::\s*\w+\s*)?\)\s*(?:->\s*\w+\s*)?:'
     - check: response_number
       equals: 4
     - check: response_satisfies

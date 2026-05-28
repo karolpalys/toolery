@@ -78,8 +78,12 @@ scoring:
       tool: calculator
     - check: tool_not_called
       tool: read_file
-    - check: response_contains
-      patterns: ["487"]      # Q3 revenue
+    # Q3 revenue — accept "487", "$487", "487M", "$487M", "487 million" etc.
+    # Bare "487" wouldn't match "$487M" because the \w lookahead blocks the
+    # trailing M; use a numeric-with-suffix regex instead.
+    - check: response_matches_regex
+      any_of:
+        - "(?<![\\w.])\\$?487(?!\\.\\d*[1-9])(?:\\b|M\\b|\\s*million)"
     # YoY growth — accept bare "22" or "22%"/"22 percent". Original literal
     # "22%" rejected models that follow the prompt's "one figure per line"
     # rule strictly (the row is already labeled "(percent)"). \b22\b is
@@ -91,9 +95,9 @@ scoring:
     - check: response_satisfies
       any_of:
         - ["4,213", "4213"]   # Headcount (either comma or no-comma)
-    - check: response_satisfies
+    - check: response_matches_regex
       any_of:
-        - ["1,842", "1842"]   # Cash & equivalents (either comma or no-comma)
+        - "(?<![\\w.])\\$?1[,]?842(?!\\.\\d*[1-9])(?:\\b|M\\b|\\s*million)"
     - check: call_count_at_most
       n: 0
   forbidden: []

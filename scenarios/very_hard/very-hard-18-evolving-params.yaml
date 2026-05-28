@@ -40,10 +40,17 @@ scoring:
   required:
     # Single call must carry forward date AND units together (the key
     # accumulation evidence). Location spelling Tokyo/Tokio handled by
-    # mock fallbacks, but the date+units pair must coexist in ONE call.
-    - check: tool_args_contain
+    # mock fallbacks; date and units checked via regex so that the model
+    # can supply `2026-07-04`, `2026-07-04T00:00`, `"F"` or `"fahrenheit"`
+    # and still satisfy the assertion (mock requires exact "F" itself).
+    - check: tool_args_match_regex
       tool: get_weather_global
-      args: { date: "2026-07-04", units: "F" }
+      arg: date
+      pattern: "^2026-07-04(?:T.*)?$"
+    - check: tool_args_match_regex
+      tool: get_weather_global
+      arg: units
+      pattern: "(?i)^f(ahrenheit)?$"
     - check: response_number
       equals: 86
   forbidden: []

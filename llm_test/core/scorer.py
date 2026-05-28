@@ -426,9 +426,19 @@ def check_response_markdown_table(calls, chk, response):
 
 
 _LANG_MARKERS = {
-    "pl": ["jest", "się", "nie", "że", "czy", "dzień", "cześć", "stopni", "pochmurno", "który"],
+    "pl": ["jest", "się", "nie", "że", "czy", "dzień", "cześć", "stopni",
+           "pochmurno", "który", "deszcz", "słonecznie", "temperatura"],
     "en": ["the", "is", "and", "of", "to", "with", "for", "was", "you", "have"],
-    "de": ["der", "die", "das", "und", "ist", "nicht", "mit", "ein", "von", "auf"],
+    "de": ["der", "die", "das", "und", "ist", "nicht", "mit", "ein", "von",
+           "auf", "in", "bewölkt", "bewoelkt", "grad", "wetter", "stadt",
+           "regen", "sonnig", "temperatur", "heute"],
+}
+
+# Diacritic / character-set fallback signals — used when a response is too
+# short to score on stop words alone (e.g. "Berlin: 10°C, bewölkt.").
+_LANG_DIACRITIC_HINTS = {
+    "pl": "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ",
+    "de": "äöüßÄÖÜẞ",
 }
 
 
@@ -439,6 +449,10 @@ def check_response_language(calls, chk, response):
     words = response.lower().split()
     scores = {lang: sum(1 for w in words if w.strip(".,!?:;\"'()") in markers)
               for lang, markers in _LANG_MARKERS.items()}
+    # Diacritic fallback: if no stop-word hits, weight by lang-unique chars.
+    if not any(scores.values()):
+        for lang, hint_chars in _LANG_DIACRITIC_HINTS.items():
+            scores[lang] = sum(1 for c in response if c in hint_chars)
     detected = max(scores, key=scores.get) if any(scores.values()) else None
     if detected == expected:
         return _ok("response_language", f"detected {detected}")

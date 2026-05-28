@@ -26,8 +26,10 @@ scoring:
   required:
     - check: command_regex_match
       pattern: '^du\s+.*/var/log'
+    # Accept both US ("1.4 G") and Polish-decimal ("1,4 G") notations,
+    # with optional "B" or "iB" suffix the model may render naturally.
     - check: response_matches_regex
-      all_of: ["(?<![\\w.])1\\.4\\s*G(?![A-Za-z])"]
+      all_of: ["(?<![\\w.])1[.,]4\\s*G(?:i?B)?\\b"]
       none_of: ["error:", "command not found", "permission denied"]
   forbidden: []
   partial:

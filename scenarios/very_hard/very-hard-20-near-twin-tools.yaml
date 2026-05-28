@@ -27,9 +27,10 @@ tool_responses:
       returns: { error: "city_not_found" }
 scoring:
   required:
-    - check: tool_args_contain
+    - check: tool_args_match_regex
       tool: get_weather_global
-      args: { date: "2026-08-14" }
+      arg: date
+      pattern: "^2026-08-14(?:T.*)?$"
     - check: response_number
       equals: 24
   forbidden: []

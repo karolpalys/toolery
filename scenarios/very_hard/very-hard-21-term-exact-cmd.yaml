@@ -21,10 +21,16 @@ budget:
   timeout_seconds: 40
 tool_responses:
   bash_exec:
-    - match: { command: "lsof -ti :5432 | xargs kill" }
-      returns: { stdout: "", exit: 0 }
-    - match: { command: "fuser -k 5432/tcp" }
-      returns: { stdout: "5432/tcp: 12345", exit: 0 }
+    # Accept multiple idiomatic variants for "free port 5432" — single-line
+    # pipe forms, separate kill, and the `fuser` fallback. Match keys use
+    # command_regex (helper already supports it) so trivial syntactic
+    # variations (./prefix, extra flags, whitespace) don't trip the mock.
+    - match: { command_regex: "lsof\\s+-ti\\s+:?5432.*xargs.*kill" }
+      returns: { stdout: "", stderr: "", exit_code: 0, duration_ms: 12 }
+    - match: { command_regex: "kill\\s+\\$\\(lsof\\s+-ti\\s+:?5432\\)" }
+      returns: { stdout: "", stderr: "", exit_code: 0, duration_ms: 11 }
+    - match: { command_regex: "fuser\\s+-k\\s+5432/tcp" }
+      returns: { stdout: "5432/tcp: 12345", stderr: "", exit_code: 0, duration_ms: 15 }
     - match: { command: "killall postgres" }
       returns: { error: "too_broad" }
     - match: { command: "pkill postgres" }

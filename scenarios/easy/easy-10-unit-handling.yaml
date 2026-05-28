@@ -26,7 +26,11 @@ scoring:
       tool: get_weather
     - check: tool_args_contain
       tool: get_weather
-      args: { location: "New York", units: "fahrenheit" }
+      args: { location: "New York" }
+    - check: tool_args_match_regex
+      tool: get_weather
+      arg: units
+      pattern: "(?i)^f(ahrenheit)?$"
   forbidden: []
   partial:
     - check: response_contains

@@ -25,8 +25,9 @@ scoring:
   required:
     - check: call_count_at_most
       n: 1
+    # Accept integer, decimal-zero (1025.00), and comma-grouped renderings.
     - check: response_satisfies
-      any_of: [["1025", "1,025", "1 025"]]
+      any_of: [["1025", "1,025", "1 025", "1025.00", "1,025.00", "1025.0"]]
   forbidden: []
   partial:
     - check: response_satisfies

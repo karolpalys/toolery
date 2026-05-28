@@ -29,8 +29,10 @@ scoring:
       tool: web_search
     - check: call_count_at_least
       n: 2
-    - check: response_contains
-      patterns: ["4.2M"]
+    # Accept "4.2M", "$4.2M", "4.2 million", "$4.2 million" etc.
+    - check: response_matches_regex
+      any_of:
+        - "\\$?\\s?4[.,]2\\s?(?:M\\b|million|mln|mio)"
   forbidden: []
   partial:
     - check: call_count_at_most

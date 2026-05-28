@@ -28,29 +28,19 @@ scoring:
           required: [name]
           additionalProperties: false
           properties:
-            name: { type: string }
-        allOf:
-          - contains:
-              type: object
-              properties:
-                name:
-                  anyOf:
-                    - { const: "Gdańsk" }
-                    - { const: "Gdansk" }
-          - contains:
-              type: object
-              properties:
-                name: { const: "Gdynia" }
-          - contains:
-              type: object
-              properties:
-                name:
-                  anyOf:
-                    - { const: "Sopot" }
-                    - { const: "Kołobrzeg" }
-                    - { const: "Kolobrzeg" }
-                    - { const: "Świnoujście" }
-                    - { const: "Swinoujscie" }
+            # Each item must name a real Polish Baltic-coast town. The list
+            # below covers the realistic set a model would choose from —
+            # accept any 3 distinct entries (model isn't forced to pick the
+            # 3 most famous).
+            name:
+              enum: ["Gdańsk", "Gdansk", "Gdynia", "Sopot",
+                     "Kołobrzeg", "Kolobrzeg",
+                     "Świnoujście", "Swinoujscie",
+                     "Władysławowo", "Wladyslawowo",
+                     "Hel", "Ustka", "Darłowo", "Darlowo",
+                     "Mielno", "Krynica Morska", "Krynica-Morska",
+                     "Łeba", "Leba", "Jastarnia", "Jurata",
+                     "Międzyzdroje", "Miedzyzdroje"]
     - check: response_satisfies
       none_of: ["Warszawa", "Kraków", "Krakow", "Wrocław", "Wroclaw", "Poznań", "Poznan"]
   forbidden: []

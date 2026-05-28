@@ -24,15 +24,16 @@ budget:
   timeout_seconds: 90
 tool_responses:
   bash_exec:
-    - match: { command: "backup_script.sh start" }
+    # Accept idiomatic variants: bare path, ./prefix, bash/sh wrappers.
+    - match: { command_regex: "(?:\\./|bash\\s+|sh\\s+)?backup_script\\.sh\\s+start\\b" }
       returns: { stdout: "submitted job_id=4271", stderr: "", exit_code: 0 }
     # First two status polls report pending; third+ reports complete. Uses
     # match_index (per-status-call counter) so models can poll robustly
     # without the result depending on what other commands they ran first.
-    - match: { command: "backup_script.sh status" }
+    - match: { command_regex: "(?:\\./|bash\\s+|sh\\s+)?backup_script\\.sh\\s+status\\b" }
       match_index: ">=2"
       returns: { stdout: "complete: 14.2 GB written", stderr: "", exit_code: 0 }
-    - match: { command: "backup_script.sh status" }
+    - match: { command_regex: "(?:\\./|bash\\s+|sh\\s+)?backup_script\\.sh\\s+status\\b" }
       returns: { stdout: "pending", stderr: "", exit_code: 0 }
     - match: any
       returns: { stdout: "", stderr: "unknown cmd", exit_code: 1 }

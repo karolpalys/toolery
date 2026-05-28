@@ -42,8 +42,10 @@ scoring:
       tool: calculator
       arg: expression
       pattern: "175(\\.43)?\\s*\\*\\s*30|30\\s*\\*\\s*175(\\.43)?"
+    # Calculator returns 5262.90 exactly — accept full decimal, rounded
+    # integer, and comma-grouped renderings.
     - check: response_satisfies
-      any_of: [["5262", "5,262", "5 262"]]
+      any_of: [["5262.90", "5,262.90", "5262.9", "5262", "5,262", "5 262"]]
     - check: call_count_at_most
       n: 2
   forbidden: []
