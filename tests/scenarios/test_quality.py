@@ -92,6 +92,39 @@ def test_required_is_not_empty_and_partial_is_not_only_guardrail():
     assert not offenders, "scenario scoring quality issues:\n" + "\n".join(offenders)
 
 
+def test_no_singleton_any_of_groups_in_required_or_forbidden():
+    """Flag `any_of: [[a], [b], ...]` patterns where each group has 1 item.
+
+    Semantics: `any_of` with multiple groups requires ≥1 match per group (AND
+    across groups). Single-item groups in this shape almost always indicate
+    author confusion — they intended OR across all items, which should be ONE
+    group: `any_of: [[a, b, ...]]`. Acceptable in `partial:` (rare gradient
+    use), but in `required:` or `forbidden:` it almost always inverts intent.
+    """
+    offenders = []
+    for path, data in _scenarios():
+        for section_name in ("required", "forbidden"):
+            for check in data["scoring"].get(section_name, []) or []:
+                if check.get("check") not in {"response_satisfies",
+                                              "response_matches_regex"}:
+                    continue
+                any_of = check.get("any_of") or []
+                if len(any_of) < 2:
+                    continue  # single group is fine; that's just OR within
+                singletons = [g for g in any_of
+                              if isinstance(g, list) and len(g) == 1]
+                if len(singletons) == len(any_of):
+                    # All groups have exactly one item — definitely an AND-trap
+                    offenders.append(
+                        f"{path.relative_to(ROOT.parent)}: {data['id']} "
+                        f"{section_name}.{check['check']}.any_of has "
+                        f"{len(any_of)} single-item groups (probably "
+                        f"meant ONE group with all items)")
+    assert not offenders, (
+        "any_of single-item groups likely indicate AND-trap "
+        "(meant to be OR, behaves as AND):\n" + "\n".join(offenders))
+
+
 def test_tool_responses_keys_match_scenario_tools():
     """Loader-level sanity: every key in `tool_responses` must appear in `tools`.
 

@@ -75,8 +75,7 @@ scoring:
       none_of: ["random seed", "flaky network", "timezone"]
     - check: response_satisfies
       any_of:
-        - ["asyncio.Lock", "Lock()", "lock", "async with"]
-        - ["atomic"]
+        - ["asyncio.Lock", "Lock()", "lock", "async with", "atomic"]
   forbidden:
     - check: response_contains
       patterns: ["increase the sleep", "use time.sleep"]
@@ -86,8 +85,7 @@ scoring:
         - ["context switch", "await asyncio.sleep", "interleav"]
     - check: response_satisfies
       any_of:
-        - ["asyncio.Lock"]
-        - ["async with self.lock"]
+        - ["asyncio.Lock", "async with self.lock"]
     - check: call_count_at_most
       n: 5
   weights:

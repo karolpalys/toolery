@@ -51,10 +51,10 @@ scoring:
                 msg: { type: string, minLength: 1 }
     - check: response_satisfies
       all_of: ["discount"]
-      any_of: [["-10"], ["ujemn"], ["negative"], ["less than 0"]]
+      any_of: [["-10", "ujemn", "negative", "less than 0"]]
   forbidden:
     - check: response_satisfies
-      any_of: [["nie znalezion"], ["brak problemów"], ["wszystko ok"], ["no issues"]]
+      any_of: [["nie znalezion", "brak problemów", "wszystko ok", "no issues"]]
   partial:
     - check: response_matches_schema
       schema:

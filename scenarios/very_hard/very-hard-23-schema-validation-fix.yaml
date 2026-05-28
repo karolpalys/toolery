@@ -20,7 +20,7 @@ budget:
   timeout_seconds: 45
 tool_responses:
   http_post:
-    - match: { url: "https://api.acme.com/profiles", body: { id: "user-42", name: "Marta", role: "admin" } }
+    - match: { url: "https://api.acme.com/profiles", json: { id: "user-42", name: "Marta", role: "admin" } }
       returns: { status: 200, body: "{\"ok\": true, \"id\": \"user-42\"}" }
     - match: { url: "https://api.acme.com/profiles" }
       returns: { status: 400, body: "{\"error\": \"schema_validation_failed\", \"missing\": [\"id\"]}" }
@@ -30,17 +30,17 @@ scoring:
   required:
     - check: tool_args_match_regex
       tool: http_post
-      arg: body
+      arg: json
       pattern: "user-42"
     - check: call_count_at_most
       n: 2
     - check: tool_args_match_regex
       tool: http_post
-      arg: body
+      arg: json
       pattern: "Marta"
     - check: tool_args_match_regex
       tool: http_post
-      arg: body
+      arg: json
       pattern: "admin"
     - check: response_satisfies
       any_of: [["user-42"]]

@@ -30,7 +30,7 @@ scoring:
       none_of: ["result:", "is approximately", "square root is", "= 4", "= 3", "= 2", "= 1"]
   forbidden:
     - check: response_satisfies
-      any_of: [["43.20"], ["43.21"], ["43.22"]]
+      any_of: [["43.20", "43.21", "43.22"]]
   partial:
     - check: response_satisfies
       any_of: [["date", "format", "number"]]

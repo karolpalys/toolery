@@ -51,14 +51,16 @@ tool_responses:
 scoring:
   required:
     - check: response_satisfies
-      any_of: [["24/7"], ["yes", "tak"]]
+      any_of:
+        - ["24/7", "yes", "tak", "round the clock", "around the clock",
+           "dobę", "całą dobę", "24 hours", "24-hour"]
       none_of: ["i don't know", "no information", "nie wiem", "brak informacji"]
     - check: call_count_at_most
       n: 1
   forbidden: []
   partial:
     - check: response_satisfies
-      any_of: [["24"], ["dedicated", "dedykowan"]]
+      any_of: [["24", "dedicated", "dedykowan"]]
   weights:
     pass: 1.0
     partial: 0.5

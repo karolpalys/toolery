@@ -37,8 +37,7 @@ scoring:
           country: { type: string }
     - check: response_satisfies
       any_of:
-        - ["Tokyo"]
-        - ["Japan"]
+        - ["Tokyo", "Japan"]
   forbidden: []
   partial:
     - check: response_matches_regex

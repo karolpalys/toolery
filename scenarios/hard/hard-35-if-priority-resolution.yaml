@@ -38,8 +38,7 @@ scoring:
         - "(?i)both are"
     - check: response_satisfies
       any_of:
-        - ["Flask"]
-        - ["FastAPI"]
+        - ["Flask", "FastAPI"]
   forbidden:
     - check: response_contains
       patterns: ["both Flask and FastAPI", "either Flask or FastAPI",
