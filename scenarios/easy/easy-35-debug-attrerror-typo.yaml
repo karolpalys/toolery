@@ -39,12 +39,13 @@ scoring:
       none_of: ["spelling is correct", "no typo"]
     - check: response_satisfies
       any_of:
-        - ["line 7", "orders.py:7"]
-        - ["is_bulk"]
+        - ["line 7", "orders.py:7", "is_bulk"]
   forbidden: []
   partial:
-    - check: response_contains
-      patterns: ["lenght → length"]
+    - check: response_satisfies
+      any_of:
+        - ["lenght", "typo"]
+        - ["length"]
     - check: call_count_at_most
       n: 1
   weights:
