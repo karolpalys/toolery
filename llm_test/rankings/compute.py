@@ -392,6 +392,7 @@ def compute_matrix(
     *, store: Store, dimensions: list[str],
     history_window_runs: int = 5, half_life_days: float = 14.0,
     use_case_weights: dict[str, float] | None = None,
+    cluster_filter: str | None = None,
 ) -> list[dict]:
     """Compute per-(model, adapter) scores across all ranking dimensions.
 
@@ -410,9 +411,16 @@ def compute_matrix(
     per pair, computed with the same formula as `overall` but using the given
     weights map (e.g. from a use-case persona) instead of the default
     `_DIM_WEIGHTS`. The standard `overall` score remains unchanged.
+
+    When `cluster_filter` is provided (e.g. 'single', 'dual', 'triple', 'quad',
+    'octa'), only runs with that cluster topology contribute to the matrix.
+    Pairs that have no qualifying data after filtering are dropped from the
+    result.
     """
     now = datetime.now(UTC)
     runs = store.fetch_all_runs()
+    if cluster_filter is not None:
+        runs = [r for r in runs if r.get("cluster") == cluster_filter]
     run_meta = {r["run_id"]: r for r in runs}
 
     with store.conn() as c:

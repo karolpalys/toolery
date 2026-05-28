@@ -16,15 +16,18 @@ from llm_test.rankings.presets import USE_CASES, get_use_case
 # Dim → short label (≤8 chars to fit in a 10-wide column with breathing room).
 _DIM_LABEL = {
     "coding": "coding",
+    "debugging": "debug",
     "terminal": "terminal",
     "agentic": "agentic",
     "safety": "safety",
+    "adversarial_robustness": "adv_rob",
     "restraint": "restraint",
     "error_recovery": "err_rec",
     "parameter_precision": "params",
     "context_state_tracking": "state",
     "structured_output": "struct",
     "tool_selection": "toolSel",
+    "instruction_following": "instr",
     "long_context": "longCtx",
     "localization": "loc",
     "budget_efficiency": "budget",
@@ -32,10 +35,11 @@ _DIM_LABEL = {
 }
 
 _DIM_ORDER = [
-    "coding", "terminal", "agentic", "safety",
-    "restraint", "error_recovery", "parameter_precision",
-    "context_state_tracking", "structured_output", "tool_selection",
-    "long_context", "localization", "budget_efficiency", "hallucination",
+    "coding", "debugging", "terminal", "agentic", "safety",
+    "adversarial_robustness", "restraint", "error_recovery",
+    "parameter_precision", "context_state_tracking", "structured_output",
+    "tool_selection", "instruction_following", "long_context",
+    "localization", "budget_efficiency", "hallucination",
 ]
 
 
@@ -79,27 +83,12 @@ class SetupTab(Container):
 
     SetupTab #ranking-section,
     SetupTab #selector-section,
-    SetupTab #weights-section {
+    SetupTab #weights-section,
+    SetupTab #sparks-section {
         border: round $primary;
         border-title-color: $primary;
         background: $surface;
         padding: 0 1;
-    }
-
-    SetupTab #ranking-section {
-        height: 1fr;
-        margin-bottom: 1;
-    }
-
-    SetupTab #uc-rank-title {
-        height: auto;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-    }
-
-    SetupTab #uc-rank-table {
-        height: 1fr;
     }
 
     SetupTab #selector-section {
@@ -133,12 +122,53 @@ class SetupTab(Container):
         color: $text;
     }
 
+    SetupTab #sparks-section {
+        height: 4;
+        margin-bottom: 1;
+    }
+
+    SetupTab #sparks-row {
+        width: 1fr;
+        height: 3;
+    }
+
+    SetupTab #sparks-row Button {
+        margin-right: 1;
+        min-width: 6;
+    }
+
+    SetupTab #ranking-section {
+        height: 1fr;
+        margin-bottom: 1;
+    }
+
+    SetupTab #uc-rank-title {
+        height: auto;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+    }
+
+    SetupTab #uc-rank-table {
+        height: 1fr;
+    }
+
     SetupTab #setup-status {
         height: 1;
         color: $text-muted;
         padding-left: 1;
     }
     """
+
+    # SPARKS button id suffix → cluster value in DB (None = no filter, all clusters)
+    _SPARKS_TO_CLUSTER = {
+        "all": None,
+        "1": "single",
+        "2": "dual",
+        "3": "triple",
+        "4": "quad",
+        "8": "octa",
+    }
 
     def __init__(self, id: str | None = None) -> None:
         super().__init__(id=id)
@@ -147,6 +177,7 @@ class SetupTab(Container):
         )
         self._previewed_key: str | None = None
         self._active_key: str | None = None
+        self._sparks_key: str = "all"  # SPARKS filter (default: ALL clusters)
 
     def compose(self) -> ComposeResult:
         self._active_key = self._read_active_use_case()
@@ -155,14 +186,7 @@ class SetupTab(Container):
             "Choose a usage profile and apply it to compute a local ranking.",
             id="setup-intro",
         )
-        with Vertical(id="ranking-section"):
-            yield Static("[dim]Apply a profile to compute this ranking.[/dim]",
-                         id="uc-rank-title")
-            yield DataTable(
-                id="uc-rank-table",
-                zebra_stripes=True,
-                cursor_type="row",
-            )
+        # Top: use-case profiles + weight preview (user-controlled inputs).
         with Horizontal(id="selector-section"):
             with Horizontal(id="persona-row"):
                 yield Button("None", id="uc-none", variant=self._variant_for("none"))
@@ -173,12 +197,32 @@ class SetupTab(Container):
                 yield Button("Apply profile", id="apply", variant="primary")
         with Vertical(id="weights-section"):
             yield Static(self._render_weights(), id="weights-block")
+        # SPARKS filter — controls which cluster topology contributes to the
+        # ranking table below.
+        with Horizontal(id="sparks-section"):
+            with Horizontal(id="sparks-row"):
+                for key in ("all", "1", "2", "3", "4", "8"):
+                    label = "ALL" if key == "all" else key
+                    yield Button(label, id=f"sparks-{key}",
+                                 variant=self._sparks_variant_for(key))
+        # Ranking table below (the output the user inspects).
+        with Vertical(id="ranking-section"):
+            yield Static("[dim]Apply a profile to compute this ranking.[/dim]",
+                         id="uc-rank-title")
+            yield DataTable(
+                id="uc-rank-table",
+                zebra_stripes=True,
+                cursor_type="row",
+            )
         yield Static(self._status_text(), id="setup-status")
 
     def on_mount(self) -> None:
         try:
             self.query_one("#selector-section").border_title = "Use-case profiles"
             self.query_one("#weights-section").border_title = "Weight preview"
+            self.query_one("#sparks-section").border_title = (
+                "SPARKS — cluster filter (DGX Spark nodes)"
+            )
             self.query_one("#ranking-section").border_title = "Profile ranking"
         except Exception:
             pass
@@ -191,6 +235,10 @@ class SetupTab(Container):
         if self._previewed_key == key:
             return "success"
         return "default"
+
+    def _sparks_variant_for(self, key: str) -> str:
+        """Highlight the active SPARKS filter button."""
+        return "success" if self._sparks_key == key else "default"
 
     def _render_weights(self) -> str:
         if self._previewed_key is None:
@@ -212,8 +260,10 @@ class SetupTab(Container):
     def _status_text(self) -> str:
         previewing = self._previewed_key or "none"
         active = self._active_key or "none"
+        sparks = "ALL" if self._sparks_key == "all" else self._sparks_key
         return (f"[dim]Previewing: [bold]{previewing}[/bold]    ·    "
-                f"Active in setup.json: [bold]{active}[/bold][/dim]")
+                f"Active in setup.json: [bold]{active}[/bold]    ·    "
+                f"SPARKS: [bold]{sparks}[/bold][/dim]")
 
     def _save_active_use_case(self, key: str | None) -> None:
         p = self._results_dir / "setup.json"
@@ -235,6 +285,19 @@ class SetupTab(Container):
             self._previewed_key = None if key == "none" else key
             self._refresh_persona_buttons()
             self._refresh_weights_block()
+            self._refresh_status()
+            return
+        if bid.startswith("sparks-"):
+            key = bid.removeprefix("sparks-")
+            if key not in self._SPARKS_TO_CLUSTER:
+                return
+            self._sparks_key = key
+            self._refresh_sparks_buttons()
+            # Re-render the ranking table with the new cluster filter, but
+            # only if a persona is currently applied — otherwise the table
+            # is empty by design.
+            if self._active_key is not None:
+                self._render_ranking_table(self._active_key)
             self._refresh_status()
 
     def _handle_apply(self) -> None:
@@ -259,6 +322,13 @@ class SetupTab(Container):
             if not bid.startswith("uc-"):
                 continue
             btn.variant = self._variant_for(bid.removeprefix("uc-"))
+
+    def _refresh_sparks_buttons(self) -> None:
+        for btn in self.query("#sparks-row Button"):
+            bid = btn.id or ""
+            if not bid.startswith("sparks-"):
+                continue
+            btn.variant = self._sparks_variant_for(bid.removeprefix("sparks-"))
 
     def _refresh_weights_block(self) -> None:
         self.query_one("#weights-block", Static).update(self._render_weights())
@@ -287,16 +357,23 @@ class SetupTab(Container):
             return
         store = Store(db)
         store.init_schema()
+        cluster_filter = self._SPARKS_TO_CLUSTER.get(self._sparks_key)
         try:
             matrix = compute_matrix(
                 store=store, dimensions=["overall"],
                 use_case_weights=dict(uc.weights),
+                cluster_filter=cluster_filter,
             )
         except Exception as e:
             title.update(f"[red]compute failed: {e}[/red]")
             return
         if not matrix:
-            title.update("[yellow]No results yet — run a test first.[/yellow]")
+            sparks_label = ("ALL" if self._sparks_key == "all"
+                            else f"{self._sparks_key} ({cluster_filter})")
+            title.update(
+                f"[yellow]No results for SPARKS={sparks_label} — "
+                "run a test with this cluster topology first.[/yellow]"
+            )
             return
 
         # One row per model: best adapter under the use-case score.
@@ -332,8 +409,10 @@ class SetupTab(Container):
                 Text(str(r.get("runs", 0))),
             )
 
+        sparks_label = ("ALL clusters" if self._sparks_key == "all"
+                        else f"SPARKS={self._sparks_key} ({cluster_filter})")
         title.update(
             f"[bold]Model ranking for [green]{uc.name}[/green][/bold]   "
-            f"[dim]({len(rows)} models, best adapter per model · "
-            f"this table is local to Setup, the Rankings tab is unaffected)[/dim]"
+            f"[dim]({len(rows)} models · {sparks_label} · "
+            f"best adapter per model · local to Setup tab)[/dim]"
         )
