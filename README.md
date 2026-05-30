@@ -73,6 +73,27 @@ Everything below is invoked with `uv run toolery …` (no manual venv activation
 If you'd rather activate the environment, `source .venv/bin/activate` and drop the
 `uv run` prefix.
 
+### Quick launch (one command)
+
+The repo ships a tiny launcher, [`toolery.sh`](toolery.sh), that opens the TUI dashboard
+straight from the console:
+
+```bash
+chmod +x toolery.sh     # once
+./toolery.sh            # opens the panel
+```
+
+To launch from **any** directory, symlink it onto your `PATH`:
+
+```bash
+sudo ln -s "$(pwd)/toolery.sh" /usr/local/bin/toolery
+toolery                 # opens the dashboard from anywhere
+```
+
+The script `cd`s into the repo and runs `uv run toolery tui`, so dependencies stay managed
+by uv — no activation, no global install. Any extra arguments are forwarded to
+`toolery tui`.
+
 ---
 
 ## Quickstart
@@ -217,13 +238,16 @@ adapter**:
 <table>
   <tr>
     <td width="50%"><img src="docs/screenshots/scenarios.svg" alt="Scenarios tab"><br><em>Scenarios — catalog with the selected task prompt above the per-model results.</em></td>
-    <td width="50%"><img src="docs/screenshots/profiles.svg" alt="Profiles tab"><br><em>Profiles — pick a use-case persona to re-weight the ranking.</em></td>
+    <td width="50%"><img src="docs/screenshots/compare.svg" alt="Compare tab"><br><em>Compare — head-to-head matrix of selected models, per-column winner highlighted.</em></td>
   </tr>
   <tr>
+    <td width="50%"><img src="docs/screenshots/profiles.svg" alt="Profiles tab"><br><em>Profiles — pick a use-case persona to re-weight the ranking.</em></td>
     <td width="50%"><img src="docs/screenshots/history.svg" alt="History tab"><br><em>History — past runs with per-depth perf and details.</em></td>
-    <td width="50%" valign="top"><br>All screenshots are live SVG exports of the Textual TUI (<code>App.save_screenshot</code>), so they stay crisp at any zoom.</td>
   </tr>
 </table>
+
+All screenshots are live SVG exports of the Textual TUI (`App.save_screenshot`), so they
+stay crisp at any zoom.
 
 ---
 
