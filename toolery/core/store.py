@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS runs (
   run_id TEXT PRIMARY KEY, model TEXT NOT NULL, base_url TEXT,
   started_at TIMESTAMP NOT NULL, finished_at TIMESTAMP, duration_s REAL,
   status TEXT CHECK(status IN ('running','done','aborted','failed','paused')),
-  config_json TEXT, toolery_version TEXT, scenarios_hash TEXT
+  config_json TEXT, llm_test_version TEXT, scenarios_hash TEXT
 );
 CREATE TABLE IF NOT EXISTS adapters_in_run (
   run_id TEXT REFERENCES runs(run_id) ON DELETE CASCADE,
@@ -106,7 +106,7 @@ class Store:
                       started_at TIMESTAMP NOT NULL, finished_at TIMESTAMP,
                       duration_s REAL,
                       status TEXT CHECK(status IN ('running','done','aborted','failed','paused')),
-                      config_json TEXT, toolery_version TEXT, scenarios_hash TEXT,
+                      config_json TEXT, llm_test_version TEXT, scenarios_hash TEXT,
                       total_units INTEGER, phase TEXT, current_scenario TEXT,
                       cluster TEXT, updated_at TEXT
                     );
@@ -117,14 +117,14 @@ class Store:
                 c.execute("PRAGMA foreign_keys=ON")
 
     def create_run(self, run_id, model, base_url, started_at, config_json, scenarios_hash,
-                   toolery_version: str = "0.1.0", total_units: int | None = None,
+                   llm_test_version: str = "0.1.0", total_units: int | None = None,
                    cluster: str | None = None) -> None:
         with self.conn() as c:
             c.execute(
                 "INSERT INTO runs(run_id, model, base_url, started_at, status, config_json, "
-                "toolery_version, scenarios_hash, total_units, phase, cluster) "
+                "llm_test_version, scenarios_hash, total_units, phase, cluster) "
                 "VALUES (?,?,?,?, 'running', ?, ?, ?, ?, 'scenarios', ?)",
-                (run_id, model, base_url, started_at, config_json, toolery_version,
+                (run_id, model, base_url, started_at, config_json, llm_test_version,
                  scenarios_hash, total_units, cluster),
             )
 
