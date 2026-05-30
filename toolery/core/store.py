@@ -249,6 +249,15 @@ class Store:
             )
             c.execute("UPDATE runs SET updated_at=? WHERE run_id=?", (now, run_id))
 
+    def heartbeat(self, run_id: str) -> None:
+        """Bump runs.updated_at so the TUI's stale-detector knows the run is
+        alive. Used during long blocking phases (perf/llama-benchy) that don't
+        write scenario rows — without it a >5 min perf is falsely marked aborted."""
+        from datetime import UTC, datetime
+        now = datetime.now(UTC).isoformat()
+        with self.conn() as c:
+            c.execute("UPDATE runs SET updated_at=? WHERE run_id=?", (now, run_id))
+
     def fetch_in_flight_for_run(self, run_id: str) -> list[dict]:
         with self.conn() as c:
             rows = c.execute(

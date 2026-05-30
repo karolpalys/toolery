@@ -285,8 +285,25 @@ def run(
         (run_dir / "summary.md").write_text(md)
 
     if with_perf or perf_only:
+        import threading
+
         from toolery.perf.benchy import run_benchy
         store.update_phase(run_id, "perf", current_scenario="llama-bench")
+        # llama-benchy blocks for the whole benchmark (minutes) and the perf
+        # phase writes no scenario rows — so without a heartbeat the TUI's
+        # stale-detector falsely marks the run aborted ("RUN DIED") after 5 min.
+        # Touch updated_at every 60s; if the box truly hangs/OOMs the thread
+        # stops too, so a genuine stale-abort still fires.
+        _stop_hb = threading.Event()
+
+        def _heartbeat() -> None:
+            while not _stop_hb.wait(60):
+                try:
+                    store.heartbeat(run_id)
+                except Exception:
+                    pass
+
+        threading.Thread(target=_heartbeat, daemon=True).start()
         try:
             perf = run_benchy(model=api_model, base_url=base_url,
                               depth=[0, 4096, 8192], runs=3)
@@ -300,6 +317,8 @@ def run(
             console.print(f"[green]✓ perf: collected {len(perf.rows)} depth points[/green]")
         except Exception as e:
             console.print(f"[yellow]perf collection failed: {e}[/yellow]")
+        finally:
+            _stop_hb.set()
 
     store.finish_run(run_id, finished_at=datetime.now(UTC).isoformat(),
                      duration_s=(datetime.now(UTC) - started).total_seconds(),
