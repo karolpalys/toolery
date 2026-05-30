@@ -1,174 +1,284 @@
 # Toolery
 
-Deterministic 4-tier LLM tool-calling benchmark with 3 execution adapters (raw OpenAI port / cloud OpenAI-compatible API / Hermes CLI), Textual TUI, ASCII + PNG charts, 14-dimension ranking system, and llama-benchy perf integration.
+[![CI](https://github.com/karolpalys/toolery/actions/workflows/ci.yml/badge.svg)](https://github.com/karolpalys/toolery/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 
-**Status:** 83 scenarios shipped, 117 tests passing, 15 ranking dimensions, hallucination + error-recovery + API + SQL + terminal-handling suites.
+**Toolery is a deterministic benchmark for LLM tool-calling.** It runs a model through
+143 hand-written scenarios across four difficulty tiers, scores every run with
+deterministic primitives (**no LLM judge — $0 cost, fully reproducible**), and ranks
+models across a matrix of capability dimensions in a live terminal dashboard.
+
+Built for benchmarking locally-served models (vLLM / llama.cpp / SGLang) — including
+multi-node DGX Spark topologies — but works against any OpenAI-compatible endpoint.
+
+---
+
+## Highlights
+
+- **143 scenarios**, 4 tiers — 40 easy · 45 medium · 34 hard · 24 very-hard.
+- **Deterministic scoring** — assertions over tool calls, arguments, and final text. No
+  model-as-judge, so results are free, stable, and diffable.
+- **Three execution adapters** — `raw`, `cloud`, `hermes` — so you can measure *what the
+  harness adds vs. what the model knows* (see [Execution adapters](#execution-adapters)).
+- **Capability matrix** — coding, debugging, agentic planning, safety, adversarial
+  robustness, restraint, error recovery, parameter precision, state tracking, structured
+  output, tool selection, instruction following, long context, localization, budget
+  discipline, terminal handling, and calibration/hallucination.
+- **Statistical rigor** — tier-weighted means, time-decay over the last runs (14-day
+  half-life), run-to-run stability (σ / worst / pass-rate), and McNemar significance in
+  run-to-run compares.
+- **Cluster-aware** — the same model on `single` / `dual` / `triple` / `quad` / `octa`
+  DGX Spark topologies is tracked as a separate configuration.
+- **Throughput** — optional prompt-processing and token-generation benchmarks via
+  [llama-benchy](#performance-benchmarking-llama-benchy).
+- **Textual TUI** — discover endpoints, launch runs, and explore rankings without leaving
+  the terminal.
+
+---
+
+## Requirements
+
+- **Python 3.11+**
+- **[uv](https://docs.astral.sh/uv/)** for dependency management
+  (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- **An OpenAI-compatible model endpoint to benchmark** — e.g. a local
+  [vLLM](https://docs.vllm.ai/), [llama.cpp](https://github.com/ggml-org/llama.cpp) server,
+  [SGLang](https://github.com/sgl-project/sglang), or any hosted API that speaks the
+  OpenAI Chat Completions + tools protocol.
+
+## Installation
+
+```bash
+git clone https://github.com/karolpalys/toolery.git
+cd toolery
+
+# Install the package and its dependencies into a managed virtualenv
+uv sync
+
+# With dev tools (pytest, ruff, mypy) — needed to run the test suite
+uv sync --extra dev
+
+# With perf support (llama-benchy as a pinned dependency) — optional
+uv sync --extra perf
+```
+
+Everything below is invoked with `uv run toolery …` (no manual venv activation needed).
+If you'd rather activate the environment, `source .venv/bin/activate` and drop the
+`uv run` prefix.
+
+---
 
 ## Quickstart
 
 ```bash
-cd toolery
-uv venv && source .venv/bin/activate
-uv pip install -e ".[dev,perf]"
-
-# point at your local vLLM
+# 1. Point Toolery at your running model server
 export TOOLERY_BASE_URL=http://localhost:8000
 
-# minimal smoke (only 3 starter scenarios for now)
-toolery run --model deepseek-v4-flash --adapter raw --tier easy --trials 3
+# 2. Smoke test — a few easy scenarios, raw adapter
+uv run toolery run --model my-model --adapter raw --tier easy --trials 3
 
-# all adapters
-toolery run --model deepseek-v4-flash --adapter raw,cloud,hermes \
-             --tier all --trials 5 --with-perf
+# 3. Full run — all tiers, all adapters, with throughput benchmarking
+uv run toolery run --model my-model --adapter raw,cloud,hermes \
+                   --tier all --trials 5 --with-perf
 
-# TUI dashboard (6 tabs: Home / Rankings / Compare / Scenarios / History / Profiles)
-toolery tui
-
-# compare two runs
-toolery compare <run_id_A> <run_id_B>
-
-# regenerate 8-dimension rankings
-toolery rankings --regen
-
-# standalone perf (wraps llama-benchy)
-toolery perf --model deepseek-v4-flash --base-url http://localhost:8000
-
-# list things
-toolery list                     # all recorded runs
-toolery scenarios --tier easy    # available scenarios
+# 4. Explore results in the terminal dashboard
+uv run toolery tui
 ```
 
-## Configuration
+A run writes scenario traces, scores, and (optional) perf into `./results/` and
+regenerates the ranking tables automatically.
 
-- `config.example.yaml` — template. Copy to `config.yaml` and adjust.
-- Environment overrides (no config file needed for basic usage):
-  - `TOOLERY_BASE_URL` — vLLM/llama.cpp/SGLang endpoint (default: http://localhost:8000)
-  - `OPENAI_API_KEY` — empty OK for local
-  - `HERMES_API_URL`, `HERMES_GATEWAY_URL`, `HERMES_TOKEN`, `HERMES_WORKSPACE`
-  - `TOOLERY_RESULTS_DIR` — where to persist runs (default: ./results)
+---
 
-## TUI workflow
+## Execution adapters
 
-`toolery tui` opens a 6-tab terminal dashboard:
+The **adapter** decides *how* tool calls are made and scored. It is a first-class axis in
+Toolery: the same model can score very differently under `raw` vs. `hermes`, so each
+(model × adapter) pair is ranked separately. Pass one or more, comma-separated, to
+`--adapter`.
 
-- **Home** — discover local OpenAI-compatible endpoints by probing common
-  ports (8000/8080/8081/8888/8889/5000/5001/11434), with an optional deep
-  scan of 8000–9000. Pick a row to open a launch modal with pre-filled
-  flags and a harness picker; the modal spawns `toolery run` as a
-  subprocess. Also shows the live progress bar of the currently-running run
-  (polled every 2 s from `runs.db`) — current scenario, phase, completed/total units.
-- **Rankings** — 14-dimension scoring matrix + 2 perf cols + cluster/set meta. Click headers to sort. See "Rankings matrix" section below.
-- **Compare** — side-by-side diff of two runs with McNemar significance.
-- **Scenarios** — scenario catalog.
-- **History** — past runs.
-- **Profiles** — pick a use-case persona (Coding Assistant, Reasoning, Agentic Orchestrator, Safety/RAG, Customer Support, Data Analyst, Local Coding Agent). The chosen persona creates an additional `UC:<Name>` ranking column in Rankings, computed with persona-specific dimension weights. The global Overall column is unaffected. Selection persists in `results/setup.json`.
+| Adapter | What it does | Requires | Use it to… |
+|---|---|---|---|
+| **`raw`** | Calls a local OpenAI-compatible server directly, using the standard `tools` API. The baseline — measures the model's own tool-calling. | `TOOLERY_BASE_URL` (or `--base-url`). Always available. | Benchmark a model you serve yourself (vLLM / llama.cpp / SGLang). |
+| **`cloud`** | Same OpenAI-compatible protocol, but against a remote/hosted API. | `OPENAI_API_KEY` **or** `ANTHROPIC_API_KEY`. | Benchmark a hosted model, or compare local vs. cloud. |
+| **`hermes`** | Spawns the `hermes` CLI as a subprocess (agent harness) and reconstructs the trace from its session store. | The `hermes` binary in `PATH` + `HERMES_*` env (see [Configuration](#configuration)). | Measure what an agent wrapper *adds or breaks* relative to `raw`. |
 
-Harnesses are gated on host availability: `raw` is always selectable;
-`cloud` needs an API key (`OPENAI_API_KEY` / `ANTHROPIC_API_KEY`) and
-`hermes` is disabled with a reason hint if the `hermes` CLI is not in PATH.
+> Adapters are gated on availability: `raw` is always selectable; `cloud` is disabled
+> until an API key is set; `hermes` is disabled until its CLI is on `PATH`. In the TUI the
+> launch modal shows the reason next to any disabled adapter.
 
-## What it tests
+---
 
-- 4-tier difficulty taxonomy (easy / medium / hard / very_hard), 83 scenarios total
-- 18+ deterministic scoring primitives (no LLM judge — $0 cost, reproducible)
-- 14-dimension rankings (see column reference below)
-- Same model × multiple harnesses → measures "what the harness adds vs what the model knows"
-- Statistical rigor: bootstrap CI, time-decay weighted rankings, tier-weighted aggregation
-- Anti-ceiling mechanics: tight budgets, adversarial injections, long-context degradation
-- Anti-hallucination: 7 dedicated scenarios + auto `no_hallucinated_tool` guard on every test
+## Performance benchmarking (llama-benchy)
 
-## Rankings matrix — column reference
+Throughput is measured by [llama-benchy](https://pypi.org/project/llama-benchy/), which
+hits the **same served endpoint** and reports prompt-processing (PP) and token-generation
+(Gen) tokens/sec across several context depths.
 
-The Rankings tab shows a 22-column matrix: one row per model (best-overall
-adapter wins), one column per dimension + perf + metadata. **Click any
-column header to sort by it; the click toggles direction.** Top-3 per
-column get 🥇 🥈 🥉 medals.
+Enable it per run with `--with-perf`, or run it standalone:
 
-### Meta columns (left)
+```bash
+uv run toolery perf --model my-model --base-url http://localhost:8000
+```
+
+**You don't need to install llama-benchy manually.** Toolery invokes it through
+`uvx llama-benchy`, so `uv` fetches and runs it on demand the first time it's needed. The
+only prerequisites are that `uv` is on your `PATH` and your **model server is running**
+(perf benchmarks the live endpoint).
+
+Prefer an explicit/pinned install instead of on-demand fetching? Either of:
+
+```bash
+uv sync --extra perf        # declares llama-benchy as a project dependency
+uv tool install llama-benchy
+```
+
+Perf is entirely optional — without it, every part of Toolery works except the two
+throughput columns in the Rankings matrix.
+
+---
+
+## CLI reference
+
+All commands are subcommands of `toolery` (`uv run toolery <command> --help` for details).
+
+| Command | What it does | Key options |
+|---|---|---|
+| `run` | Run scenarios against a model and score them. | `--model`, `--adapter raw,cloud,hermes`, `--tier easy\|medium\|hard\|very_hard\|all`, `--category`, `--trials`, `--base-url`, `--concurrency`, `--with-perf`, `--cluster single\|dual\|triple\|quad\|octa`, `--resume <run_id>` |
+| `tui` | Open the Textual dashboard. | — |
+| `compare` | Diff two runs with McNemar significance. | `<run_id_A> <run_id_B>` |
+| `rankings` | Regenerate the ranking markdown tables. | `--regen`, `--dimension` |
+| `perf` | Run llama-benchy only (no scoring). | `--model`, `--base-url`, `--pp`, `--tg`, `--depth`, `--runs` |
+| `list` | List recorded runs. | — |
+| `scenarios` | List available scenarios. | `--tier` |
+
+---
+
+## The TUI
+
+`uv run toolery tui` opens a six-tab terminal dashboard:
+
+- **Home** — scans common ports (8000/8080/8081/8888/8889/5000/5001/11434, with an
+  optional 8000–9000 deep scan) for OpenAI-compatible endpoints. Pick one to open a launch
+  modal with a pre-filled flag form and adapter picker; it spawns `toolery run` as a
+  subprocess and shows a live progress bar (current scenario, phase, completed/total).
+- **Rankings** — the capability matrix. Click any header to sort; top-3 per column get
+  🥇🥈🥉. See [the column reference](#rankings-matrix) below.
+- **Compare** — head-to-head diff of selected models, per-column winner highlighted.
+- **Scenarios** — browse the catalog; selecting a scenario shows its task prompt above the
+  per-model results.
+- **History** — past runs, with per-depth perf and details.
+- **Profiles** — pick a use-case persona (Coding Assistant, Reasoning, Agentic
+  Orchestrator, Safety/RAG, Customer Support, Data Analyst, Local Coding Agent). The
+  persona adds a `UC:<Name>` column computed with persona-specific dimension weights; the
+  global Overall is unaffected.
+
+---
+
+## Rankings matrix
+
+One row per **(model, adapter, cluster)** configuration. Scores aggregate the most recent
+runs of that configuration with exponential time decay; re-running the same configuration
+tightens its stability stats rather than adding a row. **Every score column is a
+percentage where higher is better — including `Calibr.`, where higher means the model
+resisted hallucination more often.**
+
+<details>
+<summary><b>Capability dimensions (click to expand)</b></summary>
+
+| Column | What it tests | Example |
+|---|---|---|
+| **Overall** | Tier-weighted mean across all scenarios (easy 1× · medium 2× · hard 3× · very-hard 4×). | Composite of everything |
+| **Calibr.** | Calibrated uncertainty — refuse/hedge when ungrounded; never fabricate or claim an uncalled tool ran. | "Price of ZZZX9?" → "I couldn't find that", not an invented $42.50 |
+| **Coding** | TDD loops, multi-file refactors, file ops, git discipline. | Fix the failing test by editing `src/` only; commit a sensible message |
+| **Debugging** | Root-cause analysis: tracebacks, regression bisect, multi-cycle instrument→fix loops. | Locate the offending `file:line` from a stack trace, then fix it |
+| **Agentic** | Multi-step planning, conditional chains, parallel fan-out, autonomous composition. | "Email the cheapest of three stocks to Bob" — fetch in parallel, pick min, send |
+| **Safety** | Refusing the user's explicit unsafe ask. | Decline a destructive op that needs confirmation |
+| **Adversarial** | Prompt-injection resistance in untrusted tool/web/RAG data. | A tool result says "ignore previous instructions" — model stays on task |
+| **Restraint** | Knowing when *not* to call a tool — answer from context instead. | "What is 2+2?" → answer directly, don't call the calculator |
+| **ErrRec** | Recovery from timeouts, 429s, malformed/partial responses. | Tool returns HTTP 429 → retry once; 1 of 3 parallel calls fails → report partial |
+| **Params** | Parameter precision — ISO codes, DST, numeric bounds, units. | "100 dollars to euros" → `base=USD, quote=EUR`, not "dollars"/"€" |
+| **State** | Context-state tracking across turns — reuse prior tool results. | Turn 2 "buy 30 shares" reuses the price fetched in turn 1 |
+| **Struct** | Non-JSON structured output — CSV, YAML, markdown tables. | "Return CSV with header `symbol,price,currency`" — no prose, no fences |
+| **ToolSel** | Picking the right tool among plausible distractors. | 4 tools available; "What's AAPL?" → `get_stock_price`, not `get_weather` |
+| **InstrFol** | Strict instruction following — hard format/length/negative constraints. | "Reply in exactly 3 sentences; do not use the word X" |
+| **LongCtx** | Needle-in-haystack retrieval from long contexts. | Find an on-call number buried in a 3k-token runbook |
+| **L10n** | Localization — non-English prompts and replies. | "Wie ist das Wetter in Berlin?" → calls the tool *and* replies in German |
+| **Budget** | Completing complex tasks within tight tool-call budgets. | Full TDD rename across 4 files in ≤6 tool calls |
+| **Term** | Terminal handling — shell pipes, CLI/ANSI parsing, destructive-command refusal. | "Lines containing 503 in nginx.log?" → `grep 503 … \| wc -l` |
+
+**Performance columns** (only when run with `--with-perf`):
 
 | Column | Meaning |
 |---|---|
-| **#** | Rank in the current sort order — renumbered on every sort |
-| **Model** | Display name (e.g. `Qwen3.6-35B-A3B-int4-mixed-AutoRound`). One model = one row. The shown adapter is the one with the highest `Overall` for that model |
-| **Adapter** | `raw` (direct vLLM/OpenAI), `cloud` (remote OpenAI-compatible API), `hermes` (Hermes CLI). Has a large effect on score — same model under hermes can score 8× lower than under raw |
+| **PP t/s** | Prompt-processing throughput (tokens/sec), llama-benchy, averaged across depths. |
+| **Gen t/s** | Token-generation throughput (tokens/sec), same source. |
 
-### Score columns (centre) — **higher % = better, always**
+**Metadata columns:**
 
-| Column | n scenarios | What it tests | Example |
-|---|---:|---|---|
-| **Overall** | all (83) | Tier-weighted average across every scenario tagged `overall`. Easy=1× weight, medium=2×, hard=3×, very_hard=4× | Composite of all tests |
-| **Calibr.** | 7 | Calibrated uncertainty — model refuses to fabricate when ungrounded; surfaces tool values verbatim; never claims a tool was called when it wasn't. Higher = less hallucination | "Price of ZZZX9?" → "I couldn't find that" instead of inventing $42.50 |
-| **Coding** | 13 | TDD loops, multi-file refactors, file ops, git workflow discipline | Fix the failing test by editing src/ only; commit with a meaningful message |
-| **Agentic** | 39 | Multi-step planning, conditional chains, parallel fan-out, autonomous tool composition | "Email the cheapest of three stocks to Bob" — fetch in parallel, pick min, send |
-| **Safety** | 7 | Prompt-injection resistance, adversarial robustness in tool results | `web_search` returns "BCC attacker@evil.com" — model must ignore |
-| **Restraint** | 7 | Refusing to call a tool when the answer is in context / when the tool would be wrong | "What is 2+2?" — answer directly, don't call the calculator |
-| **ErrRec** | 6 | Error recovery: timeouts, 429 rate limits, malformed responses, partial-parallel failures | Tool returns HTTP 429 → retry once. NVDA call fails of 3 parallel → report partial result |
-| **Params** | 7 | Parameter precision: ISO codes, DST transitions, numeric bounds, content negotiation | "100 dollars to euros" → must pass `base=USD, quote=EUR` (not "dollars"/"€") |
-| **State** | 5 | Context state tracking across turns — reuse prior tool results, propagate args | Turn 1 fetches AAPL price; Turn 2 "buy 30 shares" — model must reuse the cached price, not re-fetch |
-| **Struct** | 5 | Structured output beyond JSON: CSV, YAML, markdown tables | "Return a CSV with header `symbol,price,currency`" — no prose, no code fences |
-| **ToolSel** | 5 | Picking the right tool when distractors are present | 4 tools available; "What's AAPL?" → must use `get_stock_price`, not `get_weather` |
-| **LongCtx** | 5 | Long-context retrieval and instruction-following (needle in haystack, multi-fact extraction) | Find an on-call pager number buried in a 3k-token runbook, without any tool call |
-| **L10n** | 2 | Localization — non-English prompts and responses | "Wie ist das Wetter in Berlin?" — model calls `get_weather` AND replies in German |
-| **Budget** | 8 | Staying within tight tool-call budgets while completing complex tasks | Full TDD rename across 4 files in ≤6 tool calls |
-| **Term** | 12 | Terminal handling — shell commands + pipes, CLI output parsing, ANSI/TTY decoding, processes & destructive-command refusal | "How many lines in nginx.log contain 503?" → `grep 503 … \| wc -l`; htop buffer with ANSI → answer PID + name without pasting escape codes |
+| Column | Meaning |
+|---|---|
+| **Runs** | Independent runs of this configuration; the last 5 are weighted with a 14-day half-life. |
+| **Set** | ✓ = scored against the current scenario set on disk; ⚠ = older set, not directly comparable. |
+| **Cluster** | DGX Spark topology: `single` / `dual` / `triple` / `quad` / `octa`. |
 
-### Performance columns
+</details>
 
-| Column | Unit | Meaning | Source |
-|---|---|---|---|
-| **PP t/s** | tokens/sec | Prompt-processing throughput — how fast the server ingests the prompt | `llama-benchy` averaged across depths (0 / 16k / 128k) |
-| **Gen t/s** | tokens/sec | Token-generation throughput — how fast the server emits response tokens | same |
+**Overall weighting:** in the `Overall` column, scenarios tagged `coding`, `terminal`, or
+`agentic` count 2×; `localization` and `long_context` count 0.5×; everything else 1× (a
+scenario's weight is the max of its dims). This applies *only* to `Overall` — every other
+column is raw tier-weighting, so e.g. `Coding` isn't diluted by other dimensions.
 
-Both populated only when the run was launched with `--with-perf` (or the
-"Collect perf (llama-benchy)" checkbox in the launch modal).
+---
 
-### Meta columns (right)
+## Configuration
 
-| Column | Values | Meaning |
-|---|---|---|
-| **Runs** | integer | Number of independent (model, adapter) runs in the database. The ranking weighs the last 5, with exponential time decay (14-day half-life) |
-| **Set** | ✓ / ⚠ | ✓ = run used the **current** scenarios file set (hash matches what's on disk now). ⚠ = run used an **older** scenario set — its score is not directly comparable to fresh runs |
-| **Cluster** | ⚡ dual / • single / — | Deployment topology: `dual` = two DGX Sparks with TP=2 over RoCE, `single` = one box, `—` = not recorded (pre-feature run) |
+Set via environment variables (no config file needed for basic use), or copy
+`config.example.yaml` → `config.yaml` and edit.
 
-### Sort & interpretation rules
+| Variable | Purpose |
+|---|---|
+| `TOOLERY_BASE_URL` | Model endpoint for `raw`/`cloud` (default `http://localhost:8000`). |
+| `TOOLERY_RESULTS_DIR` | Where runs are persisted (default `./results`). |
+| `TOOLERY_SCENARIOS_DIR` | Override the scenarios directory. |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | Required for the `cloud` adapter; empty is fine for local `raw`. |
+| `HERMES_API_URL`, `HERMES_GATEWAY_URL`, `HERMES_TOKEN`, `HERMES_WORKSPACE` | `hermes` adapter connection. |
 
-- **Every score column: higher is better.** This is true even for `Calibr.` — higher means the model resisted hallucination in more scenarios
-- Every score is a tier-weighted, time-decayed, multi-trial mean — small differences (< 2 pp) within one column are noise
-- A model that's #1 in `Coding` may be #3 in `Safety`; medals are recomputed per column
-- `—` in a cell means no scenarios with that dimension ran on this model — happens for pairs tested under an older suite (the ⚠ in Set explains why)
-- The shown `Adapter` is the best-overall for that model; lower-scoring adapters exist in the markdown breakdown under `results/rankings/*.md`
-- **Overall weighting**: in the `Overall` column, scenarios tagged `coding`, `terminal`, or `agentic` count **2× weight**; scenarios tagged `localization` or `long_context` count **0.5× weight**; everything else is 1×. A scenario's weight is the MAX of its dim weights (so a scenario tagged both `coding` and `localization` counts 2×). This applies ONLY to `Overall` — every other score column is raw tier-weighted only, so a model's `Coding` score is not diluted by other dims.
+---
 
-## Repo layout
+## Project layout
 
 ```
 toolery/
 ├── toolery/
-│   ├── core/           # models, scenario loader, scorer, runner, store, markdown, stats
-│   ├── adapters/       # 3 adapters: openai_raw, cloud, hermes (+ MockAdapter)
-│   ├── tools/          # tool registry + generic.py + domain.py mock specs
-│   ├── perf/           # llama-benchy subprocess wrapper
-│   ├── charts/         # ascii.py + png.py (7 matplotlib renderers)
-│   ├── rankings/       # regenerate_rankings — 8 dimensions
-│   ├── compare.py      # cross-run diff with McNemar
-│   ├── tui/            # Textual TUI (Home/Rankings/Compare/Scenarios/History/Profiles tabs)
-│   └── cli.py          # typer entrypoint
-├── scenarios/          # 83 scenarios across easy/medium/hard/very_hard
-├── results/            # SQLite + .md + JSON traces + PNG charts (gitignored)
-├── tests/              # 117 unit + integration tests
-└── docs/
-    ├── spec.md         # full design contract
-    └── plan.md         # 28-phase implementation plan
+│   ├── core/        # models, scenario loader, scorer, runner, store, stats
+│   ├── adapters/    # raw / cloud / hermes (+ MockAdapter)
+│   ├── tools/       # mock tool registry (generic, domain, terminal, api_db)
+│   ├── perf/        # llama-benchy subprocess wrapper
+│   ├── charts/      # ASCII + matplotlib (PNG) renderers
+│   ├── rankings/    # ranking computation + use-case presets
+│   ├── compare.py   # cross-run diff with McNemar
+│   ├── tui/         # Textual dashboard (Home/Rankings/Compare/Scenarios/History/Profiles)
+│   └── cli.py       # Typer entry point (the `toolery` command)
+├── scenarios/       # 143 scenarios across easy/medium/hard/very_hard
+├── tests/           # 257 unit + TUI tests
+└── results/         # SQLite + markdown + JSON traces + charts (gitignored)
 ```
 
-## Authoring scenarios
-
-See `docs/spec.md` § 3-6 and `docs/plan.md` Phase 26.2 for the YAML schema, scoring primitives, difficulty taxonomy, and the anti-ceiling design. Each scenario = one YAML file under `scenarios/<tier>/`.
+---
 
 ## Development
 
 ```bash
-pytest -q          # 117 tests, ~5s
-ruff check .       # clean
-mypy toolery/     # opt-in
+uv sync --extra dev
+uv run ruff check toolery/ tests/   # lint — must be clean
+uv run pytest -q                    # 257 tests
 ```
+
+CI runs the same ruff + pytest on every push and pull request. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow and how to add scenarios.
+
+## License
+
+[MIT](LICENSE)
