@@ -12,6 +12,12 @@ models across a matrix of capability dimensions in a live terminal dashboard.
 Built for benchmarking locally-served models (vLLM / llama.cpp / SGLang) — including
 multi-node DGX Spark topologies — but works against any OpenAI-compatible endpoint.
 
+<p align="center">
+  <img src="docs/screenshots/rankings.svg" alt="Toolery — Rankings tab" width="100%">
+  <br>
+  <em>The Rankings tab: one row per (model, adapter, cluster), sortable capability matrix.</em>
+</p>
+
 ---
 
 ## Highlights
@@ -155,6 +161,38 @@ All commands are subcommands of `toolery` (`uv run toolery <command> --help` for
 
 ---
 
+## Example output
+
+`toolery list` shows every recorded run:
+
+```text
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
+┃ run_id                       ┃ model                        ┃ status  ┃ started_at                    ┃ duration (s) ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
+│ 2026-05-29T15-49_MiMo-V2.5-… │ MiMo-V2.5-NVFP4              │ done    │ 2026-05-29T15:49:57+00:00     │ 919.3        │
+│ 2026-05-29T10-51_MiniMax-M2… │ MiniMax-M2.7-NVFP4           │ done    │ 2026-05-29T10:51:33+00:00     │ 4082.7       │
+│ 2026-05-28T15-06_DeepSeek-V… │ DeepSeek-V4-Flash            │ done    │ 2026-05-28T15:06:56+00:00     │ 5153.3       │
+└──────────────────────────────┴──────────────────────────────┴─────────┴───────────────────────────────┴──────────────┘
+```
+
+Each run regenerates the ranking tables under `results/rankings/`. The `Overall`
+ranking (`results/rankings/overall.md`) scores each model under its **best-performing
+adapter**:
+
+| # | Model | Score | Best adapter | Runs |
+|---|-------|------:|--------------|-----:|
+| 1 | GPT5.5-codex | 66.8% | cloud | 1 |
+| 2 | Qwen3.6-35B-A3B-FP8 | 62.2% | raw | 1 |
+| 3 | MiniMax-M2.7-NVFP4 | 59.1% | raw | 1 |
+| 4 | MiniMax-M2.7-AWQ-4bit | 58.8% | raw | 1 |
+| 5 | MiMo-V2.5-NVFP4 | 55.4% | raw | 1 |
+| 6 | DeepSeek-V4-Flash | 50.3% | raw | 1 |
+| 7 | Qwen3.6-27B-FP8 | 38.2% | raw | 1 |
+
+> Scores are tier-weighted and time-decayed; small gaps (< 2 pp) are noise.
+
+---
+
 ## The TUI
 
 `uv run toolery tui` opens a six-tab terminal dashboard:
@@ -173,6 +211,19 @@ All commands are subcommands of `toolery` (`uv run toolery <command> --help` for
   Orchestrator, Safety/RAG, Customer Support, Data Analyst, Local Coding Agent). The
   persona adds a `UC:<Name>` column computed with persona-specific dimension weights; the
   global Overall is unaffected.
+
+### Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/scenarios.svg" alt="Scenarios tab"><br><em>Scenarios — catalog with the selected task prompt above the per-model results.</em></td>
+    <td width="50%"><img src="docs/screenshots/profiles.svg" alt="Profiles tab"><br><em>Profiles — pick a use-case persona to re-weight the ranking.</em></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/history.svg" alt="History tab"><br><em>History — past runs with per-depth perf and details.</em></td>
+    <td width="50%" valign="top"><br>All screenshots are live SVG exports of the Textual TUI (<code>App.save_screenshot</code>), so they stay crisp at any zoom.</td>
+  </tr>
+</table>
 
 ---
 
