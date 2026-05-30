@@ -83,6 +83,13 @@ class HermesAdapter:
         # the literal cwd — which means a benchmark like 'rename foo across the
         # codebase' will actually modify toolery/ and create stray commits.
         self.use_worktree = use_worktree
+        # `--worktree` runs `git worktree add`/`remove` against the shared repo,
+        # whose .git locks are NOT safe to touch from several processes at once.
+        # With concurrency > 1 the parallel hermes scenarios collide on those
+        # locks and crash. Serialize hermes invocations through this lock so the
+        # worktree git ops never overlap; other adapters (raw/cloud) still run
+        # concurrently because each adapter instance has its own lock.
+        self._run_lock = asyncio.Lock()
 
     async def run_scenario(
         self, scenario: Scenario, model: str, timeout: int
@@ -108,24 +115,36 @@ class HermesAdapter:
         error: str | None = None
         stdout_bytes = b""
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                proc.communicate(),
-                # Use the full HERMES_TIMEOUT cap per scenario — agentic hermes
-                # runs are slow, and the run-wide heartbeat keeps the TUI from
-                # false-killing a long scenario. The per-scenario budget is not
-                # used to shrink this (it would cap fast-budget scenarios at a
-                # few minutes and trip "hermes: timeout" on a slow backend).
-                timeout=self.timeout,
-            )
-            if proc.returncode != 0:
-                error = stderr_bytes.decode(errors="replace")[:500]
-        except TimeoutError:
-            error = "hermes: timeout"
+            # Serialize: only one hermes subprocess at a time (see _run_lock) so
+            # concurrent --worktree git ops can't collide and crash the run.
+            async with self._run_lock:
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                try:
+                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                        proc.communicate(),
+                        # Use the full HERMES_TIMEOUT cap per scenario — agentic
+                        # hermes runs are slow, and the run-wide heartbeat keeps
+                        # the TUI from false-killing a long scenario. The
+                        # per-scenario budget is not used to shrink this (it would
+                        # cap fast-budget scenarios and trip "hermes: timeout" on
+                        # a slow backend).
+                        timeout=self.timeout,
+                    )
+                    if proc.returncode != 0:
+                        error = stderr_bytes.decode(errors="replace")[:500]
+                except TimeoutError:
+                    error = "hermes: timeout"
+                    # Kill the timed-out process so it releases its git worktree
+                    # before the next hermes scenario acquires the lock.
+                    proc.kill()
+                    try:
+                        await proc.wait()
+                    except Exception:
+                        pass
         except FileNotFoundError as e:
             error = f"hermes CLI not found: {e}"
 
