@@ -38,7 +38,18 @@ def run_benchy(*, model: str, base_url: str, pp: int = 4096, tg: int = 512,
         cmd += extra_args
     completed = subprocess.run(cmd, capture_output=True, text=True)
     if completed.returncode != 0:
-        raise RuntimeError(f"llama-benchy failed: {completed.stderr[:500]}")
+        # llama-benchy prints transformers warnings to stderr first and the real
+        # failure (e.g. a connection error) to stdout last — so report the TAIL
+        # of the combined output, not the head of stderr, which is just noise.
+        combined = ((completed.stdout or "") + "\n" + (completed.stderr or "")).strip()
+        tail = "\n".join(combined.splitlines()[-8:]) or "(no output)"
+        hint = ""
+        if "connect" in combined.lower():
+            hint = (f"\n\nHint: could not reach the model server at {benchy_base}. "
+                    "Make sure it is running and that --base-url / TOOLERY_BASE_URL is correct.")
+        raise RuntimeError(
+            f"llama-benchy failed (exit {completed.returncode}):\n{tail}{hint}"
+        )
     data = json.loads(Path(output_file).read_text())
     # Normalise new (0.3.8+) `benchmarks` schema into the flat per-depth rows
     # the rest of the pipeline expects (pp_tps, tg_tps, ttft_ms, …).
