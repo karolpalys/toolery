@@ -203,10 +203,10 @@ adapter**:
 | # | Model | Score | Best adapter | Runs |
 |---|-------|------:|--------------|-----:|
 | 1 | GPT5.5-codex | 66.8% | cloud | 1 |
-| 2 | Qwen3.6-35B-A3B-FP8 | 62.2% | raw | 1 |
-| 3 | MiniMax-M2.7-NVFP4 | 59.1% | raw | 1 |
-| 4 | MiniMax-M2.7-AWQ-4bit | 58.8% | raw | 1 |
-| 5 | MiMo-V2.5-NVFP4 | 55.4% | raw | 1 |
+| 2 | MiniMax-M2.7-NVFP4 | 59.1% | raw | 1 |
+| 3 | MiniMax-M2.7-AWQ-4bit | 58.8% | raw | 1 |
+| 4 | MiMo-V2.5-NVFP4 | 55.4% | raw | 1 |
+| 5 | Qwen3.6-35B-A3B-FP8 | 52.6% | raw | 1 |
 | 6 | DeepSeek-V4-Flash | 50.3% | raw | 1 |
 | 7 | Qwen3.6-27B-FP8 | 38.2% | raw | 1 |
 
@@ -216,22 +216,51 @@ adapter**:
 
 ## The TUI
 
-`uv run toolery tui` opens a six-tab terminal dashboard:
+`uv run toolery tui` opens a six-tab terminal dashboard. Each tab owns one stage of the
+workflow — discover an endpoint, launch a run, then explore the results.
 
-- **Home** — scans common ports (8000/8080/8081/8888/8889/5000/5001/11434, with an
-  optional 8000–9000 deep scan) for OpenAI-compatible endpoints. Pick one to open a launch
-  modal with a pre-filled flag form and adapter picker; it spawns `toolery run` as a
-  subprocess and shows a live progress bar (current scenario, phase, completed/total).
-- **Rankings** — the capability matrix. Click any header to sort; top-3 per column get
-  🥇🥈🥉. See [the column reference](#rankings-matrix) below.
-- **Compare** — head-to-head diff of selected models, per-column winner highlighted.
-- **Scenarios** — browse the catalog; selecting a scenario shows its task prompt above the
-  per-model results.
-- **History** — past runs, with per-depth perf and details.
-- **Profiles** — pick a use-case persona (Coding Assistant, Reasoning, Agentic
-  Orchestrator, Safety/RAG, Customer Support, Data Analyst, Local Coding Agent). The
-  persona adds a `UC:<Name>` column computed with persona-specific dimension weights; the
-  global Overall is unaffected.
+#### 🏠 Home — discover, launch, monitor
+Your launchpad. It probes common ports (8000/8080/8081/8888/8889/5000/5001/11434, with an
+optional 8000–9000 deep scan) and lists every reachable OpenAI-compatible endpoint with its
+served model. Pick a row to open the **launch modal**: model is pre-filled, and you choose
+the category/tier (multi-select), the mode (**Eval only** / **Eval + perf** / **Perf only**),
+the cluster topology, and the adapter. Hitting **Run** spawns `toolery run` as a background
+subprocess; Home then shows a **live progress bar** (current scenario, phase, completed/total
+units, polled from `runs.db` every 2 s) and **run controls** — Pause, Resume, and STOP — plus
+a one-click resume for any interrupted run on the same endpoint.
+
+#### 📊 Rankings — the capability matrix
+The headline view. One row per **(model, adapter, cluster)** configuration, one column per
+capability dimension, plus throughput and metadata. **Click any header to sort** by that
+column (click again to flip direction); the top-3 cells in each column get 🥇🥈🥉. Filter by
+**Sparks** topology (1× → 8×) and switch the **ranking mode** (best-adapter-per-model /
+one-row-per-adapter / raw-only). It auto-refreshes every 5 s as runs complete, and a column
+guide explains every dimension. Full reference: [Rankings matrix](#rankings-matrix).
+
+#### ⚔️ Compare — focused head-to-head
+For pitting specific models against each other. Tick the models you care about, hit
+**Compare**, and Toolery renders a matrix limited to just those — with the **per-column
+winner highlighted** (green) and the rest dimmed, so the strongest model on each dimension
+jumps out. Same underlying numbers as Rankings, but curated and side-by-side.
+
+#### 📋 Scenarios — the test catalog
+Browse all 143 scenarios (id, tier, category, tools, title). Select one and the tab shows its
+**full task content** — title, description, system prompt, and the exact user prompt — above a
+**per-model results table** for that scenario. This is how you see precisely *what was asked*
+and *how each model handled it*, trace by trace.
+
+#### 🕓 History — past runs
+Every recorded run, newest first. Open one for the details: per-scenario pass/fail, the
+failure-kind breakdown, the per-context-depth perf table, and run metadata (adapter, cluster,
+duration). You can also remove a run (with a confirmation step) to prune the database.
+
+#### 🎛️ Profiles — use-case personas
+Re-weight the ranking for a specific job. Pick a persona — Coding Assistant, Reasoning,
+Agentic Orchestrator, Safety/RAG, Customer Support, Data Analyst, or Local Coding Agent — and
+Toolery computes an extra **`UC:<Name>`** ranking using that persona's dimension weights
+(e.g. a coding persona up-weights Coding/Debugging/Terminal). The global Overall is untouched;
+your choice persists in `results/setup.json` and also drives the optional use-case column in
+the Rankings tab.
 
 ### Screenshots
 
