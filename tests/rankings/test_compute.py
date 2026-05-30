@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
-from llm_test.core.models import Message, ScenarioResult, TraceResult
-from llm_test.core.store import Store
-from llm_test.rankings.compute import regenerate_rankings
+from toolery.core.models import Message, ScenarioResult, TraceResult
+from toolery.core.store import Store
+from toolery.rankings.compute import regenerate_rankings
 
 
 def _trace(sid, adapter):
@@ -58,7 +58,7 @@ def test_regenerate_overall_ranking(tmp_path):
 
 def test_compute_matrix_exposes_stability_metrics(tmp_path):
     store = _seed(tmp_path, "model_stable", [1.0, 0.0], ["overall"])
-    matrix = __import__("llm_test.rankings.compute", fromlist=["compute_matrix"]).compute_matrix(
+    matrix = __import__("toolery.rankings.compute", fromlist=["compute_matrix"]).compute_matrix(
         store=store, dimensions=["overall"]
     )
     row = matrix[0]
@@ -69,7 +69,7 @@ def test_compute_matrix_exposes_stability_metrics(tmp_path):
 
 
 def test_collapse_matrix_rows_modes():
-    from llm_test.rankings.compute import collapse_matrix_rows
+    from toolery.rankings.compute import collapse_matrix_rows
     matrix = [
         {"model": "m", "adapter": "raw", "runs": 1, "scores": {"overall": 0.4}, "perf": {}, "stability": {"overall": {"mean": 0.4}}, "scenarios_hashes": {"h"}},
         {"model": "m", "adapter": "hermes", "runs": 1, "scores": {"overall": 0.8}, "perf": {}, "stability": {"overall": {"mean": 0.8}}, "scenarios_hashes": {"h"}},
@@ -85,7 +85,7 @@ def test_collapse_matrix_rows_modes():
 
 def test_compute_failure_breakdown_counts_by_model_adapter(tmp_path):
     store = _seed(tmp_path, "model_fail", [0.0, 0.0], ["overall", "coding"])
-    from llm_test.rankings.compute import compute_failure_breakdown
+    from toolery.rankings.compute import compute_failure_breakdown
     breakdown = compute_failure_breakdown(store)
     assert breakdown[("model_fail", "raw")]["wrong_tool"] == 2
     assert compute_failure_breakdown(store, dimensions=["coding"])[("model_fail", "raw")]["wrong_tool"] == 2
@@ -115,7 +115,7 @@ def _seed_cluster_run(store, run_id, model, adapter, cluster, scores):
 
 def test_compute_matrix_splits_same_model_adapter_across_clusters(tmp_path):
     """Same model+adapter on single vs dual → two separate rows (different config)."""
-    from llm_test.rankings.compute import compute_matrix
+    from toolery.rankings.compute import compute_matrix
     store = Store(tmp_path / "runs.db")
     store.init_schema()
     _seed_cluster_run(store, "r_single", "m", "raw", "single", [1.0, 1.0])
@@ -130,7 +130,7 @@ def test_compute_matrix_splits_same_model_adapter_across_clusters(tmp_path):
 
 def test_compute_matrix_aggregates_same_config_reruns(tmp_path):
     """Re-running the SAME (model, adapter, cluster) aggregates into one row."""
-    from llm_test.rankings.compute import compute_matrix
+    from toolery.rankings.compute import compute_matrix
     store = Store(tmp_path / "runs.db")
     store.init_schema()
     _seed_cluster_run(store, "r1", "m", "raw", "single", [1.0, 1.0])

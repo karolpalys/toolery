@@ -1,4 +1,4 @@
-from llm_test.core.stats import bootstrap_ci, decay_weighted_mean, mcnemar_p
+from toolery.core.stats import bootstrap_ci, decay_weighted_mean, mcnemar_p
 
 
 def test_bootstrap_ci_normal_case():

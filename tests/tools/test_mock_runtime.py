@@ -1,8 +1,8 @@
 """Unit tests for the per-rule match_index semantics in MockToolRuntime."""
 from __future__ import annotations
 
-from llm_test.core.models import Budget, Category, Scenario, Scoring, Tier, ToolResponseRule
-from llm_test.tools.mock_runtime import MockToolRuntime
+from toolery.core.models import Budget, Category, Scenario, Scoring, Tier, ToolResponseRule
+from toolery.tools.mock_runtime import MockToolRuntime
 
 
 def _scenario(tool_responses: dict) -> Scenario:

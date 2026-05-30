@@ -1,8 +1,8 @@
 import pytest
 
-from llm_test.adapters.base import MockAdapter, ScenarioPlan
-from llm_test.core.models import Budget, Category, Scenario, Scoring, ScoringCheck, Tier, ToolCall
-from llm_test.core.runner import Runner
+from toolery.adapters.base import MockAdapter, ScenarioPlan
+from toolery.core.models import Budget, Category, Scenario, Scoring, ScoringCheck, Tier, ToolCall
+from toolery.core.runner import Runner
 
 
 def _scenario():

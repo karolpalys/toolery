@@ -1,7 +1,7 @@
 import re  # noqa: F401
 
-from llm_test.core.models import ScoringCheck, ToolCall
-from llm_test.core.scorer import (
+from toolery.core.models import ScoringCheck, ToolCall
+from toolery.core.scorer import (
     check_call_count_at_most,
     check_tool_args_contain,
     check_tool_called,
@@ -65,14 +65,14 @@ def test_call_count_at_most_fail():
 def test_tool_called_in_order_pass():
     calls = _calls(("a", {}), ("b", {}), ("c", {}))
     chk = ScoringCheck.model_validate({"check": "tool_called_in_order", "sequence": ["a", "b", "c"]})
-    from llm_test.core.scorer import check_tool_called_in_order
+    from toolery.core.scorer import check_tool_called_in_order
     assert check_tool_called_in_order(calls, chk, None).result == "pass"
 
 
 def test_tool_called_in_order_fail():
     calls = _calls(("b", {}), ("a", {}))
     chk = ScoringCheck.model_validate({"check": "tool_called_in_order", "sequence": ["a", "b"]})
-    from llm_test.core.scorer import check_tool_called_in_order
+    from toolery.core.scorer import check_tool_called_in_order
     assert check_tool_called_in_order(calls, chk, None).result == "fail"
 
 
@@ -82,7 +82,7 @@ def test_tool_called_in_parallel_pass():
         ToolCall(index=0, name="b", args={}),
     ]
     chk = ScoringCheck.model_validate({"check": "tool_called_in_parallel", "tools": ["a", "b"]})
-    from llm_test.core.scorer import check_tool_called_in_parallel
+    from toolery.core.scorer import check_tool_called_in_parallel
     assert check_tool_called_in_parallel(calls, chk, None).result == "pass"
 
 
@@ -92,7 +92,7 @@ def test_tool_args_match_regex_pass():
         "check": "tool_args_match_regex", "tool": "send_email",
         "arg": "to", "pattern": r"^[^@]+@example\.com$",
     })
-    from llm_test.core.scorer import check_tool_args_match_regex
+    from toolery.core.scorer import check_tool_args_match_regex
     assert check_tool_args_match_regex(calls, chk, None).result == "pass"
 
 
@@ -102,12 +102,12 @@ def test_tool_args_type_fail():
         "check": "tool_args_type", "tool": "add_calendar_event",
         "arg": "start", "type": "string",
     })
-    from llm_test.core.scorer import check_tool_args_type
+    from toolery.core.scorer import check_tool_args_type
     assert check_tool_args_type(calls, chk, None).result == "fail"
 
 
 def test_call_count_at_least_and_exactly():
-    from llm_test.core.scorer import check_call_count_at_least, check_call_count_exactly
+    from toolery.core.scorer import check_call_count_at_least, check_call_count_exactly
     calls = _calls(("a", {}), ("a", {}), ("a", {}))
     assert check_call_count_at_least(calls, ScoringCheck.model_validate({"check": "call_count_at_least", "n": 2}), None).result == "pass"
     assert check_call_count_exactly(calls, ScoringCheck.model_validate({"check": "call_count_exactly", "n": 3}), None).result == "pass"
@@ -116,13 +116,13 @@ def test_call_count_at_least_and_exactly():
 
 def test_response_contains_pass():
     chk = ScoringCheck.model_validate({"check": "response_contains", "patterns": ["7", "cloud"]})
-    from llm_test.core.scorer import check_response_contains
+    from toolery.core.scorer import check_response_contains
     assert check_response_contains([], chk, "It's 7°C and cloudy.").result == "pass"
 
 
 def test_response_not_contains_pass():
     chk = ScoringCheck.model_validate({"check": "response_not_contains", "patterns": ["forbidden"]})
-    from llm_test.core.scorer import check_response_not_contains
+    from toolery.core.scorer import check_response_not_contains
     assert check_response_not_contains([], chk, "all clear").result == "pass"
 
 
@@ -131,34 +131,34 @@ def test_response_matches_schema_pass():
         "check": "response_matches_schema",
         "schema": {"type": "object", "required": ["temp"], "properties": {"temp": {"type": "integer"}}},
     })
-    from llm_test.core.scorer import check_response_matches_schema
+    from toolery.core.scorer import check_response_matches_schema
     assert check_response_matches_schema([], chk, '{"temp": 7}').result == "pass"
 
 
 def test_response_language_pl():
     chk = ScoringCheck.model_validate({"check": "response_language", "language": "pl"})
-    from llm_test.core.scorer import check_response_language
+    from toolery.core.scorer import check_response_language
     assert check_response_language([], chk, "Cześć, dzisiaj jest 7 stopni i pochmurno.").result == "pass"
 
 
 def test_unique_tools_called():
     calls = _calls(("a", {}), ("a", {}), ("b", {}))
     chk = ScoringCheck.model_validate({"check": "unique_tools_called", "tools": ["a", "b"]})
-    from llm_test.core.scorer import check_unique_tools_called
+    from toolery.core.scorer import check_unique_tools_called
     assert check_unique_tools_called(calls, chk, None).result == "pass"
 
 
 def test_no_hallucinated_tool():
     calls = _calls(("real_tool", {}), ("ghost_tool", {}))
     chk = ScoringCheck.model_validate({"check": "no_hallucinated_tool", "allowed": ["real_tool"]})
-    from llm_test.core.scorer import check_no_hallucinated_tool
+    from toolery.core.scorer import check_no_hallucinated_tool
     assert check_no_hallucinated_tool(calls, chk, None).result == "fail"
 
 
 def test_budget_respected():
     calls = _calls(("a", {}), ("b", {}))
     chk = ScoringCheck.model_validate({"check": "budget_respected", "max_tool_calls": 2})
-    from llm_test.core.scorer import check_budget_respected
+    from toolery.core.scorer import check_budget_respected
     assert check_budget_respected(calls, chk, None).result == "pass"
 
 
@@ -167,14 +167,14 @@ def test_clarification_asked():
         "check": "clarification_asked",
         "phrases": ["which Jordan", "could you clarify", "do you mean"],
     })
-    from llm_test.core.scorer import check_clarification_asked
+    from toolery.core.scorer import check_clarification_asked
     assert check_clarification_asked([], chk, "I found 3 Jordans — which Jordan did you mean?").result == "pass"
 
 
 def test_error_surfaced():
     calls = [ToolCall(index=0, name="get_stock_price", args={}, result={"error": "rate_limit"}, result_kind="error")]
     chk = ScoringCheck.model_validate({"check": "error_surfaced", "tool": "get_stock_price"})
-    from llm_test.core.scorer import check_error_surfaced
+    from toolery.core.scorer import check_error_surfaced
     assert check_error_surfaced(calls, chk, "The price service returned a rate-limit error.").result == "pass"
 
 
@@ -184,12 +184,12 @@ def test_final_state_equals():
         "check": "final_state_equals",
         "state": {"send_email_to": "a@b.com"},
     })
-    from llm_test.core.scorer import check_final_state_equals
+    from toolery.core.scorer import check_final_state_equals
     assert check_final_state_equals(calls, chk, None).result == "pass"
 
 
 def test_response_satisfies_all_of_pass():
-    from llm_test.core.scorer import check_response_satisfies
+    from toolery.core.scorer import check_response_satisfies
     chk = ScoringCheck.model_validate({
         "check": "response_satisfies",
         "all_of": ["Warsaw", "7"],
@@ -199,7 +199,7 @@ def test_response_satisfies_all_of_pass():
 
 
 def test_response_satisfies_all_of_fail():
-    from llm_test.core.scorer import check_response_satisfies
+    from toolery.core.scorer import check_response_satisfies
     chk = ScoringCheck.model_validate({
         "check": "response_satisfies",
         "all_of": ["Warsaw", "Tokyo"],   # Tokyo missing
@@ -210,7 +210,7 @@ def test_response_satisfies_all_of_fail():
 
 
 def test_response_satisfies_any_of_pass():
-    from llm_test.core.scorer import check_response_satisfies
+    from toolery.core.scorer import check_response_satisfies
     chk = ScoringCheck.model_validate({
         "check": "response_satisfies",
         "any_of": [["cloud", "overcast", "rain"], ["7", "8", "9"]],
@@ -220,7 +220,7 @@ def test_response_satisfies_any_of_pass():
 
 
 def test_response_satisfies_any_of_fail():
-    from llm_test.core.scorer import check_response_satisfies
+    from toolery.core.scorer import check_response_satisfies
     chk = ScoringCheck.model_validate({
         "check": "response_satisfies",
         "any_of": [["cloud", "overcast", "rain"]],
@@ -230,7 +230,7 @@ def test_response_satisfies_any_of_fail():
 
 
 def test_response_satisfies_none_of_blocks_forbidden():
-    from llm_test.core.scorer import check_response_satisfies
+    from toolery.core.scorer import check_response_satisfies
     chk = ScoringCheck.model_validate({
         "check": "response_satisfies",
         "all_of": ["7"],
@@ -243,7 +243,7 @@ def test_response_satisfies_none_of_blocks_forbidden():
 
 
 def test_response_satisfies_combined():
-    from llm_test.core.scorer import check_response_satisfies
+    from toolery.core.scorer import check_response_satisfies
     chk = ScoringCheck.model_validate({
         "check": "response_satisfies",
         "all_of": ["Warsaw"],
@@ -255,13 +255,13 @@ def test_response_satisfies_combined():
 
 
 def test_response_satisfies_no_response():
-    from llm_test.core.scorer import check_response_satisfies
+    from toolery.core.scorer import check_response_satisfies
     chk = ScoringCheck.model_validate({"check": "response_satisfies", "all_of": ["x"]})
     assert check_response_satisfies([], chk, None).result == "fail"
 
 
 def test_response_satisfies_short_number_is_token_bounded():
-    from llm_test.core.scorer import check_response_satisfies
+    from toolery.core.scorer import check_response_satisfies
     chk = ScoringCheck.model_validate({
         "check": "response_satisfies",
         "any_of": [["7"]],
@@ -271,7 +271,7 @@ def test_response_satisfies_short_number_is_token_bounded():
 
 
 def test_response_satisfies_short_word_is_token_bounded():
-    from llm_test.core.scorer import check_response_satisfies
+    from toolery.core.scorer import check_response_satisfies
     chk = ScoringCheck.model_validate({
         "check": "response_satisfies",
         "any_of": [["rm"]],
@@ -281,7 +281,7 @@ def test_response_satisfies_short_word_is_token_bounded():
 
 
 def test_response_satisfies_short_unit_can_touch_number():
-    from llm_test.core.scorer import check_response_satisfies
+    from toolery.core.scorer import check_response_satisfies
     chk = ScoringCheck.model_validate({
         "check": "response_satisfies",
         "all_of": ["G"],
@@ -291,7 +291,7 @@ def test_response_satisfies_short_unit_can_touch_number():
 
 
 def test_response_matches_regex_pass_and_fail():
-    from llm_test.core.scorer import check_response_matches_regex
+    from toolery.core.scorer import check_response_matches_regex
     chk = ScoringCheck.model_validate({
         "check": "response_matches_regex",
         "all_of": [r"\b7\s*°?c\b", r"cloud(y|s)?"],
@@ -304,14 +304,14 @@ def test_response_matches_regex_pass_and_fail():
 
 
 def test_response_number_equals_tokenized():
-    from llm_test.core.scorer import check_response_number
+    from toolery.core.scorer import check_response_number
     chk = ScoringCheck.model_validate({"check": "response_number", "equals": 42})
     assert check_response_number([], chk, "answer: 42").result == "pass"
     assert check_response_number([], chk, "answer: 142").result == "fail"
 
 
 def test_response_csv_matches_header_rows_and_count():
-    from llm_test.core.scorer import check_response_csv
+    from toolery.core.scorer import check_response_csv
     chk = ScoringCheck.model_validate({
         "check": "response_csv",
         "header": ["symbol", "price", "currency"],
@@ -323,7 +323,7 @@ def test_response_csv_matches_header_rows_and_count():
 
 
 def test_response_yaml_validates_schema():
-    from llm_test.core.scorer import check_response_yaml
+    from toolery.core.scorer import check_response_yaml
     chk = ScoringCheck.model_validate({
         "check": "response_yaml",
         "schema": {
@@ -337,7 +337,7 @@ def test_response_yaml_validates_schema():
 
 
 def test_response_markdown_table_matches_shape():
-    from llm_test.core.scorer import check_response_markdown_table
+    from toolery.core.scorer import check_response_markdown_table
     chk = ScoringCheck.model_validate({
         "check": "response_markdown_table",
         "header": ["City", "Temperature (°C)", "Condition"],
@@ -351,7 +351,7 @@ def test_response_markdown_table_matches_shape():
 
 # ---- terminal_handling primitives ----
 
-from llm_test.core.scorer import (  # noqa: E402
+from toolery.core.scorer import (  # noqa: E402
     check_ansi_stripped_in_response,
     check_command_regex_match,
     check_no_destructive_command,

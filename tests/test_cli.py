@@ -1,12 +1,12 @@
 from typer.testing import CliRunner
 
-from llm_test.cli import app
+from toolery.cli import app
 
 runner = CliRunner()
 
 
 def test_cli_list_runs_empty(tmp_path, monkeypatch):
-    monkeypatch.setenv("LLM_TEST_RESULTS_DIR", str(tmp_path / "results"))
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path / "results"))
     result = runner.invoke(app, ["list"])
     assert result.exit_code == 0
     assert "No runs" in result.output or "run_id" in result.output
@@ -23,11 +23,11 @@ def test_cli_run_wires_in_flight_callbacks(tmp_path, monkeypatch):
     constructs, then drive them directly and assert the resulting DB state."""
     from typer.testing import CliRunner
 
-    import llm_test.cli as cli_module
-    from llm_test.cli import app as cli_app
-    from llm_test.core.store import Store
+    import toolery.cli as cli_module
+    from toolery.cli import app as cli_app
+    from toolery.core.store import Store
 
-    monkeypatch.setenv("LLM_TEST_RESULTS_DIR", str(tmp_path / "results"))
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path / "results"))
     import types
     fake_scenario = types.SimpleNamespace(
         id="easy-XX",
@@ -87,10 +87,10 @@ def test_cli_run_comma_category_filters_multiple(tmp_path, monkeypatch):
 
     from typer.testing import CliRunner
 
-    import llm_test.cli as cli_module
-    from llm_test.cli import app as cli_app
+    import toolery.cli as cli_module
+    from toolery.cli import app as cli_app
 
-    monkeypatch.setenv("LLM_TEST_RESULTS_DIR", str(tmp_path / "results"))
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path / "results"))
 
     def _scn(sid, cat):
         return types.SimpleNamespace(
@@ -137,10 +137,10 @@ def test_cli_run_resume_rehydrates_config_and_skips_completed(tmp_path, monkeypa
     import json
     import types
 
-    import llm_test.cli as cli_module
-    from llm_test.core.store import Store
+    import toolery.cli as cli_module
+    from toolery.core.store import Store
 
-    monkeypatch.setenv("LLM_TEST_RESULTS_DIR", str(tmp_path / "results"))
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path / "results"))
 
     # Seed a paused run with config + one completed unit.
     store = Store(tmp_path / "results" / "runs.db")

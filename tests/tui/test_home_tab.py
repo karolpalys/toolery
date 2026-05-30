@@ -2,8 +2,8 @@ import pytest
 from textual.app import App
 from textual.widgets import DataTable, Static
 
-from llm_test.core.endpoint_scanner import EndpointInfo
-from llm_test.tui.home_tab import HomeTab
+from toolery.core.endpoint_scanner import EndpointInfo
+from toolery.tui.home_tab import HomeTab
 
 
 class _Host(App):
@@ -92,7 +92,7 @@ async def test_row_select_invokes_app_opener():
 
 import json as _json
 
-from llm_test.tui.home_tab import _build_plan
+from toolery.tui.home_tab import _build_plan
 
 
 def test_build_plan_orders_scenario_adapter_trial():
@@ -125,7 +125,7 @@ def test_build_plan_handles_single_adapter_string():
     assert plan == [("easy-01", "raw", 0), ("easy-01", "raw", 1)]
 
 
-from llm_test.tui.home_tab import _classify_plan
+from toolery.tui.home_tab import _classify_plan
 
 
 def test_classify_plan_three_states():
@@ -184,7 +184,7 @@ def test_classify_plan_running_after_done_marks_live_edge():
     assert last_running == 2
 
 
-from llm_test.tui.home_tab import _detail_block_running, _detail_block_upcoming
+from toolery.tui.home_tab import _detail_block_running, _detail_block_upcoming
 
 
 def test_detail_block_running_includes_elapsed():
@@ -211,7 +211,7 @@ def test_detail_block_upcoming_includes_position():
     assert "12" in text
 
 
-from llm_test.tui.home_tab import STALE_HEARTBEAT_SECONDS, _is_stale_run
+from toolery.tui.home_tab import STALE_HEARTBEAT_SECONDS, _is_stale_run
 
 
 def test_is_stale_run_when_updated_at_old():
@@ -248,8 +248,8 @@ async def test_refresh_from_db_aborts_stale_run(tmp_path, monkeypatch):
 
     from textual.app import App
 
-    from llm_test.core.store import Store
-    from llm_test.tui.home_tab import STALE_HEARTBEAT_SECONDS, HomeTab
+    from toolery.core.store import Store
+    from toolery.tui.home_tab import STALE_HEARTBEAT_SECONDS, HomeTab
 
     db = tmp_path / "runs.db"
     store = Store(db)
@@ -266,7 +266,7 @@ async def test_refresh_from_db_aborts_stale_run(tmp_path, monkeypatch):
     # add an in_flight row to verify cleanup
     store.mark_in_flight(run_id, "easy-01", "raw", 0, stale)
 
-    monkeypatch.setenv("LLM_TEST_RESULTS_DIR", str(tmp_path))
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path))
 
     async def never_called(*_a, **_kw):
         return []

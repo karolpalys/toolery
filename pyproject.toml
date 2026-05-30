@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "llm-test"
+name = "toolery"
 version = "0.1.0"
 description = "Deterministic 4-tier LLM tool-calling benchmark"
 readme = "README.md"
@@ -45,12 +45,12 @@ dev = [
 ]
 
 [project.scripts]
-llm-test = "llm_test.cli:app"
+toolery = "toolery.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/karol.palys/LLM-test"
-Repository = "https://github.com/karol.palys/LLM-test"
-Issues = "https://github.com/karol.palys/LLM-test/issues"
+Homepage = "https://github.com/karolpalys/toolery"
+Repository = "https://github.com/karolpalys/toolery"
+Issues = "https://github.com/karolpalys/toolery/issues"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -1,4 +1,4 @@
-# LLM-test
+# Toolery
 
 Deterministic 4-tier LLM tool-calling benchmark with 3 execution adapters (raw OpenAI port / cloud OpenAI-compatible API / Hermes CLI), Textual TUI, ASCII + PNG charts, 14-dimension ranking system, and llama-benchy perf integration.
 
@@ -7,54 +7,54 @@ Deterministic 4-tier LLM tool-calling benchmark with 3 execution adapters (raw O
 ## Quickstart
 
 ```bash
-cd LLM-test
+cd toolery
 uv venv && source .venv/bin/activate
 uv pip install -e ".[dev,perf]"
 
 # point at your local vLLM
-export LLM_TEST_BASE_URL=http://localhost:8000
+export TOOLERY_BASE_URL=http://localhost:8000
 
 # minimal smoke (only 3 starter scenarios for now)
-llm-test run --model deepseek-v4-flash --adapter raw --tier easy --trials 3
+toolery run --model deepseek-v4-flash --adapter raw --tier easy --trials 3
 
 # all adapters
-llm-test run --model deepseek-v4-flash --adapter raw,cloud,hermes \
+toolery run --model deepseek-v4-flash --adapter raw,cloud,hermes \
              --tier all --trials 5 --with-perf
 
 # TUI dashboard (6 tabs: Home / Rankings / Compare / Scenarios / History / Profiles)
-llm-test tui
+toolery tui
 
 # compare two runs
-llm-test compare <run_id_A> <run_id_B>
+toolery compare <run_id_A> <run_id_B>
 
 # regenerate 8-dimension rankings
-llm-test rankings --regen
+toolery rankings --regen
 
 # standalone perf (wraps llama-benchy)
-llm-test perf --model deepseek-v4-flash --base-url http://localhost:8000
+toolery perf --model deepseek-v4-flash --base-url http://localhost:8000
 
 # list things
-llm-test list                     # all recorded runs
-llm-test scenarios --tier easy    # available scenarios
+toolery list                     # all recorded runs
+toolery scenarios --tier easy    # available scenarios
 ```
 
 ## Configuration
 
 - `config.example.yaml` — template. Copy to `config.yaml` and adjust.
 - Environment overrides (no config file needed for basic usage):
-  - `LLM_TEST_BASE_URL` — vLLM/llama.cpp/SGLang endpoint (default: http://localhost:8000)
+  - `TOOLERY_BASE_URL` — vLLM/llama.cpp/SGLang endpoint (default: http://localhost:8000)
   - `OPENAI_API_KEY` — empty OK for local
   - `HERMES_API_URL`, `HERMES_GATEWAY_URL`, `HERMES_TOKEN`, `HERMES_WORKSPACE`
-  - `LLM_TEST_RESULTS_DIR` — where to persist runs (default: ./results)
+  - `TOOLERY_RESULTS_DIR` — where to persist runs (default: ./results)
 
 ## TUI workflow
 
-`llm-test tui` opens a 6-tab terminal dashboard:
+`toolery tui` opens a 6-tab terminal dashboard:
 
 - **Home** — discover local OpenAI-compatible endpoints by probing common
   ports (8000/8080/8081/8888/8889/5000/5001/11434), with an optional deep
   scan of 8000–9000. Pick a row to open a launch modal with pre-filled
-  flags and a harness picker; the modal spawns `llm-test run` as a
+  flags and a harness picker; the modal spawns `toolery run` as a
   subprocess. Also shows the live progress bar of the currently-running run
   (polled every 2 s from `runs.db`) — current scenario, phase, completed/total units.
 - **Rankings** — 14-dimension scoring matrix + 2 perf cols + cluster/set meta. Click headers to sort. See "Rankings matrix" section below.
@@ -142,8 +142,8 @@ Both populated only when the run was launched with `--with-perf` (or the
 ## Repo layout
 
 ```
-LLM-test/
-├── llm_test/
+toolery/
+├── toolery/
 │   ├── core/           # models, scenario loader, scorer, runner, store, markdown, stats
 │   ├── adapters/       # 3 adapters: openai_raw, cloud, hermes (+ MockAdapter)
 │   ├── tools/          # tool registry + generic.py + domain.py mock specs
@@ -170,5 +170,5 @@ See `docs/spec.md` § 3-6 and `docs/plan.md` Phase 26.2 for the YAML schema, sco
 ```bash
 pytest -q          # 117 tests, ~5s
 ruff check .       # clean
-mypy llm_test/     # opt-in
+mypy toolery/     # opt-in
 ```

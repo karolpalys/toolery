@@ -2,7 +2,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from llm_test.tui.profiles_tab import ProfilesTab
+from toolery.tui.profiles_tab import ProfilesTab
 
 
 def test_profiles_tab_imports_without_error():

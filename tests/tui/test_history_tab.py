@@ -5,8 +5,8 @@ import datetime as dt
 import pytest
 from textual.app import App, ComposeResult
 
-from llm_test.core.store import Store
-from llm_test.tui.history_tab import ConfirmRemoveModal, HistoryTab, MarkdownModal
+from toolery.core.store import Store
+from toolery.tui.history_tab import ConfirmRemoveModal, HistoryTab, MarkdownModal
 
 
 def _seed_run(store: Store, run_id: str = "test-run-1",
@@ -30,7 +30,7 @@ class _Host(App):
 
 @pytest.fixture
 def seeded_results_dir(tmp_path, monkeypatch):
-    monkeypatch.setenv("LLM_TEST_RESULTS_DIR", str(tmp_path))
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path))
     store = Store(tmp_path / "runs.db")
     _seed_run(store)
     return tmp_path

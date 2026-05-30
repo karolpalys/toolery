@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from llm_test.core.endpoint_scanner import EndpointInfo, scan
+from toolery.core.endpoint_scanner import EndpointInfo, scan
 
 
 def test_endpoint_info_serializes_basic_fields():

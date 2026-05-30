@@ -4,8 +4,8 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Static
 
-from llm_test.core.store import Store
-from llm_test.tui.rankings_tab import (
+from toolery.core.store import Store
+from toolery.tui.rankings_tab import (
     _HEADERS,
     _LEGEND,
     _PERF_HEADERS,
@@ -60,7 +60,7 @@ class _Host(App):
 
 @pytest.mark.asyncio
 async def test_rankings_tab_renders_table_and_legend(tmp_path, monkeypatch):
-    monkeypatch.setenv("LLM_TEST_RESULTS_DIR", str(tmp_path))
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path))
     Store(tmp_path / "runs.db").init_schema()
     app = _Host()
     async with app.run_test(size=(150, 60)) as pilot:

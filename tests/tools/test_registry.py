@@ -1,7 +1,7 @@
 import pytest
 
-from llm_test.tools import generic  # noqa: F401  triggers registration
-from llm_test.tools.registry import ToolRegistry
+from toolery.tools import generic  # noqa: F401  triggers registration
+from toolery.tools.registry import ToolRegistry
 
 
 def test_registry_has_get_weather():

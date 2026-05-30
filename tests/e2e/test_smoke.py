@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from llm_test.adapters.base import MockAdapter, ScenarioPlan
-from llm_test.core.models import ToolCall
-from llm_test.core.runner import Runner
-from llm_test.core.scenario import load_all_scenarios
+from toolery.adapters.base import MockAdapter, ScenarioPlan
+from toolery.core.models import ToolCall
+from toolery.core.runner import Runner
+from toolery.core.scenario import load_all_scenarios
 
 
 @pytest.mark.asyncio

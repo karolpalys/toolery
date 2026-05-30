@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-import llm_test.tools.generic  # noqa: F401  register mock tools
-from llm_test.adapters.hermes import HermesAdapter
-from llm_test.core.models import Budget, Category, Scenario, Scoring, Tier
+import toolery.tools.generic  # noqa: F401  register mock tools
+from toolery.adapters.hermes import HermesAdapter
+from toolery.core.models import Budget, Category, Scenario, Scoring, Tier
 
 
 def _scenario() -> Scenario:

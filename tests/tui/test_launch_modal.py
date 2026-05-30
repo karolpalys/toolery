@@ -3,9 +3,9 @@ from textual import work
 from textual.app import App
 from textual.widgets import RadioButton, SelectionList, Static
 
-from llm_test.core.adapter_probe import AdapterStatus
-from llm_test.core.endpoint_scanner import EndpointInfo
-from llm_test.tui.launch_modal import LaunchModal
+from toolery.core.adapter_probe import AdapterStatus
+from toolery.core.endpoint_scanner import EndpointInfo
+from toolery.tui.launch_modal import LaunchModal
 
 
 def _endpoint():

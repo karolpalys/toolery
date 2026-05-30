@@ -1,5 +1,5 @@
-from llm_test.core.markdown import render_scenario, render_summary
-from llm_test.core.models import CheckResult, Message, ScenarioResult, TraceResult
+from toolery.core.markdown import render_scenario, render_summary
+from toolery.core.models import CheckResult, Message, ScenarioResult, TraceResult
 
 
 def _result(adapter="raw", status="pass", score=1.0):

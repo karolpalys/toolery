@@ -1,7 +1,7 @@
 import json
 from unittest.mock import MagicMock, patch
 
-from llm_test.perf.benchy import BenchyResult, run_benchy
+from toolery.perf.benchy import BenchyResult, run_benchy
 
 _FAKE_BENCHY_JSON = {
     "model": "deepseek-v4-flash",

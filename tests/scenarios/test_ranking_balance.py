@@ -8,7 +8,7 @@ from __future__ import annotations
 import collections
 from pathlib import Path
 
-from llm_test.core.scenario import load_all_scenarios
+from toolery.core.scenario import load_all_scenarios
 
 # Expected counts after debugging category landed (+13 scenarios).
 # Baseline was the "Final balance" from docs/superpowers/specs/

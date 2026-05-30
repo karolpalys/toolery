@@ -1,7 +1,7 @@
 import pytest
 
-from llm_test.adapters.base import MockAdapter, ScenarioPlan
-from llm_test.core.models import Budget, Category, Scenario, Scoring, Tier, ToolCall
+from toolery.adapters.base import MockAdapter, ScenarioPlan
+from toolery.core.models import Budget, Category, Scenario, Scoring, Tier, ToolCall
 
 
 @pytest.mark.asyncio

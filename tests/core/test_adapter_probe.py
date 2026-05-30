@@ -1,4 +1,4 @@
-from llm_test.core.adapter_probe import AdapterStatus, available_adapters
+from toolery.core.adapter_probe import AdapterStatus, available_adapters
 
 
 def test_raw_adapter_always_available():

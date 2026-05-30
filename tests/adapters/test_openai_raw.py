@@ -4,9 +4,9 @@ import httpx
 import pytest
 import respx
 
-import llm_test.tools.generic  # noqa: F401 — registers tools into ToolRegistry
-from llm_test.adapters.openai_raw import OpenAIRawAdapter
-from llm_test.core.models import Budget, Category, Scenario, Scoring, Tier, ToolResponseRule
+import toolery.tools.generic  # noqa: F401 — registers tools into ToolRegistry
+from toolery.adapters.openai_raw import OpenAIRawAdapter
+from toolery.core.models import Budget, Category, Scenario, Scoring, Tier, ToolResponseRule
 
 
 def _scenario():

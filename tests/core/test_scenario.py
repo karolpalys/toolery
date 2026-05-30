@@ -1,6 +1,6 @@
 import pytest
 
-from llm_test.core.scenario import DuplicateIdError, load_all_scenarios, load_scenario
+from toolery.core.scenario import DuplicateIdError, load_all_scenarios, load_scenario
 
 
 def test_load_single_scenario(fixtures_dir):

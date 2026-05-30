@@ -1,4 +1,4 @@
-from llm_test.rankings.compute import _DIM_WEIGHTS, _scenario_dim_weight
+from toolery.rankings.compute import _DIM_WEIGHTS, _scenario_dim_weight
 
 
 def test_dim_weights_constant_has_expected_keys():
@@ -37,8 +37,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from llm_test.core.store import Store
-from llm_test.rankings.compute import compute_matrix
+from toolery.core.store import Store
+from toolery.rankings.compute import compute_matrix
 
 
 def _seed_store(store: Store, results: list[dict]) -> None:
@@ -128,7 +128,7 @@ def test_coding_column_unaffected_by_dim_weights():
 
 # --- Tests for load_active_use_case() loader ---
 
-from llm_test.rankings.compute import load_active_use_case
+from toolery.rankings.compute import load_active_use_case
 
 
 def test_load_active_use_case_missing_file():

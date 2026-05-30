@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from llm_test.core import runner_subprocess
-from llm_test.core.runner_subprocess import RunArgs, build_argv
+from toolery.core import runner_subprocess
+from toolery.core.runner_subprocess import RunArgs, build_argv
 
 
 def test_build_argv_minimum_required():
@@ -18,7 +18,7 @@ def test_build_argv_minimum_required():
         with_perf=False,
     )
     argv = build_argv(args)
-    assert argv[0] == "llm-test"
+    assert argv[0] == "toolery"
     assert argv[1] == "run"
     assert "--model" in argv and argv[argv.index("--model") + 1] == "MiniMax-M2.7"
     assert "--adapter" in argv and argv[argv.index("--adapter") + 1] == "raw"
@@ -52,7 +52,7 @@ def test_build_argv_with_perf_adds_flag():
 
 
 def test_build_argv_resume_emits_only_resume_flag():
-    """When resume is set, argv must reduce to `llm-test run --resume <id>` so
+    """When resume is set, argv must reduce to `toolery run --resume <id>` so
     the CLI hydrates everything from the original run's config_json."""
     args = RunArgs(
         model="placeholder", base_url="http://placeholder",
@@ -60,8 +60,8 @@ def test_build_argv_resume_emits_only_resume_flag():
         with_perf=True, cluster="dual",
         resume="2026-05-26T07-34_Qwen3.6-27B-FP8",
     )
-    argv = build_argv(args, executable="/bin/llm-test")
-    assert argv == ["/bin/llm-test", "run", "--resume",
+    argv = build_argv(args, executable="/bin/toolery")
+    assert argv == ["/bin/toolery", "run", "--resume",
                     "2026-05-26T07-34_Qwen3.6-27B-FP8"]
 
 
@@ -75,9 +75,9 @@ async def test_spawn_run_calls_subprocess_factory(monkeypatch):
         model="m", base_url="http://x:1", adapter="raw",
         tier="all", trials=2, concurrency=1, with_perf=True,
     )
-    result = await runner_subprocess.spawn_run(args, executable="/fake/llm-test")
+    result = await runner_subprocess.spawn_run(args, executable="/fake/toolery")
     assert result is fake_proc
     spawn_mock.assert_awaited_once()
     called_argv = spawn_mock.await_args.args
-    assert called_argv[0] == "/fake/llm-test"
+    assert called_argv[0] == "/fake/toolery"
     assert "--with-perf" in called_argv

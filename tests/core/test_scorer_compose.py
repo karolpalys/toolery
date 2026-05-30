@@ -1,6 +1,6 @@
 import pytest
 
-from llm_test.core.models import (
+from toolery.core.models import (
     Budget,
     Category,
     Message,
@@ -11,7 +11,7 @@ from llm_test.core.models import (
     ToolCall,
     TraceResult,
 )
-from llm_test.core.scorer import evaluate
+from toolery.core.scorer import evaluate
 
 
 def _scenario(scoring: Scoring) -> Scenario:
@@ -111,7 +111,7 @@ def test_implicit_gradient_off_by_default(monkeypatch):
     Restores the pre-gradient binary behavior so weak models stop earning
     soft fractional credit for partial tool selection.
     """
-    monkeypatch.delenv("LLM_TEST_PARTIAL_GRADIENT", raising=False)
+    monkeypatch.delenv("TOOLERY_PARTIAL_GRADIENT", raising=False)
     tr = _trace(("get_weather", {"location": "Berlin"}))  # tool called, wrong args
     r = evaluate(_scenario(_two_required_one_pass_scoring()), tr)
     assert r.status == "fail"
@@ -121,8 +121,8 @@ def test_implicit_gradient_off_by_default(monkeypatch):
 
 @pytest.mark.parametrize("flag_value", ["on", "1", "true", "YES"])
 def test_implicit_gradient_can_be_re_enabled(monkeypatch, flag_value):
-    """Opt-in: LLM_TEST_PARTIAL_GRADIENT=on restores the soft-credit behavior."""
-    monkeypatch.setenv("LLM_TEST_PARTIAL_GRADIENT", flag_value)
+    """Opt-in: TOOLERY_PARTIAL_GRADIENT=on restores the soft-credit behavior."""
+    monkeypatch.setenv("TOOLERY_PARTIAL_GRADIENT", flag_value)
     tr = _trace(("get_weather", {"location": "Berlin"}))  # 1/2 required passes
     r = evaluate(_scenario(_two_required_one_pass_scoring()), tr)
     assert r.status == "partial"
@@ -133,10 +133,10 @@ def test_implicit_gradient_can_be_re_enabled(monkeypatch, flag_value):
 
 
 def test_implicit_gradient_off_does_not_affect_full_pass_path(monkeypatch):
-    """LLM_TEST_PARTIAL_GRADIENT off: clean required-pass remains a full pass
+    """TOOLERY_PARTIAL_GRADIENT off: clean required-pass remains a full pass
     regardless of partial outcome (post-Phase-5 semantics — partial is bonus
     in failure mode only, never a demotion against a correct required-pass)."""
-    monkeypatch.delenv("LLM_TEST_PARTIAL_GRADIENT", raising=False)
+    monkeypatch.delenv("TOOLERY_PARTIAL_GRADIENT", raising=False)
     scoring = Scoring(
         required=[ScoringCheck.model_validate({"check": "tool_called", "tool": "get_weather"})],
         forbidden=[],
@@ -185,7 +185,7 @@ def test_schema_check_tolerates_code_fence_wrapped_json():
 
 def test_implicit_gradient_off_keeps_budget_violation_as_fail(monkeypatch):
     """Budget overruns and hallucinations stay hard-fail regardless of flag."""
-    monkeypatch.setenv("LLM_TEST_PARTIAL_GRADIENT", "on")
+    monkeypatch.setenv("TOOLERY_PARTIAL_GRADIENT", "on")
     scoring = Scoring(
         required=[ScoringCheck.model_validate({"check": "tool_called", "tool": "get_weather"})],
         forbidden=[], partial=[],

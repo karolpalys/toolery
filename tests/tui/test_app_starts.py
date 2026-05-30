@@ -1,11 +1,11 @@
 import pytest
 
-from llm_test.tui.app import LLMTestApp
+from toolery.tui.app import TooleryApp
 
 
 @pytest.mark.asyncio
 async def test_app_has_expected_tabs():
-    app = LLMTestApp(run_id=None)
+    app = TooleryApp(run_id=None)
     async with app.run_test() as pilot:
         await pilot.pause()
         # The Live tab was folded into Home; tabs are now:

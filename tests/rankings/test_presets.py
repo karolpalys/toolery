@@ -1,4 +1,4 @@
-from llm_test.rankings.presets import USE_CASES, get_use_case
+from toolery.rankings.presets import USE_CASES, get_use_case
 
 EXPECTED_DIMS = {
     "coding", "debugging", "terminal", "agentic", "safety",

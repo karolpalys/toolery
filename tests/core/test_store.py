@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from llm_test.core.models import Message, ScenarioResult, TraceResult
-from llm_test.core.store import Store
+from toolery.core.models import Message, ScenarioResult, TraceResult
+from toolery.core.store import Store
 
 
 def _trace():

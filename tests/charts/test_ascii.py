@@ -1,4 +1,4 @@
-from llm_test.charts.ascii import bar_per_tier, failure_taxonomy, heatmap
+from toolery.charts.ascii import bar_per_tier, failure_taxonomy, heatmap
 
 
 def test_bar_per_tier_renders_table():

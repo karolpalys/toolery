@@ -4,9 +4,9 @@ import pytest
 from textual.app import App
 from textual.widgets import DataTable
 
-from llm_test.core.models import Message, ScenarioResult, TraceResult
-from llm_test.core.store import Store
-from llm_test.tui.rankings_tab import RankingsTab
+from toolery.core.models import Message, ScenarioResult, TraceResult
+from toolery.core.store import Store
+from toolery.tui.rankings_tab import RankingsTab
 
 
 def _trace(sid, adapter):
@@ -39,7 +39,7 @@ class _Host(App):
 
 @pytest.mark.asyncio
 async def test_rankings_shows_separate_rows_per_cluster(tmp_path, monkeypatch):
-    monkeypatch.setenv("LLM_TEST_RESULTS_DIR", str(tmp_path))
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path))
     store = Store(tmp_path / "runs.db")
     store.init_schema()
     # All five topologies, incl. 4× quad and 8× octa.
@@ -78,7 +78,7 @@ async def test_rankings_shows_separate_rows_per_cluster(tmp_path, monkeypatch):
 
 def test_runargs_accepts_quad_and_octa():
     """RunArgs must validate 4× quad and 8× octa, or the TUI can't launch them."""
-    from llm_test.core.runner_subprocess import RunArgs
+    from toolery.core.runner_subprocess import RunArgs
     for c in ("single", "dual", "triple", "quad", "octa"):
         args = RunArgs(model="m", base_url="x", adapter="raw",
                        trials=1, concurrency=1, cluster=c)

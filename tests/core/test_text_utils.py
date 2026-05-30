@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from llm_test.core.text_utils import strip_reasoning_tags, unwrap_structured_payload
+from toolery.core.text_utils import strip_reasoning_tags, unwrap_structured_payload
 
 # ---------- strip_reasoning_tags ---------------------------------------------
 

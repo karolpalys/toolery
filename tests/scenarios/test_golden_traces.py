@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from llm_test.core.models import Message, ToolCall, TraceResult
-from llm_test.core.scenario import load_scenario
-from llm_test.core.scorer import evaluate
+from toolery.core.models import Message, ToolCall, TraceResult
+from toolery.core.scenario import load_scenario
+from toolery.core.scorer import evaluate
 
 ROOT = Path(__file__).resolve().parents[2]
 

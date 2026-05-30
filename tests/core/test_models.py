@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from llm_test.core.models import Budget, Category, Scenario, Tier, TraceResult
+from toolery.core.models import Budget, Category, Scenario, Tier, TraceResult
 
 
 def test_scenario_minimal_valid():

@@ -1,7 +1,7 @@
 adapters:
   raw:
     enabled: true
-    base_url_env: LLM_TEST_BASE_URL
+    base_url_env: TOOLERY_BASE_URL
     api_key_env: OPENAI_API_KEY
     request_timeout: 60
     max_concurrent: 4

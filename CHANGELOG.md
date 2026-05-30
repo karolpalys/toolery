@@ -17,6 +17,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `CONTRIBUTING.md`, and this changelog.
 
 ### Changed
+- Renamed the project `LLM-test` → **Toolery**: Python package `toolery`,
+  CLI command `toolery`, and environment variables `TOOLERY_*`
+  (`TOOLERY_BASE_URL`, `TOOLERY_RESULTS_DIR`, …).
 - Execution adapters trimmed to `raw` / `cloud` / `hermes` (removed the
   `claude_code` and `codex` CLI harnesses).
 - Renamed the last TUI tab `Setup` → `Profiles` to match its content.
