@@ -348,6 +348,7 @@ Set via environment variables (no config file needed for basic use), or copy
 | `TOOLERY_SCENARIOS_DIR` | Override the scenarios directory. |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | Required for the `cloud` adapter; empty is fine for local `raw`. |
 | `HERMES_API_URL`, `HERMES_GATEWAY_URL`, `HERMES_TOKEN`, `HERMES_WORKSPACE` | `hermes` adapter connection. |
+| `HERMES_TIMEOUT` | Per-scenario timeout (seconds) for the `hermes` agent — default `1800` (30 min); raise it for very slow backends. |
 
 ---
 

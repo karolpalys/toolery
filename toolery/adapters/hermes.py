@@ -59,7 +59,7 @@ class HermesAdapter:
     def __init__(
         self,
         cli_path: str = "hermes",
-        timeout_per_scenario: int = 300,
+        timeout_per_scenario: int = 1800,
         ignore_user_config: bool = False,
         provider: str | None = None,
         use_worktree: bool = True,
@@ -115,7 +115,12 @@ class HermesAdapter:
             )
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
                 proc.communicate(),
-                timeout=min(self.timeout, max(timeout * 10, 60)),
+                # Use the full HERMES_TIMEOUT cap per scenario — agentic hermes
+                # runs are slow, and the run-wide heartbeat keeps the TUI from
+                # false-killing a long scenario. The per-scenario budget is not
+                # used to shrink this (it would cap fast-budget scenarios at a
+                # few minutes and trip "hermes: timeout" on a slow backend).
+                timeout=self.timeout,
             )
             if proc.returncode != 0:
                 error = stderr_bytes.decode(errors="replace")[:500]

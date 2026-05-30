@@ -142,7 +142,7 @@ def run(
         elif a == "hermes":
             from toolery.adapters.hermes import HermesAdapter
             adapters[a] = HermesAdapter(
-                timeout_per_scenario=int(os.environ.get("HERMES_TIMEOUT", "600")),
+                timeout_per_scenario=int(os.environ.get("HERMES_TIMEOUT", "1800")),
                 api_url=os.environ.get("HERMES_API_URL", "http://localhost:8644"),
                 gateway_url=os.environ.get("HERMES_GATEWAY_URL", "http://localhost:8642"),
                 token=os.environ.get("HERMES_TOKEN", ""),
@@ -213,6 +213,24 @@ def run(
         store.upsert_adapter(run_id, name, ad.version)
 
     started = datetime.now(UTC)
+    # Process-wide heartbeat: bump runs.updated_at every 60s for the whole run so
+    # the TUI's stale-detector never false-kills a run that is merely slow — e.g.
+    # a long agentic hermes scenario (timeout up to HERMES_TIMEOUT) or a deep
+    # perf benchmark. If the process truly dies/hangs, the heartbeat stops with
+    # it and a genuine stale-abort still fires.
+    import threading as _threading
+
+    _stop_run_hb = _threading.Event()
+
+    def _run_heartbeat() -> None:
+        while not _stop_run_hb.wait(60):
+            try:
+                store.heartbeat(run_id)
+            except Exception:
+                pass
+
+    _threading.Thread(target=_run_heartbeat, daemon=True).start()
+
     if perf_only:
         console.print("[bold]Perf-only mode: skipping eval, running llama-benchy[/bold]")
     else:
@@ -285,25 +303,10 @@ def run(
         (run_dir / "summary.md").write_text(md)
 
     if with_perf or perf_only:
-        import threading
-
         from toolery.perf.benchy import run_benchy
         store.update_phase(run_id, "perf", current_scenario="llama-bench")
-        # llama-benchy blocks for the whole benchmark (minutes) and the perf
-        # phase writes no scenario rows — so without a heartbeat the TUI's
-        # stale-detector falsely marks the run aborted ("RUN DIED") after 5 min.
-        # Touch updated_at every 60s; if the box truly hangs/OOMs the thread
-        # stops too, so a genuine stale-abort still fires.
-        _stop_hb = threading.Event()
-
-        def _heartbeat() -> None:
-            while not _stop_hb.wait(60):
-                try:
-                    store.heartbeat(run_id)
-                except Exception:
-                    pass
-
-        threading.Thread(target=_heartbeat, daemon=True).start()
+        # The process-wide heartbeat (started above) keeps the run alive through
+        # the long, scenario-row-less perf phase.
         try:
             perf = run_benchy(model=api_model, base_url=base_url,
                               depth=[0, 4096, 8192], runs=3)
@@ -317,9 +320,8 @@ def run(
             console.print(f"[green]✓ perf: collected {len(perf.rows)} depth points[/green]")
         except Exception as e:
             console.print(f"[yellow]perf collection failed: {e}[/yellow]")
-        finally:
-            _stop_hb.set()
 
+    _stop_run_hb.set()
     store.finish_run(run_id, finished_at=datetime.now(UTC).isoformat(),
                      duration_s=(datetime.now(UTC) - started).total_seconds(),
                      status="done")
