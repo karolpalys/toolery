@@ -18,9 +18,7 @@ from llm_test.tui.rankings_tab import (
     _PERF_COLS,
     _PERF_HEADERS,
     _aggregate_perf,
-    _latest_cluster,
 )
-
 
 # Winner cells need to be unmistakable — plain `bold` is too subtle in most
 # terminals against the surrounding numbers. Black-on-green flips both bg
@@ -213,11 +211,10 @@ class CompareTab(Container):
             return
         matrix = compute_matrix(store=store, dimensions=_DIMENSIONS)
         perf_agg = _aggregate_perf(store)
-        cluster_agg = _latest_cluster(store)
         for r in matrix:
-            key = (r["model"], r["adapter"])
+            # cluster is part of the matrix row now; perf matches on it too.
+            key = (r["model"], r["adapter"], r.get("cluster"))
             r["perf"] = perf_agg.get(key, {})
-            r["cluster"] = cluster_agg.get(key)
 
         # One row per selected model: same rule as Rankings (best-overall adapter).
         by_model: dict[str, list[dict]] = defaultdict(list)

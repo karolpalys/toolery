@@ -12,12 +12,23 @@ from llm_test.tools.mock_runtime import MockToolRuntime
 from llm_test.tools.registry import ToolRegistry
 
 
+def _normalise_base_url(base_url: str) -> str:
+    """OpenAI-compatible endpoints serve under `/vN/chat/completions`. Local
+    vLLM/llama.cpp callers pass the bare host (`http://localhost:8888`) and
+    expect the adapter to add `/v1`. We auto-detect to avoid the
+    `/v1/v1/chat/completions` 404 if the caller already included `/v1`."""
+    url = base_url.rstrip("/")
+    if any(seg.startswith("v") and seg[1:].isdigit() for seg in url.split("/")):
+        return url
+    return url + "/v1"
+
+
 class OpenAIRawAdapter:
     name = "raw"
-    version = "0.1"
+    version = "0.2"
 
     def __init__(self, base_url: str, api_key: str = "", concurrency: int = 4) -> None:
-        self.base_url = base_url.rstrip("/")
+        self.base_url = _normalise_base_url(base_url)
         self.api_key = api_key
         self._client = httpx.AsyncClient(timeout=120)
 
@@ -51,7 +62,7 @@ class OpenAIRawAdapter:
                     payload["tools"] = tools_schema
                 headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
                 resp = await self._client.post(
-                    f"{self.base_url}/v1/chat/completions", json=payload, headers=headers
+                    f"{self.base_url}/chat/completions", json=payload, headers=headers
                 )
                 resp.raise_for_status()
                 data = resp.json()

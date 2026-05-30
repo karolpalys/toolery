@@ -12,7 +12,6 @@ from textual.widgets import Button, DataTable, Static
 
 from llm_test.rankings.presets import USE_CASES, get_use_case
 
-
 # Dim → short label (≤8 chars to fit in a 10-wide column with breathing room).
 _DIM_LABEL = {
     "coding": "coding",
@@ -61,110 +60,110 @@ def _format_weights_block(weights: dict[str, float] | None) -> str:
     return "  |  ".join(parts)
 
 
-class SetupTab(Container):
+class ProfilesTab(Container):
     """Pick a use-case persona; preview weights + see model ranking under that persona.
 
     The global Rankings tab is NEVER modified — this tab is a standalone viewer.
     """
 
     DEFAULT_CSS = """
-    SetupTab {
+    ProfilesTab {
         layout: vertical;
         padding: 1 2;
         background: $surface;
     }
 
-    SetupTab #setup-intro {
+    ProfilesTab #setup-intro {
         height: auto;
         padding: 0 1;
         margin-bottom: 1;
         color: $text-muted;
     }
 
-    SetupTab #ranking-section,
-    SetupTab #selector-section,
-    SetupTab #weights-section,
-    SetupTab #sparks-section {
+    ProfilesTab #ranking-section,
+    ProfilesTab #selector-section,
+    ProfilesTab #weights-section,
+    ProfilesTab #sparks-section {
         border: round $primary;
         border-title-color: $primary;
         background: $surface;
         padding: 0 1;
     }
 
-    SetupTab #selector-section {
+    ProfilesTab #selector-section {
         height: 4;
         margin-bottom: 1;
     }
 
-    SetupTab #persona-row {
+    ProfilesTab #persona-row {
         width: 1fr;
         height: 3;
     }
 
-    SetupTab #persona-row Button {
+    ProfilesTab #persona-row Button {
         margin-right: 1;
         min-width: 10;
     }
 
-    SetupTab #apply-row {
+    ProfilesTab #apply-row {
         width: auto;
         height: 3;
     }
 
-    SetupTab #weights-section {
+    ProfilesTab #weights-section {
         height: 5;
         margin-bottom: 1;
     }
 
-    SetupTab #weights-block {
+    ProfilesTab #weights-block {
         height: auto;
         padding: 1 1;
         color: $text;
     }
 
-    SetupTab #sparks-section {
+    ProfilesTab #sparks-section {
         height: 4;
         margin-bottom: 1;
     }
 
-    SetupTab #sparks-row {
+    ProfilesTab #sparks-row {
         width: 1fr;
         height: 3;
     }
 
-    SetupTab #adapter-row {
+    ProfilesTab #adapter-row {
         width: 1fr;
         height: 3;
         margin-left: 2;
     }
 
-    SetupTab #adapter-row Button {
+    ProfilesTab #adapter-row Button {
         margin-right: 1;
         min-width: 8;
     }
 
-    SetupTab #sparks-row Button {
+    ProfilesTab #sparks-row Button {
         margin-right: 1;
         min-width: 6;
     }
 
-    SetupTab #ranking-section {
+    ProfilesTab #ranking-section {
         height: 1fr;
         margin-bottom: 1;
     }
 
-    SetupTab #uc-rank-title {
+    ProfilesTab #uc-rank-title {
         height: auto;
         text-style: bold;
         color: $primary;
         margin-bottom: 1;
     }
 
-    SetupTab #uc-rank-table {
+    ProfilesTab #uc-rank-table {
         height: 1fr;
     }
 
-    SetupTab #setup-status {
+    ProfilesTab #setup-status {
         height: 1;
         color: $text-muted;
         padding-left: 1;
@@ -181,13 +180,11 @@ class SetupTab(Container):
         "8": "octa",
     }
 
-    # Adapter button id suffix → adapter value in DB. `claude` maps to
-    # `claude_code` (DB-canonical name). `all` clears the filter.
+    # Adapter button id suffix → adapter value in DB. `all` clears the filter.
     _ADAPTER_TO_DB = {
         "all": None,
         "cloud": "cloud",
         "hermes": "hermes",
-        "claude": "claude_code",
     }
 
     def __init__(self, id: str | None = None) -> None:
@@ -227,7 +224,7 @@ class SetupTab(Container):
                     yield Button(label, id=f"sparks-{key}",
                                  variant=self._sparks_variant_for(key))
             with Horizontal(id="adapter-row"):
-                for key in ("all", "cloud", "hermes", "claude"):
+                for key in ("all", "cloud", "hermes"):
                     label = "ALL" if key == "all" else key
                     yield Button(label, id=f"adapter-filter-{key}",
                                  variant=self._adapter_variant_for(key))

@@ -6,7 +6,7 @@ chat-completions). We spawn the `hermes` CLI in single-query mode and
 reconstruct the trace from the session SQLite store via `hermes sessions
 export`.
 
-Mirrors the subprocess pattern in ``llm_test.adapters.claude_code``.
+Follows the same subprocess pattern as the other CLI adapters.
 
 Hermes injects its own large system prompt and its own toolset (hermes-cli,
 MCP, skills). Our mock tool names (``get_weather``, ``send_email`` ...) are

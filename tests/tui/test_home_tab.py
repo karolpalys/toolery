@@ -28,8 +28,8 @@ async def test_home_tab_initial_empty_state():
     app = _Host(scanner=never_called)
     async with app.run_test(size=(120, 50)) as pilot:
         await pilot.pause()
-        status = app.query_one("#status", Static)
-        assert "Click Scan" in str(status.content)
+        status = app.query_one("#scan-status", Static)
+        assert "Ready to discover" in str(status.content)
         tbl = app.query_one(DataTable)
         assert tbl.row_count == 0
 
@@ -38,9 +38,11 @@ async def test_home_tab_initial_empty_state():
 async def test_scan_populates_table():
     fake_endpoints = [
         EndpointInfo(port=8888, base_url="http://localhost:8888",
-                     model_id="MiniMax-M2.7", models=["MiniMax-M2.7"], server_hint="vLLM"),
+                     model_id="MiniMax-M2.7", served_model_id="MiniMax-M2.7",
+                     models=["MiniMax-M2.7"], server_hint="vLLM"),
         EndpointInfo(port=8080, base_url="http://localhost:8080",
-                     model_id="qwen3-coder-4b", models=["qwen3-coder-4b"], server_hint="vLLM"),
+                     model_id="qwen3-coder-4b", served_model_id="qwen3-coder-4b",
+                     models=["qwen3-coder-4b"], server_hint="vLLM"),
     ]
 
     async def fake_scan(ports):
@@ -61,7 +63,8 @@ async def test_scan_populates_table():
 async def test_row_select_invokes_app_opener():
     fake_endpoints = [
         EndpointInfo(port=8888, base_url="http://localhost:8888",
-                     model_id="m", models=["m"], server_hint="vLLM"),
+                     model_id="m", served_model_id="m", models=["m"],
+                     server_hint="vLLM"),
     ]
 
     async def fake_scan(ports):
@@ -88,6 +91,7 @@ async def test_row_select_invokes_app_opener():
 
 
 import json as _json
+
 from llm_test.tui.home_tab import _build_plan
 
 
@@ -207,7 +211,7 @@ def test_detail_block_upcoming_includes_position():
     assert "12" in text
 
 
-from llm_test.tui.home_tab import _is_stale_run, STALE_HEARTBEAT_SECONDS
+from llm_test.tui.home_tab import STALE_HEARTBEAT_SECONDS, _is_stale_run
 
 
 def test_is_stale_run_when_updated_at_old():
@@ -241,9 +245,11 @@ async def test_refresh_from_db_aborts_stale_run(tmp_path, monkeypatch):
     """End-to-end watchdog: a stale running run in the store gets marked
     aborted on the next refresh_from_db tick."""
     from datetime import UTC, datetime, timedelta
-    from llm_test.core.store import Store
-    from llm_test.tui.home_tab import HomeTab, STALE_HEARTBEAT_SECONDS
+
     from textual.app import App
+
+    from llm_test.core.store import Store
+    from llm_test.tui.home_tab import STALE_HEARTBEAT_SECONDS, HomeTab
 
     db = tmp_path / "runs.db"
     store = Store(db)

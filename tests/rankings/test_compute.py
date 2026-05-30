@@ -89,3 +89,59 @@ def test_compute_failure_breakdown_counts_by_model_adapter(tmp_path):
     breakdown = compute_failure_breakdown(store)
     assert breakdown[("model_fail", "raw")]["wrong_tool"] == 2
     assert compute_failure_breakdown(store, dimensions=["coding"])[("model_fail", "raw")]["wrong_tool"] == 2
+
+
+def _seed_cluster_run(store, run_id, model, adapter, cluster, scores):
+    """Seed one finished run with an explicit (adapter, cluster) and overall scores."""
+    store.create_run(run_id=run_id, model=model, base_url="x",
+                     started_at=datetime.now(UTC).isoformat(),
+                     config_json="{}", scenarios_hash="h", cluster=cluster)
+    store.upsert_adapter(run_id, adapter, "0.1")
+    for i, s in enumerate(scores):
+        sid = f"easy-{i:02d}-test"
+        result = ScenarioResult(
+            scenario_id=sid, adapter=adapter, trial_index=0,
+            status="pass" if s > 0.5 else "fail", score=s,
+            call_count=1, budget_max=1, latency_ms=10,
+            failure_kind=None if s > 0.5 else "wrong_tool",
+            checks=[], trace=_trace(sid, adapter),
+        )
+        store.write_scenario_result(
+            run_id=run_id, result=result, tags=[], ranking_dims=["overall"],
+            scenario_hash="h", category="coding", tier="easy", trace_path="x.json",
+        )
+    store.finish_run(run_id, datetime.now(UTC).isoformat(), 1.0)
+
+
+def test_compute_matrix_splits_same_model_adapter_across_clusters(tmp_path):
+    """Same model+adapter on single vs dual → two separate rows (different config)."""
+    from llm_test.rankings.compute import compute_matrix
+    store = Store(tmp_path / "runs.db")
+    store.init_schema()
+    _seed_cluster_run(store, "r_single", "m", "raw", "single", [1.0, 1.0])
+    _seed_cluster_run(store, "r_dual", "m", "raw", "dual", [0.0, 0.0])
+
+    matrix = compute_matrix(store=store, dimensions=["overall"])
+    by_cluster = {r["cluster"]: r for r in matrix}
+    assert set(by_cluster) == {"single", "dual"}
+    assert by_cluster["single"]["scores"]["overall"] == 1.0
+    assert by_cluster["dual"]["scores"]["overall"] == 0.0
+
+
+def test_compute_matrix_aggregates_same_config_reruns(tmp_path):
+    """Re-running the SAME (model, adapter, cluster) aggregates into one row."""
+    from llm_test.rankings.compute import compute_matrix
+    store = Store(tmp_path / "runs.db")
+    store.init_schema()
+    _seed_cluster_run(store, "r1", "m", "raw", "single", [1.0, 1.0])
+    _seed_cluster_run(store, "r2", "m", "raw", "single", [0.0, 0.0])
+
+    matrix = compute_matrix(store=store, dimensions=["overall"])
+    rows = [r for r in matrix if r["cluster"] == "single"]
+    assert len(rows) == 1                       # not two separate rows
+    row = rows[0]
+    assert row["runs"] == 2                      # both runs counted
+    assert 0.0 < row["scores"]["overall"] < 1.0  # averaged, not one-or-the-other
+    # stability is computed from the run-to-run spread of the two runs
+    assert row["stability"]["overall"]["worst"] == 0.0
+    assert row["stability"]["overall"]["mean"] is not None

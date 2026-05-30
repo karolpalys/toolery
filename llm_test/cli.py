@@ -65,11 +65,12 @@ def scenarios(tier: str = typer.Option("all", help="easy|medium|hard|very_hard|a
 
 @app.command()
 def run(
-    model: str = typer.Option(..., "--model",
-                              help="friendly display name (run_id, DB column)"),
+    model: str = typer.Option("", "--model",
+                              help="friendly display name (run_id, DB column); "
+                                   "required unless --resume is given"),
     served_model: str = typer.Option("", "--served-model",
                                      help="name to send in API model= (default: --model)"),
-    adapter: str = typer.Option("raw", help="comma-separated: raw,cloud,hermes,claude (claude_code accepted as alias for claude)"),
+    adapter: str = typer.Option("raw", help="comma-separated: raw,cloud,hermes"),
     tier: str = typer.Option("all", help="easy|medium|hard|very_hard|all"),
     category: str = typer.Option("all", "--category",
                                  help="scenario category filter (see Category enum) or 'all'"),
@@ -84,10 +85,50 @@ def run(
     cluster: str = typer.Option("single", "--cluster",
                                 help="single | dual | triple | quad | octa "
                                      "(DGX Spark deployment topology: 1/2/3/4/8 nodes)"),
+    resume: str = typer.Option("", "--resume",
+                               help="run_id to resume: rehydrates model/adapter/"
+                                    "tier/trials/etc from the run's config_json "
+                                    "and continues from the next not-yet-run unit"),
 ):
     """Run benchmark."""
     # Import tools to register them
     from llm_test.tools import api_db, domain, generic, terminal  # noqa: F401
+
+    # Resume: rehydrate every run parameter from the original run's stored
+    # config BEFORE building adapters (adapter/base_url feed adapter setup).
+    # The TUI's Resume button invokes us as `run --resume <id>` with no other
+    # meaningful options, so all real values must come from the DB.
+    resuming = bool(resume)
+    resume_skip: set[tuple[str, str, int]] = set()
+    if resuming:
+        _rstore = _store()
+        _existing = _rstore.fetch_run(resume)
+        if _existing is None:
+            console.print(f"[red]Cannot resume: run {resume!r} not found.[/red]")
+            raise typer.Exit(2)
+        try:
+            _rcfg = json.loads(_existing.get("config_json") or "{}")
+        except json.JSONDecodeError:
+            _rcfg = {}
+        model = _existing["model"]
+        base_url = _rcfg.get("base_url") or _existing.get("base_url") or base_url
+        _adapters_field = _rcfg.get("adapter") or []
+        if isinstance(_adapters_field, str):
+            adapter = _adapters_field
+        elif _adapters_field:
+            adapter = ",".join(_adapters_field)
+        served_model = _rcfg.get("served_model") or served_model
+        tier = _rcfg.get("tier", tier)
+        category = _rcfg.get("category", category)
+        trials = int(_rcfg.get("trials", trials) or trials)
+        concurrency = int(_rcfg.get("concurrency", concurrency) or concurrency)
+        with_perf = bool(_rcfg.get("with_perf", with_perf))
+        perf_only = bool(_rcfg.get("perf_only", perf_only))
+        cluster = _rcfg.get("cluster", cluster)
+        resume_skip = _rstore.fetch_completed_units(resume)
+    elif not model:
+        console.print("[red]--model is required (unless resuming with --resume).[/red]")
+        raise typer.Exit(2)
 
     local_key = os.environ.get("OPENAI_API_KEY", "")
     adapters: dict[str, Adapter] = {}
@@ -98,13 +139,6 @@ def run(
         elif a == "cloud":
             from llm_test.adapters.cloud import CloudAdapter
             adapters[a] = CloudAdapter(base_url=base_url, api_key=local_key)
-        elif a in ("claude", "claude_code"):
-            from llm_test.adapters.claude_code import ClaudeCodeAdapter
-            # Normalize to "claude_code" key so DB / rankings stay consistent.
-            adapters["claude_code"] = ClaudeCodeAdapter(
-                cli_path=os.environ.get("CLAUDE_CLI_PATH", "claude"),
-                backend_url=base_url, use_local_model=True,
-            )
         elif a == "hermes":
             from llm_test.adapters.hermes import HermesAdapter
             adapters[a] = HermesAdapter(
@@ -114,12 +148,6 @@ def run(
                 token=os.environ.get("HERMES_TOKEN", ""),
                 workspace_id=os.environ.get("HERMES_WORKSPACE", "default"),
             )
-        elif a == "codex":
-            from llm_test.adapters.codex import CodexAdapter
-            adapters[a] = CodexAdapter(
-                cli_path=os.environ.get("CODEX_CLI_PATH", "codex"),
-                backend_url=base_url, use_local_model=True,
-            )
         else:
             console.print(f"[yellow]adapter '{a}' not yet wired in Phase 12; skipping[/yellow]")
     if not adapters:
@@ -127,10 +155,15 @@ def run(
         raise typer.Exit(2)
 
     xs = load_all_scenarios(scenarios_dir)
-    if tier != "all":
-        xs = [s for s in xs if s.tier.value == tier]
-    if category != "all":
-        xs = [s for s in xs if s.category.value == category]
+    # tier/category may be comma-joined ("easy,hard") from the launch modal's
+    # multi-select, a single value, or "all". Split and keep any match; "all"
+    # anywhere in the set means no filtering on that axis.
+    tier_set = {t.strip() for t in tier.split(",") if t.strip()}
+    if tier_set and "all" not in tier_set:
+        xs = [s for s in xs if s.tier.value in tier_set]
+    category_set = {c.strip() for c in category.split(",") if c.strip()}
+    if category_set and "all" not in category_set:
+        xs = [s for s in xs if s.category.value in category_set]
     if not xs and not perf_only:
         console.print("[red]No scenarios match filter.[/red]")
         raise typer.Exit(2)
@@ -138,7 +171,10 @@ def run(
     # NIM model IDs use `<org>/<name>` — strip the slash so we don't create
     # nested directories under results/runs/.
     safe_model = model.replace("/", "_")
-    run_id = f"{datetime.now(UTC).strftime('%Y-%m-%dT%H-%M')}_{safe_model}"
+    if resuming:
+        run_id = resume
+    else:
+        run_id = f"{datetime.now(UTC).strftime('%Y-%m-%dT%H-%M')}_{safe_model}"
     run_dir = _results_dir() / "runs" / run_id
     (run_dir / "scenarios").mkdir(parents=True, exist_ok=True)
     (run_dir / "traces").mkdir(parents=True, exist_ok=True)
@@ -162,12 +198,17 @@ def run(
            "scenarios_count": 0 if perf_only else len(xs),
            "with_perf": bool(with_perf or perf_only),
            "perf_only": bool(perf_only), "cluster": cluster}
-    store.create_run(run_id=run_id, model=model, base_url=base_url,
-                     started_at=datetime.now(UTC).isoformat(),
-                     config_json=json.dumps(cfg),
-                     scenarios_hash=scenarios_hash,
-                     cluster=cluster,
-                     total_units=total_units)
+    if resuming:
+        # Run row already exists — flip it back to running and clear any orphan
+        # in-flight rows from the paused session. Keep the original config_json.
+        store.reopen_run(run_id)
+    else:
+        store.create_run(run_id=run_id, model=model, base_url=base_url,
+                         started_at=datetime.now(UTC).isoformat(),
+                         config_json=json.dumps(cfg),
+                         scenarios_hash=scenarios_hash,
+                         cluster=cluster,
+                         total_units=total_units)
     for name, ad in adapters.items():
         store.upsert_adapter(run_id, name, ad.version)
 
@@ -188,7 +229,7 @@ def run(
 
         runner = Runner(
             adapters=adapters, trials=trials, model=api_model, concurrency=concurrency,
-            on_start=_on_start, on_end=_on_end,
+            on_start=_on_start, on_end=_on_end, skip=resume_skip,
         )
         console.print(f"[bold]Running {len(xs)} scenarios × {len(adapters)} adapters × {trials} trials"
                       f" = {total_units} units[/bold]")
@@ -208,20 +249,28 @@ def run(
                 trace_path=f"traces/{trace_filename}",
             )
             store.update_phase(run_id, "scenarios", current_scenario=r.scenario_id)
-            # External-abort check: if the TUI flipped runs.status to
-            # 'paused' or 'failed' (via Pause / STOP), exit the subprocess
-            # so no further scenarios get scheduled. In-flight scenarios
-            # at the moment of pause will still complete their current
-            # turn but their results are written above before this check.
-            external = store.get_run_status(run_id)
-            if external in ("paused", "failed"):
-                console.print(
-                    f"[yellow]Run externally marked {external!r} — "
-                    "aborting subprocess.[/yellow]"
-                )
-                raise SystemExit(0)
 
-        results = asyncio.run(runner.run(xs, on_result=_on_result))
+        def _should_stop() -> bool:
+            # Graceful external abort: if the TUI flipped runs.status to
+            # 'paused' (Pause) or 'failed' (detached STOP), stop scheduling new
+            # units. Units already in flight finish and record their results
+            # above; only not-yet-started units are skipped. Polled by the
+            # runner after a unit acquires its slot, before it starts.
+            return store.get_run_status(run_id) in ("paused", "failed")
+
+        results = asyncio.run(
+            runner.run(xs, on_result=_on_result, should_stop=_should_stop))
+
+        # If paused/stopped externally while draining, do NOT finalize — leave
+        # the status as the TUI set it so Resume can continue. In-flight units
+        # already wrote their results; skip render/summary/perf/finish.
+        external = store.get_run_status(run_id)
+        if external in ("paused", "failed"):
+            console.print(
+                f"[yellow]Run externally {external!r}: in-flight scenarios "
+                "finished, no new ones scheduled. Skipping finalize.[/yellow]"
+            )
+            raise typer.Exit(0)
 
         for s in xs:
             md = render_scenario(scenario_id=s.id, results=results, title=s.title,
@@ -258,7 +307,7 @@ def run(
 
     # Auto-regenerate rankings so the new run is reflected in TUI Rankings tab.
     try:
-        from llm_test.rankings.compute import regenerate_rankings, load_active_use_case
+        from llm_test.rankings.compute import load_active_use_case, regenerate_rankings
         uc_key, uc_weights = load_active_use_case(_results_dir())
         regenerate_rankings(
             store=store,

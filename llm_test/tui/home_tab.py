@@ -439,7 +439,7 @@ class HomeTab(Container):
     }
 
     HomeTab #eval-control,
-    HomeTab #trening-control {
+    HomeTab #training-control {
         width: 1fr;
         height: 3;
         border: round $primary;
@@ -449,7 +449,7 @@ class HomeTab(Container):
         margin-right: 1;
     }
 
-    HomeTab #trening-control {
+    HomeTab #training-control {
         margin-right: 0;
     }
 
@@ -459,7 +459,7 @@ class HomeTab(Container):
      * Base style is shared; per-id rules paint the role color and its
      * lighter hover/focus + dimmer disabled forms. */
     HomeTab #eval-control Button,
-    HomeTab #trening-control Button {
+    HomeTab #training-control Button {
         height: 1;
         min-width: 18;
         margin-right: 1;
@@ -586,7 +586,7 @@ class HomeTab(Container):
                         yield Button("Follow upcoming", id="follow-on",
                                      disabled=True)
                         yield Button("Pause follow", id="follow-off")
-                    with Horizontal(id="trening-control"):
+                    with Horizontal(id="training-control"):
                         yield Button("Pause", id="run-pause", disabled=True)
                         yield Button("Resume", id="run-resume", disabled=True)
                         yield Button("STOP", id="run-stop", disabled=True)
@@ -629,8 +629,8 @@ class HomeTab(Container):
             self.query_one("#eval-control").border_title = (
                 "evaluation workspace control"
             )
-            self.query_one("#trening-control").border_title = (
-                "trening control"
+            self.query_one("#training-control").border_title = (
+                "training control"
             )
             self.query_one("#main-split-wrapper").border_title = (
                 "Evaluation workspace"
@@ -737,7 +737,7 @@ class HomeTab(Container):
             idx = 0
         await self._on_endpoint_selected(idx)
 
-    # ----------------------------------------------------- trening control
+    # ----------------------------------------------------- training control
 
     def _is_run_active(self) -> bool:
         """A run is 'active' if either:
@@ -796,9 +796,10 @@ class HomeTab(Container):
         confirm = await self.app.push_screen_wait(
             ConfirmRunActionModal(
                 title="Pause the run?",
-                body=("Terminates the running subprocess. Already-completed "
-                      "scenario results stay in the DB; any scenarios currently "
-                      "in-flight will be treated as not-yet-run on resume."),
+                body=("Stops launching new scenarios. Scenarios currently "
+                      "in-flight finish and are saved; the subprocess exits "
+                      "once they're done. Click Resume to continue from the "
+                      "next not-yet-run scenario."),
                 confirm_label="Pause",
             )
         )
@@ -959,7 +960,7 @@ class HomeTab(Container):
             return None
 
     def refresh_from_db(self) -> None:
-        # Trening-control button state depends on subprocess + DB and changes
+        # Training-control button state depends on subprocess + DB and changes
         # independently of run progress — refresh on every tick.
         self._update_trening_buttons()
         store = self._resolve_store()

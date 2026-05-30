@@ -26,8 +26,6 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
     run_meta = {r["run_id"]: r for r in runs}
 
     for dim in dimensions:
-        per_model_runs: dict[str, list[dict]] = defaultdict(list)
-
         with store.conn() as c:
             rows = c.execute("SELECT * FROM scenario_results").fetchall()
             results = [dict(r) for r in rows]
@@ -79,7 +77,7 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
                 if w_sum <= 0:
                     continue
                 run_mean = sum(
-                    s * w for (s, _, _), w in zip(items, weights_per_item)
+                    s * w for (s, _, _), w in zip(items, weights_per_item, strict=False)
                 ) / w_sum
                 age_days = max((now - _parse_iso(r["started_at"])).total_seconds() / 86400, 0)
                 pairs.append((run_mean, age_days))
@@ -163,7 +161,7 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
                 if w_sum <= 0:
                     continue
                 run_mean = sum(
-                    s * w for (s, _, _), w in zip(items, weights_per_item)
+                    s * w for (s, _, _), w in zip(items, weights_per_item, strict=False)
                 ) / w_sum
                 age_days = max(
                     (now - _parse_iso(r["started_at"])).total_seconds() / 86400, 0
@@ -322,33 +320,38 @@ def collapse_matrix_rows(matrix: list[dict], mode: str = "pair") -> list[dict]:
     """Collapse per-(model, adapter) matrix rows for different ranking views.
 
     Modes:
-      - pair: one row per model+adapter
-      - model_best: one row per model, best overall adapter wins
-      - model_mean: one row per model, adapter scores averaged per dimension
-      - raw_only: one row per model for adapter == raw
+      - pair: one row per (model, adapter, cluster)
+      - model_best: one row per (model, cluster), best overall adapter wins
+      - model_mean: one row per (model, cluster), adapter scores averaged per dimension
+      - raw_only: one row per (model, cluster) for adapter == raw
+
+    Cluster is a grouping axis in every mode — the same model on different DGX
+    Spark topologies stays on separate rows.
     """
     if mode == "pair":
         return [dict(r) for r in matrix]
     if mode == "raw_only":
         return [dict(r) for r in matrix if r.get("adapter") == "raw"]
 
-    grouped: dict[str, list[dict]] = defaultdict(list)
+    # Group by (model, cluster) so single/dual/… stay as distinct rows.
+    grouped: dict[tuple[str, str | None], list[dict]] = defaultdict(list)
     for row in matrix:
-        grouped[row["model"]].append(row)
+        grouped[(row["model"], row.get("cluster"))].append(row)
 
     out: list[dict] = []
     if mode == "model_best":
-        for model, rows in grouped.items():
+        for (_model, cluster), rows in grouped.items():
             best = max(rows, key=lambda r: r.get("scores", {}).get("overall", -1.0))
             merged = dict(best)
             merged["adapter"] = best.get("adapter", "")
+            merged["cluster"] = cluster
             merged["adapters"] = [r.get("adapter") for r in rows]
             merged["ranking_mode"] = mode
             out.append(merged)
         return out
 
     if mode == "model_mean":
-        for model, rows in grouped.items():
+        for (model, cluster), rows in grouped.items():
             dims = sorted({d for r in rows for d in r.get("scores", {})})
             scores = {
                 d: sum(r["scores"][d] for r in rows if d in r.get("scores", {}))
@@ -364,6 +367,7 @@ def collapse_matrix_rows(matrix: list[dict], mode: str = "pair") -> list[dict]:
             out.append({
                 "model": model,
                 "adapter": "mean",
+                "cluster": cluster,
                 "adapters": [r.get("adapter") for r in rows],
                 "runs": sum(int(r.get("runs") or 0) for r in rows),
                 "scores": scores,
@@ -429,24 +433,30 @@ def compute_matrix(
     if adapter_filter is not None:
         all_results = [r for r in all_results if r.get("adapter") == adapter_filter]
 
-    # (model, adapter) -> dim -> list of {run_id, started_at, score, tier}
-    pairs: dict[tuple[str, str], dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
-    # (model, adapter) -> set of scenarios_hashes seen
-    pair_hashes: dict[tuple[str, str], set[str]] = defaultdict(set)
+    # (model, adapter, cluster) -> dim -> list of {run_id, started_at, score, tier}
+    # Cluster (DGX Spark topology) is a first-class axis alongside adapter: the
+    # same model+adapter on `single` vs `dual` is a different configuration and
+    # gets its own row. Re-runs of the SAME (model, adapter, cluster) aggregate
+    # (decay-weighted mean + run-to-run stability), same as before.
+    pairs: dict[tuple[str, str, str | None], dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+    # (model, adapter, cluster) -> set of scenarios_hashes seen
+    pair_hashes: dict[tuple[str, str, str | None], set[str]] = defaultdict(set)
     for r in all_results:
         meta = run_meta.get(r["run_id"])
         if not meta:
             continue
         model = meta["model"]
         adapter = r["adapter"]
+        cluster = meta.get("cluster")
+        key = (model, adapter, cluster)
         dims_for_r = json.loads(r["ranking_dims_json"] or "[]")
         sh = meta.get("scenarios_hash") or ""
         if sh:
-            pair_hashes[(model, adapter)].add(sh)
+            pair_hashes[key].add(sh)
         for dim in dimensions:
             if dim != "overall" and dim not in dims_for_r:
                 continue
-            pairs[(model, adapter)][dim].append({
+            pairs[key][dim].append({
                 "run_id": r["run_id"],
                 "started_at": meta["started_at"],
                 "score": r["score"],
@@ -455,7 +465,7 @@ def compute_matrix(
             })
 
     matrix: list[dict] = []
-    for (model, adapter), dim_results in pairs.items():
+    for (model, adapter, cluster), dim_results in pairs.items():
         scores: dict[str, float] = {}
         stability: dict[str, dict] = {}
         total_runs = 0
@@ -482,7 +492,7 @@ def compute_matrix(
                 if w_sum <= 0:
                     continue
                 weighted_mean = sum(
-                    s * w for (s, _, _), w in zip(items_in_run, weights)
+                    s * w for (s, _, _), w in zip(items_in_run, weights, strict=False)
                 ) / w_sum
                 run_scores.append(weighted_mean)
                 age = max((now - _parse_iso(run_started[rid])).total_seconds() / 86400, 0)
@@ -508,7 +518,7 @@ def compute_matrix(
                     if uc_w_sum <= 0:
                         continue
                     uc_weighted_mean = sum(
-                        s * w for (s, _, _), w in zip(items_in_run, uc_weights)
+                        s * w for (s, _, _), w in zip(items_in_run, uc_weights, strict=False)
                     ) / uc_w_sum
                     age = max(
                         (now - _parse_iso(run_started[rid])).total_seconds() / 86400, 0
@@ -518,9 +528,9 @@ def compute_matrix(
                     scores["use_case"] = decay_weighted_mean(uc_decay_pairs, half_life_days)
         if scores:
             matrix.append({
-                "model": model, "adapter": adapter,
+                "model": model, "adapter": adapter, "cluster": cluster,
                 "runs": total_runs, "scores": scores,
                 "stability": stability,
-                "scenarios_hashes": pair_hashes[(model, adapter)],
+                "scenarios_hashes": pair_hashes[(model, adapter, cluster)],
             })
     return matrix

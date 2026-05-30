@@ -16,6 +16,11 @@ EndCallback = Callable[[str, str, int], Awaitable[None] | None]
 
 _log = logging.getLogger(__name__)
 
+# Sentinel returned by a unit that was gated off by should_stop() before it
+# started. Distinct from None (a valid-ish callback return) so the gather loop
+# can tell "skipped, never ran" apart from a real ScenarioResult.
+_SKIP = object()
+
 
 async def _maybe_call(cb, *args) -> None:
     if cb is None:
@@ -63,18 +68,33 @@ class Runner:
             await _maybe_call(self.on_end, scenario.id, adapter_name, trial_index)
 
     async def run(self, scenarios: Iterable[Scenario],
-                  on_result: ResultCallback | None = None) -> list[ScenarioResult]:
+                  on_result: ResultCallback | None = None,
+                  should_stop: Callable[[], bool] | None = None,
+                  ) -> list[ScenarioResult]:
         """Execute all (scenario × adapter × trial) units concurrently.
 
         If on_result is provided, it is invoked for each ScenarioResult as soon as
         the unit completes (in completion order, not submission order). The
         callback may be sync or async. Exceptions in the callback are swallowed
         so a single bad observer cannot abort the whole run.
+
+        If should_stop is provided, it is consulted after a unit acquires its
+        concurrency slot but before it starts running. Once it returns True, no
+        further units begin — yet units already in flight finish normally and
+        record their results. This is the graceful-pause path: it drains rather
+        than cancels, so a paused run can resume from the next not-yet-run unit.
         """
         sem = asyncio.Semaphore(self.concurrency)
 
         async def bounded(coro):
             async with sem:
+                if should_stop is not None and should_stop():
+                    # Stop scheduling new work: discard the not-yet-started
+                    # coroutine (so on_start never fires / no in_flight row)
+                    # and signal skip. In-flight units past this gate keep
+                    # running to completion.
+                    coro.close()
+                    return _SKIP
                 return await coro
 
         skip = self.skip or set()
@@ -90,6 +110,8 @@ class Runner:
         results: list[ScenarioResult] = []
         for fut in asyncio.as_completed(tasks):
             r = await fut
+            if r is _SKIP:
+                continue
             results.append(r)
             await _maybe_call(on_result, r)
         return results

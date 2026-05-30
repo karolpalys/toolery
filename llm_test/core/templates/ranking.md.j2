@@ -2,13 +2,24 @@
 
 Last updated: {{ updated_iso }}   |   Tracked: {{ model_count }} models, {{ run_count }} runs total
 
-| # | Model | Overall | Best adapter | Runs |
-|---|-------|--------:|--------------|-----:|
+Score reflects each model under its **best-performing adapter** — averaging across adapters would let a weak harness drag a strong model's number down. Per-adapter detail is in the breakdown below.
+
+| # | Model | Score | Best adapter | Runs |
+|---|-------|------:|--------------|-----:|
 {% for row in rows -%}
 | {{ loop.index }} | {{ row.model }} | {{ "%.1f%%"|format(row.score*100) }} | {{ row.best_adapter }} | {{ row.runs }} |
 {% endfor %}
 
+## Per-(model, adapter) breakdown
+
+| Model | Adapter | Score | Runs |
+|-------|---------|------:|-----:|
+{% for p in breakdown -%}
+| {{ p.model }} | {{ p.adapter }} | {{ "%.1f%%"|format(p.score*100) }} | {{ p.runs }} |
+{% endfor %}
+
 ## Method
-- Last {{ window }} runs per model, half-life decay {{ half_life }} days
-- Bootstrap {{ bootstrap_iters }} resamples for 95% CI
-- McNemar test vs next model in ranking; p < 0.05 marked as "statistically distinguishable"
+- Last {{ window }} runs per (model, adapter) pair, half-life decay {{ half_life }} days
+- Per-run mean is tier-weighted: easy=1, medium=2, hard=3, very_hard=4
+- Model-level score = highest-scoring adapter for that model (adapter is part of the test config)
+- Implicit partial-credit gradient applied when only some required checks fail (capped at the "partial" weight)

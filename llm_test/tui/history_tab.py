@@ -530,7 +530,8 @@ class HistoryTab(Container):
     def _build_diff_md(self, run_a: str, run_b: str) -> str:
         results_dir = Path(
             os.environ.get("LLM_TEST_RESULTS_DIR", "./results"))
-        safe = lambda s: s.replace("/", "_")
+        def safe(s):
+            return s.replace("/", "_")
         out_path = (results_dir / "compare"
                     / f"{safe(run_a)}__vs__{safe(run_b)}.md")
         store = self._store()

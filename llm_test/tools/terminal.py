@@ -1,6 +1,5 @@
 from llm_test.tools.registry import ToolSpec, register
 
-
 BASH_EXEC = ToolSpec(
     name="bash_exec",
     description="Execute a shell command and return stdout, stderr, exit code, and duration.",

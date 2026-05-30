@@ -29,6 +29,19 @@ def test_build_argv_minimum_required():
     assert "--with-perf" not in argv
 
 
+def test_build_argv_multi_tier_and_category_pass_comma_joined():
+    """Multi-select in the launch modal yields comma-joined tier/category
+    strings; build_argv must forward them verbatim to the child CLI."""
+    args = RunArgs(
+        model="m", base_url="http://x", adapter="raw",
+        tier="easy,hard", category="coding,debugging",
+        trials=1, concurrency=1,
+    )
+    argv = build_argv(args)
+    assert argv[argv.index("--tier") + 1] == "easy,hard"
+    assert argv[argv.index("--category") + 1] == "coding,debugging"
+
+
 def test_build_argv_with_perf_adds_flag():
     args = RunArgs(
         model="m", base_url="http://x", adapter="raw",
@@ -36,6 +49,20 @@ def test_build_argv_with_perf_adds_flag():
     )
     argv = build_argv(args)
     assert "--with-perf" in argv
+
+
+def test_build_argv_resume_emits_only_resume_flag():
+    """When resume is set, argv must reduce to `llm-test run --resume <id>` so
+    the CLI hydrates everything from the original run's config_json."""
+    args = RunArgs(
+        model="placeholder", base_url="http://placeholder",
+        adapter="raw", tier="all", trials=1, concurrency=1,
+        with_perf=True, cluster="dual",
+        resume="2026-05-26T07-34_Qwen3.6-27B-FP8",
+    )
+    argv = build_argv(args, executable="/bin/llm-test")
+    assert argv == ["/bin/llm-test", "run", "--resume",
+                    "2026-05-26T07-34_Qwen3.6-27B-FP8"]
 
 
 @pytest.mark.asyncio

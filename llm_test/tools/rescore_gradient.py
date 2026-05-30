@@ -10,7 +10,6 @@ Run from the repo root:
 
 from __future__ import annotations
 
-import json
 import os
 import sqlite3
 import statistics
@@ -115,7 +114,7 @@ def main() -> None:
     for tier in tiers:
         offs, ons = [], []
         for entries in per_model.values():
-            for sid, t, off, on, _, missing in entries:
+            for _sid, t, off, on, _, missing in entries:
                 if missing or t != tier:
                     continue
                 offs.append(off)
@@ -144,7 +143,7 @@ def main() -> None:
         deltas = {}
         for t in tier_list:
             offs, ons = [], []
-            for sid, tt, off, on, _, missing in entries:
+            for _sid, tt, off, on, _, missing in entries:
                 if missing or tt != t:
                     continue
                 offs.append(off)

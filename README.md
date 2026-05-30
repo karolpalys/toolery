@@ -1,6 +1,6 @@
 # LLM-test
 
-Deterministic 4-tier LLM tool-calling benchmark with 4 execution adapters (raw OpenAI port / Hermes / Claude Code CLI / Codex CLI), Textual TUI, ASCII + PNG charts, 14-dimension ranking system, and llama-benchy perf integration.
+Deterministic 4-tier LLM tool-calling benchmark with 3 execution adapters (raw OpenAI port / cloud OpenAI-compatible API / Hermes CLI), Textual TUI, ASCII + PNG charts, 14-dimension ranking system, and llama-benchy perf integration.
 
 **Status:** 83 scenarios shipped, 117 tests passing, 15 ranking dimensions, hallucination + error-recovery + API + SQL + terminal-handling suites.
 
@@ -18,10 +18,10 @@ export LLM_TEST_BASE_URL=http://localhost:8000
 llm-test run --model deepseek-v4-flash --adapter raw --tier easy --trials 3
 
 # all adapters
-llm-test run --model deepseek-v4-flash --adapter raw,hermes,claude_code,codex \
+llm-test run --model deepseek-v4-flash --adapter raw,cloud,hermes \
              --tier all --trials 5 --with-perf
 
-# TUI dashboard (6 tabs: Home / Rankings / Compare / Scenarios / History / Setup)
+# TUI dashboard (6 tabs: Home / Rankings / Compare / Scenarios / History / Profiles)
 llm-test tui
 
 # compare two runs
@@ -45,7 +45,6 @@ llm-test scenarios --tier easy    # available scenarios
   - `LLM_TEST_BASE_URL` — vLLM/llama.cpp/SGLang endpoint (default: http://localhost:8000)
   - `OPENAI_API_KEY` — empty OK for local
   - `HERMES_API_URL`, `HERMES_GATEWAY_URL`, `HERMES_TOKEN`, `HERMES_WORKSPACE`
-  - `CLAUDE_CLI_PATH`, `CODEX_CLI_PATH` — path to CLI binaries
   - `LLM_TEST_RESULTS_DIR` — where to persist runs (default: ./results)
 
 ## TUI workflow
@@ -62,19 +61,18 @@ llm-test scenarios --tier easy    # available scenarios
 - **Compare** — side-by-side diff of two runs with McNemar significance.
 - **Scenarios** — scenario catalog.
 - **History** — past runs.
-- **Setup** — pick a use-case persona (Coding Assistant, Reasoning, Agentic Orchestrator, Safety/RAG, Customer Support, Data Analyst, Local Coding Agent). The chosen persona creates an additional `UC:<Name>` ranking column in Rankings, computed with persona-specific dimension weights. The global Overall column is unaffected. Selection persists in `results/setup.json`.
+- **Profiles** — pick a use-case persona (Coding Assistant, Reasoning, Agentic Orchestrator, Safety/RAG, Customer Support, Data Analyst, Local Coding Agent). The chosen persona creates an additional `UC:<Name>` ranking column in Rankings, computed with persona-specific dimension weights. The global Overall column is unaffected. Selection persists in `results/setup.json`.
 
 Harnesses are gated on host availability: `raw` is always selectable;
-`hermes`, `claude_code`, and `codex` are disabled with a reason hint if
-the CLI binary or env var (`CLAUDE_CLI_PATH` / `CODEX_CLI_PATH`) is
-missing.
+`cloud` needs an API key (`OPENAI_API_KEY` / `ANTHROPIC_API_KEY`) and
+`hermes` is disabled with a reason hint if the `hermes` CLI is not in PATH.
 
 ## What it tests
 
 - 4-tier difficulty taxonomy (easy / medium / hard / very_hard), 83 scenarios total
 - 18+ deterministic scoring primitives (no LLM judge — $0 cost, reproducible)
 - 14-dimension rankings (see column reference below)
-- Same model × 4 harnesses → measures "what the harness adds vs what the model knows"
+- Same model × multiple harnesses → measures "what the harness adds vs what the model knows"
 - Statistical rigor: bootstrap CI, time-decay weighted rankings, tier-weighted aggregation
 - Anti-ceiling mechanics: tight budgets, adversarial injections, long-context degradation
 - Anti-hallucination: 7 dedicated scenarios + auto `no_hallucinated_tool` guard on every test
@@ -92,7 +90,7 @@ column get 🥇 🥈 🥉 medals.
 |---|---|
 | **#** | Rank in the current sort order — renumbered on every sort |
 | **Model** | Display name (e.g. `Qwen3.6-35B-A3B-int4-mixed-AutoRound`). One model = one row. The shown adapter is the one with the highest `Overall` for that model |
-| **Adapter** | `raw` (direct vLLM/OpenAI), `hermes` (Hermes CLI), `claude_code` (Claude Code CLI), `codex` (Codex CLI). Has a large effect on score — same model under hermes can score 8× lower than under raw |
+| **Adapter** | `raw` (direct vLLM/OpenAI), `cloud` (remote OpenAI-compatible API), `hermes` (Hermes CLI). Has a large effect on score — same model under hermes can score 8× lower than under raw |
 
 ### Score columns (centre) — **higher % = better, always**
 
@@ -147,13 +145,13 @@ Both populated only when the run was launched with `--with-perf` (or the
 LLM-test/
 ├── llm_test/
 │   ├── core/           # models, scenario loader, scorer, runner, store, markdown, stats
-│   ├── adapters/       # 4 adapters: openai_raw, hermes, claude_code, codex (+ MockAdapter)
+│   ├── adapters/       # 3 adapters: openai_raw, cloud, hermes (+ MockAdapter)
 │   ├── tools/          # tool registry + generic.py + domain.py mock specs
 │   ├── perf/           # llama-benchy subprocess wrapper
 │   ├── charts/         # ascii.py + png.py (7 matplotlib renderers)
 │   ├── rankings/       # regenerate_rankings — 8 dimensions
 │   ├── compare.py      # cross-run diff with McNemar
-│   ├── tui/            # Textual TUI (Home/Rankings/Compare/Scenarios/History/Setup tabs)
+│   ├── tui/            # Textual TUI (Home/Rankings/Compare/Scenarios/History/Profiles tabs)
 │   └── cli.py          # typer entrypoint
 ├── scenarios/          # 83 scenarios across easy/medium/hard/very_hard
 ├── results/            # SQLite + .md + JSON traces + PNG charts (gitignored)

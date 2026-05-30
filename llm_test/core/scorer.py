@@ -420,7 +420,7 @@ def check_response_markdown_table(calls, chk, response):
         return _bad("response_markdown_table", f"row count {len(rows)} != {row_count}")
     contains_rows = d.get("contains_rows") or []
     for expected in contains_rows:
-        if not any(all(str(cell).lower() in row_cell.lower() for cell, row_cell in zip(expected, row)) for row in rows):
+        if not any(all(str(cell).lower() in row_cell.lower() for cell, row_cell in zip(expected, row, strict=False)) for row in rows):
             return _bad("response_markdown_table", f"missing row like {expected}")
     return _ok("response_markdown_table", "markdown table matched")
 

@@ -5,7 +5,6 @@ import pytest
 
 from llm_test.core.text_utils import strip_reasoning_tags, unwrap_structured_payload
 
-
 # ---------- strip_reasoning_tags ---------------------------------------------
 
 def test_strip_reasoning_tags_removes_paired_think():

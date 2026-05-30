@@ -98,7 +98,7 @@ USE_CASES: list[UseCase] = [
     UseCase(
         key="local_coding_agent",
         name="Local Coding Agent",
-        description="Local CLI agent (Claude Code / Codex) — heavy terminal + autonomy.",
+        description="Local CLI agent — heavy terminal + autonomy.",
         weights={
             "coding": 3.0, "debugging": 3.0, "terminal": 3.0, "agentic": 2.5,
             "safety": 1.5, "adversarial_robustness": 2.5, "restraint": 1.5,

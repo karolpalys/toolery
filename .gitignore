@@ -5,6 +5,9 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 results/
+logs/
+.bak/
+*.bak
 config.yaml
 *.egg-info/
 dist/
@@ -15,3 +18,4 @@ htmlcov/
 .env.*
 .idea/
 .vscode/
+.worktrees/

@@ -36,6 +36,57 @@ async def test_runner_single_scenario_single_adapter_pass():
 
 
 @pytest.mark.asyncio
+async def test_runner_skip_set_omits_completed_units():
+    """Resume contract: units in `skip` must not produce new results."""
+    plan = ScenarioPlan(
+        tool_calls=[ToolCall(index=0, name="get_weather", args={"location": "Warsaw"})],
+        final_response="ok",
+    )
+    mock = MockAdapter(plans={"easy-01-direct-weather": plan})
+    skip = {("easy-01-direct-weather", "mock", 0), ("easy-01-direct-weather", "mock", 2)}
+    runner = Runner(adapters={"mock": mock}, trials=3, model="x", skip=skip)
+    results = await runner.run([_scenario()])
+    assert len(results) == 1
+    assert results[0].trial_index == 1
+
+
+@pytest.mark.asyncio
+async def test_runner_should_stop_drains_inflight_skips_pending():
+    """Pause contract: once should_stop() flips True, the unit already running
+    finishes and records its result, but NO further units are started.
+
+    With concurrency=1 exactly one unit runs at a time, so flipping stop in the
+    first on_result must yield exactly one result and exactly one on_start —
+    proving the in-flight unit completed and nothing new was scheduled."""
+    plan = ScenarioPlan(
+        tool_calls=[ToolCall(index=0, name="get_weather", args={"location": "Warsaw"})],
+        final_response="ok",
+    )
+    mock = MockAdapter(plans={"easy-01-direct-weather": plan})
+    starts: list = []
+    results: list = []
+
+    def on_start(*a):
+        starts.append(a)
+
+    def on_result(r):
+        results.append(r)
+
+    # Stop scheduling once any unit has started. With concurrency=1, trial 0
+    # passes the gate and runs to completion; by the time trial 1 acquires the
+    # slot, should_stop() is True, so it (and the rest) are skipped — proving
+    # the in-flight unit drained while no new units started.
+    runner = Runner(adapters={"mock": mock}, trials=5, model="x",
+                    concurrency=1, on_start=on_start)
+    returned = await runner.run([_scenario()], on_result=on_result,
+                                should_stop=lambda: len(starts) >= 1)
+    assert len(results) == 1
+    assert len(starts) == 1
+    # Pending (skipped) units must not leak into the returned result list.
+    assert returned == results
+
+
+@pytest.mark.asyncio
 async def test_runner_multiple_adapters():
     s = _scenario()
     plan_good = ScenarioPlan(

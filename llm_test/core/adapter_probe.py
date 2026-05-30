@@ -32,16 +32,4 @@ def available_adapters(
         if path_lookup("hermes")
         else AdapterStatus(available=False, reason="hermes CLI not in PATH")
     )
-    if env.get("CLAUDE_CLI_PATH") or path_lookup("claude"):
-        out["claude_code"] = AdapterStatus(available=True)
-    else:
-        out["claude_code"] = AdapterStatus(
-            available=False, reason="set CLAUDE_CLI_PATH or install claude"
-        )
-    if env.get("CODEX_CLI_PATH") or path_lookup("codex"):
-        out["codex"] = AdapterStatus(available=True)
-    else:
-        out["codex"] = AdapterStatus(
-            available=False, reason="set CODEX_CLI_PATH or install codex"
-        )
     return out

@@ -12,16 +12,19 @@ from pydantic import BaseModel, Field
 _spawn_child = asyncio.create_subprocess_exec
 
 
-Adapter = Literal["raw", "hermes", "claude_code", "codex"]
+Adapter = Literal["raw", "cloud", "hermes"]
 Tier = Literal["easy", "medium", "hard", "very_hard", "all"]
-Cluster = Literal["single", "dual", "triple", "quad"]
+Cluster = Literal["single", "dual", "triple", "quad", "octa"]
 
 
 class RunArgs(BaseModel):
     model: str
     base_url: str
     adapter: Adapter
-    tier: Tier
+    # tier/category are comma-joined strings ("easy,hard") when the launch
+    # modal multi-selects, or a single value, or "all". The child CLI splits
+    # them, so we keep them as free-form strings rather than a single Literal.
+    tier: str = "all"
     trials: int = Field(ge=1, le=100)
     concurrency: int = Field(ge=1, le=64)
     with_perf: bool = False
@@ -31,9 +34,14 @@ class RunArgs(BaseModel):
     # API-side model name (alias the served endpoint expects). If None or equal
     # to `model`, omit --served-model and let cli.py default to --model value.
     served_model: str | None = None
+    # When set, argv collapses to `llm-test run --resume <run_id>` and the
+    # receiving CLI rehydrates model/base_url/tier/etc from the run's config_json.
+    resume: str | None = None
 
 
 def build_argv(args: RunArgs, executable: str = "llm-test") -> list[str]:
+    if args.resume:
+        return [executable, "run", "--resume", args.resume]
     argv = [
         executable, "run",
         "--model", args.model,

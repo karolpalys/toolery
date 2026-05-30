@@ -35,6 +35,11 @@ scoring:
         - ["\\bAAPL\\b", "\\bApple\\b"]
         - ["\\$", "\\bUSD\\b", "dollar"]
       none_of: ["error", "couldn't", "could not find"]
+    # Anti-hallucination: must ground the price via a real tool call.
+    - check: call_count_at_least
+      n: 1
+    - check: no_hallucinated_tool
+      allowed: [get_stock_price, web_search]
   forbidden:
     - check: tool_called
       tool: get_weather

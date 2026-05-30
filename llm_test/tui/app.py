@@ -15,9 +15,9 @@ from llm_test.tui.compare_tab import CompareTab
 from llm_test.tui.history_tab import HistoryTab
 from llm_test.tui.home_tab import HomeTab
 from llm_test.tui.launch_modal import LaunchModal
+from llm_test.tui.profiles_tab import ProfilesTab
 from llm_test.tui.rankings_tab import RankingsTab
 from llm_test.tui.scenarios_tab import ScenariosTab
-from llm_test.tui.setup_tab import SetupTab
 
 
 class LLMTestApp(App):
@@ -85,8 +85,8 @@ class LLMTestApp(App):
                 yield ScenariosTab(id="scenarios-tab")
             with TabPane("History", id="history"):
                 yield HistoryTab(id="history-tab")
-            with TabPane("Setup", id="setup"):
-                yield SetupTab(id="setup-tab")
+            with TabPane("Profiles", id="setup"):
+                yield ProfilesTab(id="setup-tab")
         yield Footer()
 
     def action_refresh(self) -> None:
@@ -240,18 +240,21 @@ class LLMTestApp(App):
             proc.terminate()
             try:
                 await asyncio.wait_for(proc.wait(), timeout=kill_after)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 proc.kill()
                 await proc.wait()
         except ProcessLookupError:
             pass
 
     async def pause_current_run(self) -> None:
-        """Stop the subprocess gracefully and mark the run as paused so Resume
-        can pick up later. Any scenarios with in_flight rows are cleared so
-        they re-run on resume rather than being recorded as failed."""
+        """Mark the run paused WITHOUT killing the subprocess. The running
+        subprocess polls runs.status after every completed result; once it sees
+        'paused' it stops scheduling new scenarios but lets units already in
+        flight finish and record their results. We therefore do NOT terminate
+        the process and do NOT clear in_flight rows — those scenarios are still
+        executing and will clear themselves (via on_end) as they complete.
+        Resume picks up from the next not-yet-recorded unit."""
         run_id = self._latest_running_run_id()
-        await self._terminate_subprocess()
         if run_id is None:
             return
         from datetime import UTC, datetime
@@ -259,7 +262,6 @@ class LLMTestApp(App):
         if store is None:
             return
         try:
-            store.clear_all_in_flight(run_id)
             with store.conn() as c:
                 c.execute(
                     "UPDATE runs SET status='paused', updated_at=? "
@@ -267,7 +269,7 @@ class LLMTestApp(App):
                     (datetime.now(UTC).isoformat().replace("+00:00", "Z"), run_id),
                 )
         except Exception as e:
-            self.notify(f"Pause cleanup failed: {e}",
+            self.notify(f"Pause failed: {e}",
                         severity="warning", markup=False)
 
     async def resume_current_run(self) -> None:
@@ -315,7 +317,7 @@ class LLMTestApp(App):
             self.notify(f"Stop cleanup failed: {e}",
                         severity="warning", markup=False)
 
-    def _resolve_store_safe(self) -> "Store | None":
+    def _resolve_store_safe(self) -> Store | None:
         if self._store is None:
             try:
                 results_dir = Path(
@@ -327,7 +329,7 @@ class LLMTestApp(App):
         return self._store
 
     @work
-    async def _watch_subprocess_worker(self, args: "runner_subprocess.RunArgs") -> None:
+    async def _watch_subprocess_worker(self, args: runner_subprocess.RunArgs) -> None:
         """Watch the spawned run subprocess; notify on exit, mark DB on failure.
 
         Without this, a silently-crashed subprocess leaves runs.db status='running'

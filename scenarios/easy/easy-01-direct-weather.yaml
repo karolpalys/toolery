@@ -37,6 +37,12 @@ scoring:
         - ["(?<![\\w.])7(?!\\.\\d)(?!\\w)", "\\bseven\\b"]
         - ["cloud", "overcast", "grey", "gray"]
       none_of: ["error", "could not", "couldn't"]
+    # Anti-hallucination: at least one tool MUST be called. Otherwise the model
+    # could fabricate "7 °C cloudy in Warsaw" without grounding and still pass.
+    - check: call_count_at_least
+      n: 1
+    - check: no_hallucinated_tool
+      allowed: [get_weather, web_search]
   forbidden: []
   partial:
     - check: tool_called

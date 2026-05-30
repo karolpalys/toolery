@@ -13,7 +13,6 @@ from llm_test.core.scenario import load_all_scenarios
 from llm_test.core.store import Store
 from llm_test.rankings.compute import collapse_matrix_rows, compute_matrix
 
-
 _RANKING_MODES = [
     ("model_best", "Model best", "best adapter per model"),
     ("pair", "Model+adapter", "one row per adapter"),
@@ -181,6 +180,20 @@ def _meta_cell(text: str, dim_style: str = "bold") -> Text:
     return Text(text, style=dim_style)
 
 
+def _round_items(d: dict | None, ndigits: int = 3) -> tuple:
+    """Sorted (key, value) tuple with floats rounded to display precision.
+
+    Matrix scores are time-decayed, so a pair's raw float drifts by ~1e-6 every
+    poll (age grows continuously) even when nothing the user can see changed.
+    Rounding to display precision before building the render signature stops
+    that drift from triggering a needless clear()+rebuild — which would reset
+    the user's horizontal scroll every 5 seconds."""
+    return tuple(sorted(
+        (k, round(v, ndigits) if isinstance(v, float) else v)
+        for k, v in (d or {}).items()
+    ))
+
+
 def _current_scenarios_hash() -> str | None:
     """Hash of the currently-loaded scenarios — same fn as cli.py uses on save."""
     try:
@@ -194,50 +207,32 @@ def _current_scenarios_hash() -> str | None:
     ).hexdigest()[:16]
 
 
-def _latest_cluster(store: Store) -> dict[tuple[str, str], str]:
-    """Per (model, adapter), pick the cluster topology of the most recent run.
-    Older runs without a cluster value report None and are skipped."""
-    out: dict[tuple[str, str], str] = {}
-    with store.conn() as c:
-        rows = c.execute("""
-            SELECT r.model, ar.adapter, r.cluster, r.started_at
-            FROM runs r
-            JOIN adapters_in_run ar ON ar.run_id = r.run_id
-            WHERE r.cluster IS NOT NULL
-            ORDER BY r.started_at DESC
-        """).fetchall()
-    for row in rows:
-        key = (row["model"], row["adapter"])
-        if key not in out:
-            out[key] = row["cluster"]
-    return out
+def _aggregate_perf(store: Store, history_window_runs: int = 5) -> dict[tuple[str, str, str | None], dict[str, float]]:
+    """Return per-(model, adapter, cluster) average pp_tps + tg_tps from perf_results.
 
-
-def _aggregate_perf(store: Store, history_window_runs: int = 5) -> dict[tuple[str, str], dict[str, float]]:
-    """Return per-(model, adapter) average pp_tps + tg_tps from perf_results.
-
-    Aggregation: for each pair, take the last N runs (by started_at), for each
-    run mean across depths, then mean across runs (no decay — perf is a hardware
-    measurement, not a model-quality one).
+    Keyed by cluster too: throughput is a hardware measurement and genuinely
+    differs across DGX Spark topologies, so a model's single-spark perf must not
+    blend into its dual-spark row. Aggregation: mean across depths, then mean
+    across runs of the same (model, adapter, cluster) — no decay.
     """
-    out: dict[tuple[str, str], dict[str, list[float]]] = defaultdict(
+    out: dict[tuple[str, str, str | None], dict[str, list[float]]] = defaultdict(
         lambda: {"pp_tps": [], "tg_tps": []}
     )
     with store.conn() as c:
         rows = c.execute("""
-            SELECT r.run_id, r.model, ar.adapter, p.pp_tps, p.tg_tps
+            SELECT r.run_id, r.model, ar.adapter, r.cluster, p.pp_tps, p.tg_tps
             FROM perf_results p
             JOIN runs r ON r.run_id = p.run_id
             JOIN adapters_in_run ar ON ar.run_id = r.run_id
             ORDER BY r.started_at DESC
         """).fetchall()
     for row in rows:
-        key = (row["model"], row["adapter"])
+        key = (row["model"], row["adapter"], row["cluster"])
         if row["pp_tps"] is not None:
             out[key]["pp_tps"].append(row["pp_tps"])
         if row["tg_tps"] is not None:
             out[key]["tg_tps"].append(row["tg_tps"])
-    agg: dict[tuple[str, str], dict[str, float]] = {}
+    agg: dict[tuple[str, str, str | None], dict[str, float]] = {}
     for key, perf in out.items():
         d: dict[str, float] = {}
         for k, vals in perf.items():
@@ -400,12 +395,16 @@ class RankingsTab(Container):
 
     @staticmethod
     def _signature_for_row(r: dict) -> tuple:
-        """Capture rendered fields only — used to detect 'nothing changed'."""
+        """Capture rendered fields only — used to detect 'nothing changed'.
+
+        Float values are rounded to display precision so the continuous
+        time-decay drift in scores doesn't make every poll look 'changed'
+        (see _round_items)."""
         return (
             r.get("model"), r.get("adapter"),
-            tuple(sorted((r.get("scores") or {}).items())),
-            tuple(sorted((r.get("perf") or {}).items())),
-            tuple(sorted((r.get("stability", {}).get("overall") or {}).items())),
+            _round_items(r.get("scores")),
+            _round_items(r.get("perf")),
+            _round_items(r.get("stability", {}).get("overall")),
             r.get("runs"), bool(r.get("stale")), r.get("cluster"),
         )
 
@@ -434,13 +433,13 @@ class RankingsTab(Container):
             return
 
         perf_agg = _aggregate_perf(store)
-        cluster_agg = _latest_cluster(store)
         canonical_hash = _current_scenarios_hash()
 
         for r in matrix:
-            key = (r["model"], r["adapter"])
+            # cluster is now part of the matrix row (compute_matrix keys on it),
+            # so perf is matched per (model, adapter, cluster) too.
+            key = (r["model"], r["adapter"], r.get("cluster"))
             r["perf"] = perf_agg.get(key, {})
-            r["cluster"] = cluster_agg.get(key)   # None when not recorded
             hashes = r.get("scenarios_hashes") or set()
             r["stale"] = bool(canonical_hash and hashes and canonical_hash not in hashes)
 
@@ -477,7 +476,7 @@ class RankingsTab(Container):
             "adapter": lambda r: r["adapter"],
             "runs": lambda r: -(r.get("runs") or 0),
             "set": lambda r: 1 if r.get("stale") else 0,
-            "cluster": lambda r: {"quad": 0, "triple": 1, "dual": 2, "single": 3}.get(r.get("cluster"), 4),
+            "cluster": lambda r: {"octa": 0, "quad": 1, "triple": 2, "dual": 3, "single": 4}.get(r.get("cluster"), 5),
         }
         for dim in _DIMENSIONS:
             d = dim
@@ -540,6 +539,10 @@ class RankingsTab(Container):
     def _populate_rows(self) -> None:
         """Re-sort + re-render. Reads self._rows_cache + self._sort_by/_desc."""
         tbl = self.query_one("#rank-matrix", DataTable)
+        # clear() resets scroll to the origin. Capture the current offset so we
+        # can restore it after re-adding rows — otherwise the poll/re-sort yanks
+        # the user back to the leftmost column mid-scroll.
+        prev_x, prev_y = tbl.scroll_x, tbl.scroll_y
         # Clear data rows only — keep columns.
         tbl.clear()
         rows = list(self._rows_cache)
@@ -593,7 +596,9 @@ class RankingsTab(Container):
                          else Text("✓", style="bold dim green"))
             # Cluster cell — bold colour-coded so spark-count stands out at a glance.
             cluster = r.get("cluster")
-            if cluster == "quad":
+            if cluster == "octa":
+                cells.append(Text("⚡⚡⚡⚡ octa", style="bold magenta"))
+            elif cluster == "quad":
                 cells.append(Text("⚡⚡⚡ quad", style="bold cyan"))
             elif cluster == "triple":
                 cells.append(Text("⚡⚡ triple", style="bold cyan"))
@@ -605,6 +610,14 @@ class RankingsTab(Container):
                 cells.append(Text("—", style="bold dim"))
             # height=2 → ≈1.5× visual size in the terminal.
             tbl.add_row(*cells, height=2)
+
+        # Restore the pre-clear scroll offset once the new virtual size is laid
+        # out (clamped to the new bounds). Without the after-refresh defer the
+        # offset would be clamped against the stale, just-cleared size.
+        if prev_x or prev_y:
+            def _restore(x: float = prev_x, y: float = prev_y) -> None:
+                tbl.scroll_to(x=x, y=y, animate=False)
+            self.call_after_refresh(_restore)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id or ""

@@ -11,16 +11,6 @@ adapters:
     api_url: http://localhost:8644
     token_env: HERMES_TOKEN
     workspace_id: default
-  claude_code:
-    enabled: false
-    cli_path: claude
-    use_local_model: true
-    backend_url_env: LLM_TEST_BASE_URL
-    timeout_per_scenario: 300
-  codex:
-    enabled: false
-    cli_path: codex
-    use_local_model: true
 
 storage:
   results_dir: ./results

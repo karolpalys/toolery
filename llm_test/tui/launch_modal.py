@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, RadioButton, RadioSet, Static
+from textual.widgets import (
+    Button,
+    Input,
+    Label,
+    RadioButton,
+    RadioSet,
+    SelectionList,
+    Static,
+)
 
 from llm_test.core.adapter_probe import AdapterStatus
 from llm_test.core.endpoint_scanner import EndpointInfo
@@ -15,9 +24,6 @@ _ADAPTER_LABELS = {
     "raw":         "raw                - local OpenAI-compatible port",
     "cloud":       "cloud              - remote OpenAI-compatible API (needs key)",
     "hermes":      "hermes             - CLI subprocess",
-    "claude":      "claude             - Claude Code CLI",
-    # claude_code kept as legacy alias for older configs/DB rows.
-    "claude_code": "claude             - Claude Code CLI",
 }
 
 
@@ -51,6 +57,15 @@ class LaunchModal(ModalScreen[RunArgs | None]):
         padding: 0 1;
     }
 
+    /* Cap the multi-select lists so the long Category list scrolls internally
+       instead of pushing the Run button below the modal fold. */
+    LaunchModal #category,
+    LaunchModal #tier {
+        height: 8;
+        border: none;
+        background: $surface;
+    }
+
     LaunchModal #category-col {
         margin-right: 2;
     }
@@ -78,6 +93,12 @@ class LaunchModal(ModalScreen[RunArgs | None]):
         self._endpoint = endpoint
         self._adapters = adapters
         self._interrupted_run = interrupted_run
+        # Last-known selection per multi-select list, keyed by widget id. Lets
+        # the SelectedChanged handler tell "user added a specific" apart from
+        # "user re-picked all" so the 'all' pseudo-option stays exclusive.
+        self._prev_selection: dict[str, list[str]] = {
+            "category": ["all"], "tier": ["all"],
+        }
 
     def compose(self) -> ComposeResult:
         with VerticalScroll():
@@ -87,21 +108,17 @@ class LaunchModal(ModalScreen[RunArgs | None]):
 
             with Horizontal(id="category-tier-row"):
                 with Vertical(id="category-col"):
-                    yield Label("Category:")
-                    with RadioSet(id="category"):
-                        btn_cat_all = RadioButton("all", id="category-all")
-                        btn_cat_all.value = True
-                        yield btn_cat_all
-                        for cat in Category:
-                            yield RadioButton(cat.value, id=f"category-{cat.value}")
+                    yield Label("Category (multi-select; 'all' = whole suite):")
+                    cat_options = [("all", "all", True)]
+                    cat_options += [(cat.value, cat.value, False) for cat in Category]
+                    yield SelectionList[str](*cat_options, id="category")
                 with Vertical(id="tier-col"):
-                    yield Label("Tier:")
-                    with RadioSet(id="tier"):
-                        for value in ("all", "easy", "medium", "hard", "very_hard"):
-                            btn = RadioButton(value, id=f"tier-{value}")
-                            if value == "all":
-                                btn.value = True
-                            yield btn
+                    yield Label("Tier (multi-select; 'all' = every tier):")
+                    tier_options = [
+                        (value, value, value == "all")
+                        for value in ("all", "easy", "medium", "hard", "very_hard")
+                    ]
+                    yield SelectionList[str](*tier_options, id="tier")
 
             yield Label("Mode:")
             with RadioSet(id="mode"):
@@ -133,14 +150,11 @@ class LaunchModal(ModalScreen[RunArgs | None]):
 
             yield Label("Harness:")
             with RadioSet(id="adapter"):
-                # UI exposes 4 options: raw / cloud / hermes / claude. The
-                # `claude` key is what the user sees; internal lookups still
-                # accept claude_code as the canonical adapter status key.
+                # UI exposes 3 options: raw / cloud / hermes.
                 for ui_name, status_key in (
                     ("raw",    "raw"),
                     ("cloud",  "cloud"),
                     ("hermes", "hermes"),
-                    ("claude", "claude_code"),
                 ):
                     status = self._adapters.get(status_key) or self._adapters.get(ui_name)
                     if status is None:
@@ -158,6 +172,34 @@ class LaunchModal(ModalScreen[RunArgs | None]):
                 yield Button("Cancel", id="cancel", variant="default")
                 yield Button("Run", id="run", variant="primary")
 
+    @on(SelectionList.SelectedChanged, "#category")
+    @on(SelectionList.SelectedChanged, "#tier")
+    def _keep_all_exclusive(self, event: SelectionList.SelectedChanged) -> None:
+        """'all' is mutually exclusive with the specific options. Picking a
+        specific value drops 'all'; re-picking 'all' drops the specifics; an
+        empty selection falls back to 'all' so a run target always exists.
+
+        The handler is convergent: every programmatic deselect/select below
+        re-fires SelectedChanged, but only into a now-normalized state that
+        triggers no further changes — so it settles without a re-entrancy flag.
+        """
+        sl = event.selection_list
+        key = sl.id or ""
+        sel = list(sl.selected)
+        prev = self._prev_selection.get(key, ["all"])
+        if "all" in sel and len(sel) > 1:
+            if "all" in prev:
+                # 'all' was already on, user added a specific → drop 'all'.
+                sl.deselect("all")
+            else:
+                # User turned 'all' back on → drop the specifics.
+                for value in sel:
+                    if value != "all":
+                        sl.deselect(value)
+        elif not sel:
+            sl.select("all")
+        self._prev_selection[key] = list(sl.selected)
+
     def action_cancel(self) -> None:
         self.dismiss(None)
 
@@ -170,16 +212,17 @@ class LaunchModal(ModalScreen[RunArgs | None]):
                 self.dismiss(args)
 
     def _selected_tier(self) -> str:
-        rs = self.query_one("#tier", RadioSet)
-        if rs.pressed_button is None:
-            return "all"
-        return rs.pressed_button.id.removeprefix("tier-")
+        return self._selected_multi("#tier")
 
     def _selected_category(self) -> str:
-        rs = self.query_one("#category", RadioSet)
-        if rs.pressed_button is None:
+        return self._selected_multi("#category")
+
+    def _selected_multi(self, selector: str) -> str:
+        """Comma-join the chosen values, or 'all' if 'all' (or nothing) is on."""
+        sel = list(self.query_one(selector, SelectionList).selected)
+        if not sel or "all" in sel:
             return "all"
-        return rs.pressed_button.id.removeprefix("category-")
+        return ",".join(sel)
 
     def _selected_adapter(self) -> str:
         rs = self.query_one("#adapter", RadioSet)

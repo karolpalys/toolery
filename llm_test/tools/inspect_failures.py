@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import sqlite3
 import sys
@@ -90,7 +89,7 @@ def main(scenario_ids: list[str]) -> None:
                   f"(n={len(passes)})")
 
         # --- the failing check examples
-        print(f"\nFailure details (first 3 per check):")
+        print("\nFailure details (first 3 per check):")
         for label, examples in sorted(miss_examples.items()):
             print(f"  ✗ {label} — failed in {len(examples)} trials")
             for model, detail in examples[:3]:

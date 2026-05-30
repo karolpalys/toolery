@@ -6,7 +6,18 @@ build-backend = "hatchling.build"
 name = "llm-test"
 version = "0.1.0"
 description = "Deterministic 4-tier LLM tool-calling benchmark"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.11"
+authors = [{ name = "karol.palys" }]
+keywords = ["llm", "benchmark", "tool-calling", "evaluation", "tui", "agents"]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Environment :: Console",
+]
 dependencies = [
   "typer>=0.12",
   "rich>=13.7",
@@ -36,6 +47,11 @@ dev = [
 [project.scripts]
 llm-test = "llm_test.cli:app"
 
+[project.urls]
+Homepage = "https://github.com/karol.palys/LLM-test"
+Repository = "https://github.com/karol.palys/LLM-test"
+Issues = "https://github.com/karol.palys/LLM-test/issues"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -48,3 +64,8 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B"]
 ignore = ["E501"]  # let formatter handle line length
+
+[tool.ruff.lint.per-file-ignores]
+# Tests intentionally place some imports after module-level setup
+# (env tweaks, fixtures) — E402 is expected there.
+"tests/**" = ["E402"]

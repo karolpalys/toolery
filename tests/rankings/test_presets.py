@@ -1,9 +1,10 @@
-from llm_test.rankings.presets import USE_CASES, UseCase, get_use_case
+from llm_test.rankings.presets import USE_CASES, get_use_case
 
 EXPECTED_DIMS = {
-    "coding", "terminal", "agentic", "safety", "restraint",
-    "error_recovery", "parameter_precision", "context_state_tracking",
-    "structured_output", "tool_selection", "long_context", "localization",
+    "coding", "debugging", "terminal", "agentic", "safety",
+    "adversarial_robustness", "restraint", "error_recovery",
+    "parameter_precision", "context_state_tracking", "structured_output",
+    "tool_selection", "instruction_following", "long_context", "localization",
     "budget_efficiency", "hallucination",
 }
 
@@ -24,7 +25,7 @@ def test_persona_keys_are_snake_case():
         assert "-" not in uc.key
 
 
-def test_every_persona_has_all_14_dims():
+def test_every_persona_has_all_17_dims():
     for uc in USE_CASES:
         assert set(uc.weights.keys()) == EXPECTED_DIMS, (
             f"{uc.key} missing dims: {EXPECTED_DIMS - set(uc.weights.keys())}, "
