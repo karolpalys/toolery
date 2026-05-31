@@ -229,3 +229,11 @@ def test_implicit_gradient_off_keeps_budget_violation_as_fail(monkeypatch):
     assert r.status == "fail"
     assert r.score == 0.0
     assert r.failure_kind == "budget_violated"
+
+
+def test_scenario_result_has_correctness_score_field():
+    from toolery.core.models import ScenarioResult
+    fields = ScenarioResult.model_fields
+    assert "correctness_score" in fields
+    # optional, defaults to None so existing constructors keep working
+    assert fields["correctness_score"].default is None
