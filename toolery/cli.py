@@ -455,8 +455,7 @@ def backfill_correctness(
     """Recompute correctness_score for every existing run from stored traces."""
     from toolery.core.scenario import load_all_scenarios
 
-    store = _store()
-    store.init_schema()  # ensure the column exists on old DBs
+    store = _store()  # _store() already runs init_schema() → column exists on old DBs
     scenarios = {s.id: s for s in load_all_scenarios(scenarios_dir)}
     results_dir = _results_dir()
     total_u = total_s = 0

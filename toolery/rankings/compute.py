@@ -319,7 +319,11 @@ def compute_failure_breakdown(store: Store, dimensions: list[str] | None = None)
 def compute_correctness_breakdown(store: Store) -> dict[tuple[str, str], dict[str, float | int]]:
     """Per (model, adapter): mean budgeted score vs mean budget-independent
     correctness_score, plus how many results were solved-but-not-scored
-    (correctness full while headline score fell short — typically budget overrun)."""
+    (correctness full while headline score fell short — typically budget overrun).
+
+    The solved_not_scored threshold assumes the default pass weight of 1.0
+    (every current scenario uses it); a scenario with a custom weights["pass"]
+    would still be aggregated correctly into the means but miscounted here."""
     runs = {r["run_id"]: r for r in store.fetch_all_runs()}
     agg: dict[tuple[str, str], dict[str, float | int]] = defaultdict(
         lambda: {"n": 0, "score_sum": 0.0, "correctness_sum": 0.0, "solved_not_scored": 0})
