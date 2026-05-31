@@ -230,6 +230,134 @@ async def test_bridge_reads_session_id_from_stderr_and_strips_mcp_prefix(tmp_pat
 
 
 @pytest.mark.asyncio
+async def test_bridge_skills_mode_enables_skills_toolset(tmp_path):
+    base_config = tmp_path / "user_config.yaml"
+    base_config.write_text("providers: {}\n")
+    captured: dict = {}
+
+    async def fake_subprocess(*args, **kwargs):
+        proc = AsyncMock()
+        if "chat" in args:
+            captured["chat_args"] = list(args)
+            proc.communicate = AsyncMock(return_value=(_BRIDGE_STDOUT.encode(), b""))
+            proc.returncode = 0
+        else:
+            proc.communicate = AsyncMock(return_value=(b"", b""))
+            proc.returncode = 0
+        return proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess):
+        adapter = HermesAdapter(cli_path="hermes", mcp_bridge=True,
+                                base_config_path=str(base_config), skills_mode=True)
+        await adapter.run_scenario(_scenario(), model="m", timeout=10)
+
+    chat = captured["chat_args"]
+    assert chat[chat.index("-t") + 1] == "toolery_mock,skills"
+    assert "--ignore-rules" not in chat
+
+
+@pytest.mark.asyncio
+async def test_bridge_default_mode_keeps_skills_off(tmp_path):
+    base_config = tmp_path / "user_config.yaml"
+    base_config.write_text("providers: {}\n")
+    captured: dict = {}
+
+    async def fake_subprocess(*args, **kwargs):
+        proc = AsyncMock()
+        if "chat" in args:
+            captured["chat_args"] = list(args)
+            proc.communicate = AsyncMock(return_value=(_BRIDGE_STDOUT.encode(), b""))
+            proc.returncode = 0
+        else:
+            proc.communicate = AsyncMock(return_value=(b"", b""))
+            proc.returncode = 0
+        return proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess):
+        adapter = HermesAdapter(cli_path="hermes", mcp_bridge=True,
+                                base_config_path=str(base_config))  # skills_mode default False
+        await adapter.run_scenario(_scenario(), model="m", timeout=10)
+
+    chat = captured["chat_args"]
+    assert chat[chat.index("-t") + 1] == "toolery_mock"
+    assert "--ignore-rules" in chat
+
+
+# ---------------------------------------------------------------------------
+# Part B — _normalize_alias unit tests
+# ---------------------------------------------------------------------------
+
+def test_normalize_alias_maps_only_when_canonical_allowed():
+    f = HermesAdapter._normalize_alias
+    # canonical in allowed → mapped
+    assert f("Bash", {"bash_exec", "read_file"}) == "bash_exec"
+    assert f("search_files", {"read_file"}) == "read_file"
+    # canonical NOT in allowed → left as-is (correctly stays off-script)
+    assert f("Bash", {"read_file", "run_tests"}) == "Bash"
+    # unknown native tool → unchanged
+    assert f("frobnicate", {"read_file"}) == "frobnicate"
+    # allowed=None → map unconditionally
+    assert f("terminal", None) == "bash_exec"
+
+
+@pytest.mark.asyncio
+async def test_bridge_alias_normalization_after_prefix_strip(tmp_path):
+    """Alias normalization runs after MCP prefix stripping.
+    A tool call named mcp_toolery_mock_read_file still extracts as read_file."""
+    base_config = tmp_path / "user_config.yaml"
+    base_config.write_text("providers: {}\n")
+
+    session_jsonl = json.dumps({
+        "id": "20260531_010203_alias",
+        "messages": [
+            {"role": "user", "content": "Read a file"},
+            {
+                "role": "assistant",
+                "content": "Done.",
+                "tool_calls": [
+                    {"id": "tc_1", "function": {
+                        "name": "mcp_toolery_mock_read_file",
+                        "arguments": '{"path": "foo.py"}'}},
+                ],
+            },
+        ],
+    })
+    alias_scenario = Scenario(
+        id="t-h-alias-01", title="alias test", tier=Tier.EASY,
+        category=Category.TOOL_SELECTION, domain="generic", description="d",
+        prompt="Read a file", tools=["read_file"],
+        budget=Budget(max_tool_calls=1, max_turns=2, timeout_seconds=30),
+        scoring=Scoring(),
+    )
+    stdout = "session_id: 20260531_010203_alias\nDone.\n"
+
+    async def fake_subprocess(*args, **kwargs):
+        proc = AsyncMock()
+        if "chat" in args:
+            proc.communicate = AsyncMock(return_value=(stdout.encode(), b""))
+            proc.returncode = 0
+        elif "export" in args:
+            target = args[args.index("export") + 1]
+            from pathlib import Path as _Path
+            _Path(target).write_text(session_jsonl + "\n")
+            proc.communicate = AsyncMock(return_value=(b"ok\n", b""))
+            proc.returncode = 0
+        else:
+            proc.communicate = AsyncMock(return_value=(b"", b""))
+            proc.returncode = 0
+        return proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess):
+        adapter = HermesAdapter(cli_path="hermes", mcp_bridge=True,
+                                base_config_path=str(base_config))
+        trace = await adapter.run_scenario(alias_scenario, model="m", timeout=10)
+
+    assert trace.error is None
+    # prefix strip should still work; read_file is canonical
+    assert [tc.name for tc in trace.tool_calls] == ["read_file"]
+
+
+@pytest.mark.asyncio
 async def test_bridge_cleans_up_temp_home(tmp_path):
     """The per-scenario isolated HERMES_HOME is removed after the run."""
     base_config = tmp_path / "user_config.yaml"

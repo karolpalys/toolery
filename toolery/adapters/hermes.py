@@ -101,6 +101,14 @@ class HermesAdapter:
     # scorer asserts on the bare tool name, so we strip this prefix on extract.
     _MCP_SERVER_NAME = "toolery_mock"
 
+    # Native Hermes tools that are semantically equivalent to a mock tool.
+    # Only applied when the canonical target is in the scenario's allowed tools.
+    _NATIVE_ALIASES = {
+        "Bash": "bash_exec", "bash": "bash_exec", "terminal": "bash_exec",
+        "search_files": "read_file", "grep": "read_file",
+        "list_directory": "list_files", "ls": "list_files",
+    }
+
     def __init__(
         self,
         cli_path: str = "hermes",
@@ -121,6 +129,11 @@ class HermesAdapter:
         gateway_url: str | None = None,
         token: str | None = None,
         workspace_id: str | None = None,
+        # Opt-in skills mode: include the user's Hermes skills toolset alongside
+        # the mock MCP server so we can A/B test whether skills help. When True,
+        # ``-t toolery_mock,skills`` is used (skills auto-injected) and
+        # ``--ignore-rules`` is omitted. When False (default): exactly as before.
+        skills_mode: bool = False,
     ) -> None:
         resolved = shutil.which(cli_path) if cli_path == "hermes" else cli_path
         self.cli_path = resolved or cli_path
@@ -165,6 +178,7 @@ class HermesAdapter:
         # worktree git ops never overlap; other adapters (raw/cloud) still run
         # concurrently because each adapter instance has its own lock.
         self._run_lock = asyncio.Lock()
+        self.skills_mode = skills_mode
 
     async def run_scenario(
         self, scenario: Scenario, model: str, timeout: int
@@ -217,14 +231,21 @@ class HermesAdapter:
             # --ignore-user-config (it would discard the HERMES_HOME config we
             # just wrote, dropping our MCP server). -t <server> restricts the
             # run to only our mock tools.
+            # In skills mode: include user's skills toolset alongside the mock
+            # server and let Hermes auto-inject its skills (omit --ignore-rules).
+            if self.skills_mode:
+                toolsets = f"{server_name},skills"
+            else:
+                toolsets = server_name
             cmd = [
                 self.cli_path, "chat",
                 "-q", scenario.prompt,
                 "-Q",
                 "--max-turns", str(max(scenario.budget.max_turns + 1, 2)),
-                "--ignore-rules",
-                "-t", server_name,
+                "-t", toolsets,
             ]
+            if not self.skills_mode:
+                cmd.insert(cmd.index("-t"), "--ignore-rules")
             if self.provider:
                 cmd.extend(["--provider", self.provider])
             if model:
@@ -333,7 +354,7 @@ class HermesAdapter:
         if session_id:
             try:
                 tool_calls, final_response_db = await self._extract_session(
-                    session_id, env=env
+                    session_id, allowed_tools=set(scenario.tools), env=env
                 )
             except Exception as e:
                 if error is None:
@@ -369,6 +390,20 @@ class HermesAdapter:
         prefix = f"mcp_{cls._MCP_SERVER_NAME}_"
         return name[len(prefix):] if name.startswith(prefix) else name
 
+    @classmethod
+    def _normalize_alias(cls, name: str, allowed: set[str] | None) -> str:
+        """Map a native Hermes tool name to its canonical mock equivalent.
+
+        The alias is only applied when the canonical name is present in
+        ``allowed`` (the scenario's tools), so we never invent a tool the
+        scenario doesn't use — no false passes. Pass ``allowed=None`` to map
+        unconditionally (useful in tests / standalone path).
+        """
+        canon = cls._NATIVE_ALIASES.get(name)
+        if canon and (allowed is None or canon in allowed):
+            return canon
+        return name
+
     @staticmethod
     def _parse_session_id(text: str) -> str | None:
         for line in text.splitlines():
@@ -388,7 +423,7 @@ class HermesAdapter:
         return session_id, body or None
 
     async def _extract_session(
-        self, session_id: str, env: dict | None = None
+        self, session_id: str, *, allowed_tools: set[str] | None = None, env: dict | None = None
     ) -> tuple[list[ToolCall], str | None]:
         fd, tmp_path = tempfile.mkstemp(suffix=".jsonl")
         os.close(fd)
@@ -423,6 +458,7 @@ class HermesAdapter:
                             fn = tc.get("function", {}) if isinstance(tc, dict) else {}
                             name = fn.get("name") or tc.get("name", "<unknown>")
                             name = self._strip_mcp_prefix(name)
+                            name = self._normalize_alias(name, allowed_tools)
                             raw_args = fn.get("arguments", tc.get("arguments", "{}"))
                             if isinstance(raw_args, str):
                                 try:

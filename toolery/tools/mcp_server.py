@@ -48,6 +48,15 @@ def build_server(scenario: Scenario) -> Server:
     runtime = MockToolRuntime(scenario)
     server = Server("toolery-mock")
 
+    # Native Hermes tools that are semantically equivalent to a mock tool.
+    # We register alias entries only when the canonical target is in this
+    # scenario, so Hermes can route through MCP and still get the right response.
+    ALIASES = {
+        "Bash": "bash_exec", "terminal": "bash_exec", "search_files": "read_file",
+        "grep": "read_file", "list_directory": "list_files",
+    }
+    alias_for = {a: c for a, c in ALIASES.items() if c in set(scenario.tools)}
+
     @server.list_tools()
     async def list_tools() -> list[types.Tool]:
         tools: list[types.Tool] = []
@@ -60,10 +69,25 @@ def build_server(scenario: Scenario) -> Server:
                 description=spec.description,
                 inputSchema=params,
             ))
+        # Emit alias tools reusing the canonical spec but with the alias name.
+        for alias, canonical in alias_for.items():
+            try:
+                spec = reg.get(canonical)
+            except KeyError:
+                continue
+            fn = spec.json_schema.get("function", {})
+            params = fn.get("parameters") or {"type": "object", "properties": {}}
+            tools.append(types.Tool(
+                name=alias,
+                description=spec.description,
+                inputSchema=params,
+            ))
         return tools
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+        # Map an incoming alias name to its canonical before calling runtime.
+        name = alias_for.get(name, name)
         result, kind = runtime.respond(name, arguments or {})
         return _render_content(result, kind)
 

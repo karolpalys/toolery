@@ -110,3 +110,54 @@ async def test_args_mismatch_falls_through_to_any_rule(tmp_path):
 
     payload = json.loads(result.content[0].text)
     assert payload == {"error": "city not found"}
+
+
+def _files_scenario() -> Scenario:
+    """Scenario whose tools include read_file so that search_files alias applies."""
+    return Scenario(
+        id="easy-02-files",
+        title="t",
+        tier=Tier.EASY,
+        category=Category.TOOL_SELECTION,
+        domain="generic",
+        description="d",
+        prompt="Read a file",
+        tools=["read_file", "list_files"],
+        budget=Budget(max_tool_calls=2, max_turns=2),
+        tool_responses={
+            "read_file": [
+                ToolResponseRule(match="any", returns={"content": "hello"}),
+            ],
+            "list_files": [
+                ToolResponseRule(match="any", returns={"files": ["a.py"]}),
+            ],
+        },
+        scoring=Scoring(required=[], forbidden=[], partial=[]),
+    )
+
+
+async def test_alias_tools_appear_in_list_and_route_to_canonical(tmp_path):
+    """When a scenario includes read_file, the server also advertises
+    search_files (alias) in list_tools and routes call_tool(search_files)
+    to the same canonical mock response as call_tool(read_file)."""
+    scenario_path = _write_scenario(tmp_path, _files_scenario())
+
+    async with stdio_client(_server_params(scenario_path)) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            listed = await session.list_tools()
+            by_name = {t.name: t for t in listed.tools}
+            # Alias must appear in list
+            assert "search_files" in by_name, (
+                f"expected search_files alias in listed tools, got: {set(by_name)}"
+            )
+            # list_directory alias for list_files must appear too
+            assert "list_directory" in by_name
+
+            # Calling the alias should return the same canonical mock response
+            alias_result = await session.call_tool("search_files", {"path": "."})
+            canonical_result = await session.call_tool("read_file", {"path": "."})
+
+    alias_payload = json.loads(alias_result.content[0].text)
+    canonical_payload = json.loads(canonical_result.content[0].text)
+    assert alias_payload == canonical_payload == {"content": "hello"}
