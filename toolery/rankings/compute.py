@@ -316,6 +316,41 @@ def compute_failure_breakdown(store: Store, dimensions: list[str] | None = None)
     return {k: dict(v) for k, v in out.items()}
 
 
+def compute_correctness_breakdown(store: Store) -> dict[tuple[str, str], dict[str, float | int]]:
+    """Per (model, adapter): mean budgeted score vs mean budget-independent
+    correctness_score, plus how many results were solved-but-not-scored
+    (correctness full while headline score fell short — typically budget overrun)."""
+    runs = {r["run_id"]: r for r in store.fetch_all_runs()}
+    agg: dict[tuple[str, str], dict[str, float | int]] = defaultdict(
+        lambda: {"n": 0, "score_sum": 0.0, "correctness_sum": 0.0, "solved_not_scored": 0})
+    with store.conn() as c:
+        rows = [dict(r) for r in c.execute("SELECT * FROM scenario_results").fetchall()]
+    for row in rows:
+        meta = runs.get(row["run_id"])
+        if not meta:
+            continue
+        corr = row.get("correctness_score")
+        if corr is None:
+            continue
+        key = (meta["model"], row["adapter"])
+        a = agg[key]
+        a["n"] += 1
+        a["score_sum"] += row["score"]
+        a["correctness_sum"] += corr
+        if corr >= 1.0 and row["score"] < 1.0:
+            a["solved_not_scored"] += 1
+    out: dict[tuple[str, str], dict[str, float | int]] = {}
+    for key, a in agg.items():
+        n = a["n"] or 1
+        out[key] = {
+            "n": a["n"],
+            "score_mean": a["score_sum"] / n,
+            "correctness_mean": a["correctness_sum"] / n,
+            "solved_not_scored": a["solved_not_scored"],
+        }
+    return out
+
+
 def collapse_matrix_rows(matrix: list[dict], mode: str = "pair") -> list[dict]:
     """Collapse per-(model, adapter) matrix rows for different ranking views.
 

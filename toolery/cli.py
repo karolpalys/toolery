@@ -466,3 +466,21 @@ def backfill_correctness(
         total_s += s
         console.print(f"  {run['run_id']}: updated {u}, skipped {s}")
     console.print(f"[green]✓ backfill done: updated {total_u}, skipped {total_s}[/green]")
+
+
+@app.command(name="correctness-report")
+def correctness_report():
+    """Show budgeted score vs budget-independent correctness per (model, adapter)."""
+    from rich.table import Table
+
+    from toolery.rankings.compute import compute_correctness_breakdown
+
+    data = compute_correctness_breakdown(_store())
+    table = Table(title="Score vs correctness (budget-independent)")
+    for col in ("model", "adapter", "n", "score", "correctness", "solved-not-scored"):
+        table.add_column(col)
+    for (model, adapter), v in sorted(data.items()):
+        table.add_row(model, adapter, str(v["n"]),
+                      f"{v['score_mean']:.3f}", f"{v['correctness_mean']:.3f}",
+                      str(v["solved_not_scored"]))
+    console.print(table)
