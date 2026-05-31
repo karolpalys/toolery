@@ -171,6 +171,10 @@ def run(
                 # MCP-bridge on by default (apples-to-apples mock tools over MCP);
                 # set HERMES_MCP_BRIDGE=0 to fall back to standalone-agent mode.
                 mcp_bridge=os.environ.get("HERMES_MCP_BRIDGE", "1") != "0",
+                # HERMES_SKILLS=1 enables Hermes' skills toolset (and drops
+                # --ignore-rules) so user skills are injected — for A/B testing
+                # their value. Default off keeps the apples-to-apples benchmark.
+                skills_mode=os.environ.get("HERMES_SKILLS", "0") != "0",
                 # Point Hermes at the SAME endpoint as raw/cloud, overriding any
                 # stale model.base_url in ~/.hermes/config.yaml (else hermes hits
                 # the wrong host → connection error → every scenario model_crash).
