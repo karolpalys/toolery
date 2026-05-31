@@ -653,6 +653,24 @@ def _classify_error(error: str) -> str:
     return "model_crash"
 
 
+def _correctness_score(scenario, required, forbidden_clean: bool, hallucinated: bool) -> float:
+    """Score ignoring ONLY a tool-call budget overrun. Hallucinated tools and
+    forbidden actions still fail correctness; budget is the sole gate dropped.
+    Mirrors evaluate()'s pass/fail + optional partial-gradient logic."""
+    weights = scenario.scoring.weights
+    req_pass = all(r.result == "pass" for r in required)
+    if forbidden_clean and req_pass and not hallucinated:
+        return weights["pass"]
+    if (_implicit_partial_gradient_enabled()
+            and forbidden_clean
+            and not hallucinated
+            and required):
+        n_req_pass = sum(1 for r in required if r.result == "pass")
+        if n_req_pass > 0:
+            return weights["partial"] * (n_req_pass / len(required))
+    return weights["fail"]
+
+
 def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
     calls = trace.tool_calls
     response = trace.final_response
@@ -663,6 +681,7 @@ def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
             status="error", score=0.0, call_count=len(calls),
             budget_max=scenario.budget.max_tool_calls, latency_ms=trace.duration_ms,
             failure_kind=_classify_error(trace.error), checks=[], trace=trace,
+            correctness_score=0.0,
         )
 
     def run(chk):
@@ -722,6 +741,7 @@ def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
             call_count=len(calls), budget_max=scenario.budget.max_tool_calls,
             latency_ms=trace.duration_ms, failure_kind=kind,
             checks=all_checks, trace=trace,
+            correctness_score=_correctness_score(scenario, required, forbidden_clean, hallucinated),
         )
 
     # Required + forbidden all-pass → status="pass" with full score, regardless
@@ -735,4 +755,5 @@ def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
         call_count=len(calls), budget_max=scenario.budget.max_tool_calls,
         latency_ms=trace.duration_ms, failure_kind=None,
         checks=all_checks, trace=trace,
+        correctness_score=scenario.scoring.weights["pass"],
     )
