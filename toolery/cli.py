@@ -143,6 +143,9 @@ def run(
             from toolery.adapters.hermes import HermesAdapter
             adapters[a] = HermesAdapter(
                 timeout_per_scenario=int(os.environ.get("HERMES_TIMEOUT", "1800")),
+                # MCP-bridge on by default (apples-to-apples mock tools over MCP);
+                # set HERMES_MCP_BRIDGE=0 to fall back to standalone-agent mode.
+                mcp_bridge=os.environ.get("HERMES_MCP_BRIDGE", "1") != "0",
                 api_url=os.environ.get("HERMES_API_URL", "http://localhost:8644"),
                 gateway_url=os.environ.get("HERMES_GATEWAY_URL", "http://localhost:8642"),
                 token=os.environ.get("HERMES_TOKEN", ""),

@@ -29,6 +29,31 @@ from toolery.core.models import Message, Scenario, ToolCall, TraceResult
 from toolery.core.text_utils import strip_reasoning_tags
 
 
+def build_bridge_config(
+    base_config: dict,
+    *,
+    server_name: str,
+    command: str,
+    scenario_json_path: str,
+) -> dict:
+    """Return a copy of ``base_config`` with our stdio MCP server injected.
+
+    The user's existing config (providers/endpoint/agent settings) is preserved
+    so Hermes still reaches the configured LLM; we only add an ``mcp_servers``
+    entry pointing at ``python -m toolery.tools.mcp_server <scenario.json>``.
+    Tool restriction to *only* this server is done at the CLI via ``-t``.
+    """
+    import copy
+
+    cfg = copy.deepcopy(base_config)
+    cfg.setdefault("mcp_servers", {})[server_name] = {
+        "command": command,
+        "args": ["-m", "toolery.tools.mcp_server", scenario_json_path],
+        "enabled": True,
+    }
+    return cfg
+
+
 def _build_prompt(scenario: Scenario) -> str:
     """Inline tool descriptions + task prompt + budget."""
     from toolery.tools.registry import ToolRegistry
@@ -63,6 +88,8 @@ class HermesAdapter:
         ignore_user_config: bool = False,
         provider: str | None = None,
         use_worktree: bool = True,
+        mcp_bridge: bool = True,
+        base_config_path: str | None = None,
         # Kept for backward-compat with existing CLI wiring; ignored.
         api_url: str | None = None,
         gateway_url: str | None = None,
@@ -83,6 +110,20 @@ class HermesAdapter:
         # the literal cwd — which means a benchmark like 'rename foo across the
         # codebase' will actually modify toolery/ and create stray commits.
         self.use_worktree = use_worktree
+        # MCP-bridge mode (default): expose the benchmark's mock tools to Hermes
+        # over MCP and restrict the run to *only* those tools, so Hermes emits
+        # the exact tool names/args the scorer asserts on — apples-to-apples
+        # with the raw adapter. Each scenario runs in an isolated HERMES_HOME
+        # (its own config.yaml + sessions DB), so no --worktree and no shared
+        # state: the _run_lock serialization below is unnecessary in this mode.
+        # See docs/hermes-mcp-bridge.md.
+        self.mcp_bridge = mcp_bridge
+        # Source config copied into each scenario's isolated HERMES_HOME so the
+        # configured LLM provider/endpoint still resolves. Defaults to the
+        # user's ~/.hermes/config.yaml; missing file → empty base config.
+        self.base_config_path = base_config_path or os.path.expanduser(
+            "~/.hermes/config.yaml"
+        )
         # `--worktree` runs `git worktree add`/`remove` against the shared repo,
         # whose .git locks are NOT safe to touch from several processes at once.
         # With concurrency > 1 the parallel hermes scenarios collide on those
@@ -92,6 +133,77 @@ class HermesAdapter:
         self._run_lock = asyncio.Lock()
 
     async def run_scenario(
+        self, scenario: Scenario, model: str, timeout: int
+    ) -> TraceResult:
+        if self.mcp_bridge:
+            return await self._run_bridge(scenario, model, timeout)
+        return await self._run_standalone(scenario, model, timeout)
+
+    def _load_base_config(self) -> dict:
+        """Read the source config to copy into each isolated HERMES_HOME.
+        Missing/empty file → empty base (Hermes built-in defaults apply)."""
+        import yaml
+
+        try:
+            with open(self.base_config_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+        except FileNotFoundError:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    async def _run_bridge(
+        self, scenario: Scenario, model: str, timeout: int
+    ) -> TraceResult:
+        """MCP-bridge mode: expose the scenario's mock tools to Hermes over MCP
+        in an isolated HERMES_HOME and restrict the run to only those tools."""
+        import sys
+
+        import yaml
+
+        started = time.monotonic()
+        server_name = "toolery_mock"
+        home = tempfile.mkdtemp(prefix="hermes-mcp-")
+        try:
+            scenario_json = os.path.join(home, "scenario.json")
+            with open(scenario_json, "w", encoding="utf-8") as f:
+                f.write(scenario.model_dump_json())
+
+            cfg = build_bridge_config(
+                self._load_base_config(),
+                server_name=server_name,
+                command=sys.executable,
+                scenario_json_path=scenario_json,
+            )
+            with open(os.path.join(home, "config.yaml"), "w", encoding="utf-8") as f:
+                yaml.safe_dump(cfg, f)
+
+            # No --worktree (tools come from MCP, no filesystem work) and no
+            # --ignore-user-config (it would discard the HERMES_HOME config we
+            # just wrote, dropping our MCP server). -t <server> restricts the
+            # run to only our mock tools.
+            cmd = [
+                self.cli_path, "chat",
+                "-q", scenario.prompt,
+                "-Q",
+                "--max-turns", str(max(scenario.budget.max_turns + 1, 2)),
+                "--ignore-rules",
+                "-t", server_name,
+            ]
+            if self.provider:
+                cmd.extend(["--provider", self.provider])
+            if model:
+                cmd.extend(["-m", model])
+
+            env = {**os.environ, "HERMES_HOME": home}
+            # Isolated home per scenario → no shared state, run concurrently
+            # (no _run_lock).
+            return await self._execute_and_trace(
+                scenario, model, cmd, started, env=env, use_lock=False
+            )
+        finally:
+            shutil.rmtree(home, ignore_errors=True)
+
+    async def _run_standalone(
         self, scenario: Scenario, model: str, timeout: int
     ) -> TraceResult:
         started = time.monotonic()
@@ -111,40 +223,62 @@ class HermesAdapter:
             cmd.append("--worktree")
         if model:
             cmd.extend(["-m", model])
+        return await self._execute_and_trace(
+            scenario, model, cmd, started, env=None, use_lock=True
+        )
 
+    async def _execute_and_trace(
+        self,
+        scenario: Scenario,
+        model: str,
+        cmd: list[str],
+        started: float,
+        *,
+        env: dict | None,
+        use_lock: bool,
+    ) -> TraceResult:
         error: str | None = None
         stdout_bytes = b""
-        try:
-            # Serialize: only one hermes subprocess at a time (see _run_lock) so
-            # concurrent --worktree git ops can't collide and crash the run.
-            async with self._run_lock:
-                proc = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+
+        async def _spawn() -> None:
+            nonlocal error, stdout_bytes
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+            )
+            try:
+                stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                    proc.communicate(),
+                    # Use the full HERMES_TIMEOUT cap per scenario — agentic
+                    # hermes runs are slow, and the run-wide heartbeat keeps
+                    # the TUI from false-killing a long scenario. The
+                    # per-scenario budget is not used to shrink this (it would
+                    # cap fast-budget scenarios and trip "hermes: timeout" on
+                    # a slow backend).
+                    timeout=self.timeout,
                 )
+                if proc.returncode != 0:
+                    error = stderr_bytes.decode(errors="replace")[:500]
+            except TimeoutError:
+                error = "hermes: timeout"
+                # Kill the timed-out process so it releases any resources
+                # (git worktree / MCP server) before the next scenario.
+                proc.kill()
                 try:
-                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                        proc.communicate(),
-                        # Use the full HERMES_TIMEOUT cap per scenario — agentic
-                        # hermes runs are slow, and the run-wide heartbeat keeps
-                        # the TUI from false-killing a long scenario. The
-                        # per-scenario budget is not used to shrink this (it would
-                        # cap fast-budget scenarios and trip "hermes: timeout" on
-                        # a slow backend).
-                        timeout=self.timeout,
-                    )
-                    if proc.returncode != 0:
-                        error = stderr_bytes.decode(errors="replace")[:500]
-                except TimeoutError:
-                    error = "hermes: timeout"
-                    # Kill the timed-out process so it releases its git worktree
-                    # before the next hermes scenario acquires the lock.
-                    proc.kill()
-                    try:
-                        await proc.wait()
-                    except Exception:
-                        pass
+                    await proc.wait()
+                except Exception:
+                    pass
+
+        try:
+            if use_lock:
+                # Serialize: only one hermes subprocess at a time (see _run_lock)
+                # so concurrent --worktree git ops can't collide and crash the run.
+                async with self._run_lock:
+                    await _spawn()
+            else:
+                await _spawn()
         except FileNotFoundError as e:
             error = f"hermes CLI not found: {e}"
 
@@ -156,7 +290,9 @@ class HermesAdapter:
         final_response_db: str | None = None
         if session_id:
             try:
-                tool_calls, final_response_db = await self._extract_session(session_id)
+                tool_calls, final_response_db = await self._extract_session(
+                    session_id, env=env
+                )
             except Exception as e:
                 if error is None:
                     error = f"session export failed: {type(e).__name__}: {e}"
@@ -196,16 +332,19 @@ class HermesAdapter:
         return session_id, body or None
 
     async def _extract_session(
-        self, session_id: str
+        self, session_id: str, env: dict | None = None
     ) -> tuple[list[ToolCall], str | None]:
         fd, tmp_path = tempfile.mkstemp(suffix=".jsonl")
         os.close(fd)
         try:
+            # Export must run against the SAME HERMES_HOME the chat ran in, or
+            # the (isolated) sessions DB won't contain this session.
             proc = await asyncio.create_subprocess_exec(
                 self.cli_path, "sessions", "export", tmp_path,
                 "--session-id", session_id,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=env,
             )
             await proc.communicate()
 

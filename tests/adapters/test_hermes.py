@@ -81,7 +81,7 @@ async def test_hermes_cli_parses_stdout_and_session():
         return proc
 
     with patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess):
-        adapter = HermesAdapter(cli_path="hermes")
+        adapter = HermesAdapter(cli_path="hermes", mcp_bridge=False)
         trace = await adapter.run_scenario(_scenario(), model="MiniMax-M2.7", timeout=10)
 
     assert trace.error is None
@@ -113,7 +113,7 @@ async def test_hermes_cli_strips_think_tags_from_final_response():
         return proc
 
     with patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess):
-        adapter = HermesAdapter(cli_path="hermes")
+        adapter = HermesAdapter(cli_path="hermes", mcp_bridge=False)
         trace = await adapter.run_scenario(_scenario(), model="MiniMax-M2.7", timeout=10)
 
     assert trace.final_response == '{"temp_c": 7, "condition": "cloudy"}'
@@ -130,7 +130,7 @@ async def test_hermes_cli_handles_missing_session():
         return proc
 
     with patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess):
-        adapter = HermesAdapter(cli_path="hermes")
+        adapter = HermesAdapter(cli_path="hermes", mcp_bridge=False)
         trace = await adapter.run_scenario(_scenario(), model="MiniMax-M2.7", timeout=10)
 
     assert trace.error is None

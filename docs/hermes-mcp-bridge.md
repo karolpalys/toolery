@@ -1,6 +1,36 @@
 # Plan: MCP-bridge mock tools → Hermes (apples-to-apples eval)
 
-**Status:** planned, not implemented. Pick this up in a fresh session.
+**Status:** implemented. Default-on (`HERMES_MCP_BRIDGE=1`); set
+`HERMES_MCP_BRIDGE=0` to fall back to standalone-agent mode.
+
+**Resolved open questions:**
+- *Config format* — write `mcp_servers:` directly into a per-scenario isolated
+  `HERMES_HOME` config.yaml (copy of the user's config + our server). Avoids
+  `hermes mcp add`'s interactive connection-test + "save anyway?" TTY prompt.
+- *Toolset for `-t`* — the MCP **server name** itself (`toolery_mock`). Passing
+  it as `-t` makes hermes treat it as an allowlist and drop all built-in
+  toolsets → clean tool isolation (verified in `hermes_cli/tools_config.py`).
+- *Isolation/concurrency* — each scenario runs in its own `tempfile.mkdtemp`
+  `HERMES_HOME` (own config.yaml + sessions DB). No `--worktree`, no shared
+  state, so the `_run_lock` is bypassed in bridge mode (concurrent again).
+- *Structured content* — plain text content (JSON-serialized for dict/list,
+  mirroring the raw adapter); hermes parses it fine.
+
+**Verified:** unit (MCP server returns scenario canned responses over real
+stdio), config construction, adapter wiring (`-t`, no `--worktree`, isolated
+`HERMES_HOME`, session export in same home, temp-home cleanup), and the real
+`hermes mcp test toolery_mock` → connects + discovers exactly the scenario's
+tools. **Still to run once an LLM endpoint is up:** a full `hermes chat` where
+the model actually calls `get_weather` and the scenario scores (verification
+step 2/3 below) — the configured endpoint was down at implementation time.
+
+**Code:** `toolery/tools/mcp_server.py` (server),
+`toolery/adapters/hermes.py` (`build_bridge_config`, `_run_bridge`),
+`tests/tools/test_mcp_server.py`, `tests/adapters/test_hermes_mcp_bridge.py`.
+
+---
+
+_Original plan below._
 
 ## Goal
 
