@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS scenario_results (
   status TEXT, score REAL NOT NULL,
   call_count INTEGER NOT NULL, budget_max INTEGER,
   latency_ms INTEGER, failure_kind TEXT,
+  correctness_score REAL,
   trace_path TEXT, checks_json TEXT,
   UNIQUE (run_id, scenario_id, adapter, trial_index)
 );
@@ -89,6 +90,11 @@ class Store:
                 col = stmt.rsplit(" ADD COLUMN ", 1)[1].split(" ", 1)[0]
                 if col not in existing:
                     c.execute(stmt)
+            # scenario_results column migrations (older DBs predate these).
+            sr_cols = {row[1] for row in c.execute(
+                "PRAGMA table_info(scenario_results)").fetchall()}
+            if "correctness_score" not in sr_cols:
+                c.execute("ALTER TABLE scenario_results ADD COLUMN correctness_score REAL")
             # Migration: old DBs created before 'paused' was a valid status
             # need their runs.status CHECK constraint relaxed. SQLite can't
             # ALTER a CHECK in place; recreate the table preserving data.
@@ -200,13 +206,13 @@ class Store:
             c.execute(
                 "INSERT INTO scenario_results(run_id, scenario_id, scenario_hash, tier, category, "
                 "tags_json, ranking_dims_json, adapter, trial_index, status, score, call_count, "
-                "budget_max, latency_ms, failure_kind, trace_path, checks_json) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "budget_max, latency_ms, failure_kind, correctness_score, trace_path, checks_json) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (run_id, result.scenario_id, scenario_hash, tier, category,
                  json.dumps(tags), json.dumps(ranking_dims),
                  result.adapter, result.trial_index, result.status, result.score,
                  result.call_count, result.budget_max, result.latency_ms, result.failure_kind,
-                 trace_path,
+                 result.correctness_score, trace_path,
                  json.dumps([c.model_dump() for c in result.checks])),
             )
 
