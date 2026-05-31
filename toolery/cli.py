@@ -33,6 +33,31 @@ def _store() -> Store:
     return s
 
 
+def _backfill_correctness_run(store, run_id: str, results_dir: Path, scenarios: dict) -> tuple[int, int]:
+    """Recompute correctness_score for one run from its stored trace files.
+    Returns (updated, skipped). Rows whose scenario or trace file is missing
+    are skipped (left as-is)."""
+    from toolery.core.models import TraceResult
+    from toolery.core.scorer import evaluate
+
+    updated = skipped = 0
+    for row in store.fetch_results_for_run(run_id):
+        scenario = scenarios.get(row["scenario_id"])
+        trace_path = row.get("trace_path")
+        if scenario is None or not trace_path:
+            skipped += 1
+            continue
+        tp = results_dir / "runs" / run_id / trace_path
+        if not tp.exists():
+            skipped += 1
+            continue
+        trace = TraceResult.model_validate_json(tp.read_text())
+        result = evaluate(scenario, trace)
+        store.update_correctness_score(row["result_id"], result.correctness_score)
+        updated += 1
+    return updated, skipped
+
+
 @app.command(name="list")
 def list_runs():
     """List recorded runs."""
@@ -421,3 +446,23 @@ def rankings(
                 console.print(f"[bold]{d}[/bold] → {p}")
             else:
                 console.print(f"[yellow]{d}: not yet generated (run with --regen)[/yellow]")
+
+
+@app.command(name="backfill-correctness")
+def backfill_correctness(
+    scenarios_dir: Path = typer.Option(Path("scenarios")),  # noqa: B008
+):
+    """Recompute correctness_score for every existing run from stored traces."""
+    from toolery.core.scenario import load_all_scenarios
+
+    store = _store()
+    store.init_schema()  # ensure the column exists on old DBs
+    scenarios = {s.id: s for s in load_all_scenarios(scenarios_dir)}
+    results_dir = _results_dir()
+    total_u = total_s = 0
+    for run in store.fetch_all_runs():
+        u, s = _backfill_correctness_run(store, run["run_id"], results_dir, scenarios)
+        total_u += u
+        total_s += s
+        console.print(f"  {run['run_id']}: updated {u}, skipped {s}")
+    console.print(f"[green]✓ backfill done: updated {total_u}, skipped {total_s}[/green]")

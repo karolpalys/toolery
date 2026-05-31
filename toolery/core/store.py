@@ -200,6 +200,13 @@ class Store:
             c.execute("INSERT OR REPLACE INTO adapters_in_run(run_id, adapter, adapter_version) "
                       "VALUES (?, ?, ?)", (run_id, adapter, adapter_version))
 
+    def update_correctness_score(self, result_id: int, value: float) -> None:
+        with self.conn() as c:
+            c.execute(
+                "UPDATE scenario_results SET correctness_score=? WHERE result_id=?",
+                (value, result_id),
+            )
+
     def write_scenario_result(self, run_id, result: ScenarioResult, *, tags, ranking_dims,
                               scenario_hash, category, tier, trace_path) -> None:
         with self.conn() as c:
