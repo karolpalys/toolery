@@ -139,5 +139,9 @@ class ScenarioResult(BaseModel):
     budget_max: int
     latency_ms: int
     failure_kind: str | None
+    # Budget-independent correctness: the score this scenario would get if the
+    # only thing ignored were a tool-call budget overrun. None until computed
+    # (older rows backfilled from trace files). See scorer._correctness_score.
+    correctness_score: float | None = None
     checks: list[CheckResult]
     trace: TraceResult

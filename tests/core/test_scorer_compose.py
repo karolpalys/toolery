@@ -34,6 +34,33 @@ def _trace(*calls, response="ok"):
     )
 
 
+def _error_trace(error: str):
+    return TraceResult(
+        scenario_id="test-01-x", adapter="hermes", trial_index=0,
+        messages=[], tool_calls=[], final_response=None,
+        started_at_iso="2026-05-23T18:00:00Z", duration_ms=10, error=error,
+    )
+
+
+def test_evaluate_classifies_connection_error():
+    """A connection failure must not be mislabeled model_crash — that hid a
+    stale-endpoint bug in the hermes bridge for a whole run."""
+    r = evaluate(_scenario(Scoring()), _error_trace(
+        "API call failed after 3 retries: Connection error."))
+    assert r.status == "error"
+    assert r.failure_kind == "connection_error"
+
+
+def test_evaluate_classifies_timeout():
+    r = evaluate(_scenario(Scoring()), _error_trace("hermes: timeout"))
+    assert r.failure_kind == "timeout"
+
+
+def test_evaluate_unknown_error_stays_model_crash():
+    r = evaluate(_scenario(Scoring()), _error_trace("Segmentation fault (core dumped)"))
+    assert r.failure_kind == "model_crash"
+
+
 def test_evaluate_pass_all_required():
     scoring = Scoring(
         required=[
@@ -202,3 +229,62 @@ def test_implicit_gradient_off_keeps_budget_violation_as_fail(monkeypatch):
     assert r.status == "fail"
     assert r.score == 0.0
     assert r.failure_kind == "budget_violated"
+
+
+def test_scenario_result_has_correctness_score_field():
+    from toolery.core.models import ScenarioResult
+    fields = ScenarioResult.model_fields
+    assert "correctness_score" in fields
+    # optional, defaults to None so existing constructors keep working
+    assert fields["correctness_score"].default is None
+
+
+def test_correctness_full_when_only_budget_violated():
+    """Budget overrun zeros the headline score but correctness stays full."""
+    scoring = Scoring(
+        required=[ScoringCheck.model_validate({"check": "tool_called", "tool": "get_weather"})],
+    )
+    s = _scenario(scoring)  # budget.max_tool_calls == 2
+    # 3 get_weather calls: required passes, but call_count 3 > budget 2.
+    tr = _trace(("get_weather", {"location": "Warsaw"}),
+                ("get_weather", {"location": "Warsaw"}),
+                ("get_weather", {"location": "Warsaw"}))
+    r = evaluate(s, tr)
+    assert r.status == "fail"
+    assert r.score == 0.0
+    assert r.failure_kind == "budget_violated"
+    assert r.correctness_score == 1.0
+
+
+def test_correctness_matches_score_on_clean_pass():
+    scoring = Scoring(
+        required=[ScoringCheck.model_validate({"check": "tool_called", "tool": "get_weather"})],
+    )
+    r = evaluate(_scenario(scoring), _trace(("get_weather", {"location": "Warsaw"})))
+    assert r.status == "pass"
+    assert r.correctness_score == r.score == 1.0
+
+
+def test_correctness_fails_on_hallucinated_tool():
+    """Hallucination is a correctness failure, not a frugality one."""
+    scoring = Scoring(
+        required=[ScoringCheck.model_validate({"check": "tool_called", "tool": "get_weather"})],
+    )
+    # 'made_up_tool' is not in scenario.tools (get_weather, web_search)
+    r = evaluate(_scenario(scoring), _trace(("made_up_tool", {})))
+    assert r.correctness_score == 0.0
+
+
+def test_correctness_fails_on_forbidden_action():
+    scoring = Scoring(
+        required=[ScoringCheck.model_validate({"check": "tool_called", "tool": "get_weather"})],
+        forbidden=[ScoringCheck.model_validate({"check": "tool_called", "tool": "web_search"})],
+    )
+    tr = _trace(("get_weather", {"location": "Warsaw"}), ("web_search", {"query": "x"}))
+    r = evaluate(_scenario(scoring), tr)
+    assert r.correctness_score == 0.0
+
+
+def test_correctness_zero_on_trace_error():
+    r = evaluate(_scenario(Scoring()), _error_trace("API call failed after 3 retries: Connection error."))
+    assert r.correctness_score == 0.0

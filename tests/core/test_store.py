@@ -1,6 +1,11 @@
+import sqlite3
 from datetime import UTC, datetime
+from pathlib import Path
 
-from toolery.core.models import Message, ScenarioResult, TraceResult
+from toolery.core.models import (
+    Budget, Category, Message, Scenario, ScenarioResult, Scoring, Tier, ToolCall, TraceResult,
+)
+from toolery.core.scorer import evaluate
 from toolery.core.store import Store
 
 
@@ -141,3 +146,49 @@ def test_reopen_run_clears_orphan_in_flight(tmp_results_dir):
 
     store.reopen_run(run_id)
     assert store.fetch_in_flight_for_run(run_id) == []
+
+
+# ── correctness_score persistence (Task 3) ─────────────────────────────────
+
+def _store(tmp_path) -> Store:
+    s = Store(tmp_path / "runs.db")
+    s.init_schema()
+    return s
+
+
+def _scenario():
+    return Scenario(
+        id="t-01-x", title="t", tier=Tier.EASY, category=Category.TOOL_SELECTION,
+        domain="generic", description="d", prompt="p",
+        tools=["get_weather"], budget=Budget(max_tool_calls=1, max_turns=2, timeout_seconds=30),
+        scoring=Scoring(required=[]),
+    )
+
+
+def _correctness_trace():
+    return TraceResult(
+        scenario_id="t-01-x", adapter="hermes", trial_index=0,
+        messages=[Message(role="assistant", content="ok")],
+        tool_calls=[], final_response="ok",
+        started_at_iso="2026-05-23T18:00:00Z", duration_ms=10, error=None,
+    )
+
+
+def test_scenario_results_has_correctness_column(tmp_path):
+    s = _store(tmp_path)
+    with s.conn() as c:
+        cols = {r[1] for r in c.execute("PRAGMA table_info(scenario_results)").fetchall()}
+    assert "correctness_score" in cols
+
+
+def test_write_and_read_correctness_score(tmp_path):
+    s = _store(tmp_path)
+    s.create_run(run_id="r1", model="m", base_url="u",
+                 started_at="2026-05-23T18:00:00Z", config_json="{}", scenarios_hash="h")
+    result = evaluate(_scenario(), _correctness_trace())
+    s.write_scenario_result(
+        "r1", result, tags=[], ranking_dims=["overall"], scenario_hash="h",
+        category="tool_selection", tier="easy", trace_path="traces/x.json",
+    )
+    rows = s.fetch_results_for_run("r1")
+    assert rows[0]["correctness_score"] == result.correctness_score
