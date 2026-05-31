@@ -633,6 +633,26 @@ def _classify_failure(required_results, forbidden_results, budget_violated, hall
     return "wrong_tool"
 
 
+def _classify_error(error: str) -> str:
+    """Map a raw adapter error string to a failure_kind. Collapsing everything
+    to ``model_crash`` hides infra problems (e.g. a hermes run hitting a stale
+    endpoint shows up as 70x model_crash when it's really a connection error)."""
+    e = error.lower()
+    if "timeout" in e or "timed out" in e:
+        return "timeout"
+    if (
+        "connection error" in e
+        or "connection refused" in e
+        or "api call failed" in e
+        or "failed to connect" in e
+        or "max retries" in e
+    ):
+        return "connection_error"
+    if "not found" in e and ("cli" in e or "command" in e):
+        return "adapter_missing"
+    return "model_crash"
+
+
 def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
     calls = trace.tool_calls
     response = trace.final_response
@@ -642,7 +662,7 @@ def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
             scenario_id=scenario.id, adapter=trace.adapter, trial_index=trace.trial_index,
             status="error", score=0.0, call_count=len(calls),
             budget_max=scenario.budget.max_tool_calls, latency_ms=trace.duration_ms,
-            failure_kind="model_crash", checks=[], trace=trace,
+            failure_kind=_classify_error(trace.error), checks=[], trace=trace,
         )
 
     def run(chk):

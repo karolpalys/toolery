@@ -48,6 +48,29 @@ def test_bridge_config_does_not_mutate_input():
     assert "mcp_servers" not in base
 
 
+def test_bridge_config_overrides_model_endpoint_when_base_url_given():
+    """The run's base_url/api_key must override the user's stale model endpoint
+    so Hermes hits the SAME LLM as the raw adapter (apples-to-apples). Without
+    this every scenario fails with a connection error → model_crash."""
+    base = {"model": {"base_url": "http://192.168.1.60:8000/v1", "api_key": "old"}}
+    cfg = build_bridge_config(
+        base, server_name="m", command="py", scenario_json_path="/tmp/s.json",
+        base_url="http://localhost:8888/v1", api_key="sk-local",
+    )
+    assert cfg["model"]["base_url"] == "http://localhost:8888/v1"
+    assert cfg["model"]["api_key"] == "sk-local"
+    assert cfg["model"]["provider"] == "custom"
+
+
+def test_bridge_config_leaves_model_untouched_without_base_url():
+    """When no base_url is supplied the user's model config is preserved as-is."""
+    base = {"model": {"base_url": "http://stays/v1", "api_key": "keep"}}
+    cfg = build_bridge_config(
+        base, server_name="m", command="py", scenario_json_path="/tmp/s.json",
+    )
+    assert cfg["model"] == {"base_url": "http://stays/v1", "api_key": "keep"}
+
+
 def _scenario() -> Scenario:
     return Scenario(
         id="t-h-01-cli", title="Hermes MCP bridge", tier=Tier.EASY,
@@ -114,6 +137,7 @@ async def test_bridge_run_scenario_wires_mcp_server_and_extracts_tool_calls(tmp_
     with patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess):
         adapter = HermesAdapter(
             cli_path="hermes", mcp_bridge=True, base_config_path=str(base_config),
+            base_url="http://localhost:8888/v1", api_key="sk-local",
         )
         trace = await adapter.run_scenario(_scenario(), model="MiniMax-M2.7", timeout=10)
 
@@ -132,9 +156,77 @@ async def test_bridge_run_scenario_wires_mcp_server_and_extracts_tool_calls(tmp_
     cfg = captured["bridged_config"]
     assert cfg["providers"] == {"local": {"base_url": "http://x"}}
     assert cfg["mcp_servers"]["toolery_mock"]["args"][:2] == ["-m", "toolery.tools.mcp_server"]
+    # the run's endpoint reached the isolated config, so hermes hits localhost:8888
+    assert cfg["model"]["base_url"] == "http://localhost:8888/v1"
+    assert cfg["model"]["api_key"] == "sk-local"
 
     # session export ran against the SAME isolated home
     assert captured["export_env"] == captured["hermes_home"]
+
+
+_BRIDGE_STDERR_SID = "session_id: 20260531_204140_47b1a9\n"
+_BRIDGE_SESSION_MCP_PREFIXED = json.dumps({
+    "id": "20260531_204140_47b1a9",
+    "messages": [
+        {"role": "user", "content": "What is the weather in Warsaw?"},
+        {
+            "role": "assistant",
+            "content": "",
+            # Hermes namespaces MCP tools as mcp_<server>_<tool>; the scorer
+            # asserts on the bare name, so the adapter must strip the prefix.
+            "tool_calls": [
+                {"id": "call_1", "function": {
+                    "name": "mcp_toolery_mock_get_weather",
+                    "arguments": '{"location": "Warsaw"}'}},
+            ],
+        },
+        {"role": "tool", "content": "7C cloudy"},
+        {"role": "assistant", "content": "The weather in Warsaw is 7C and cloudy."},
+    ],
+})
+
+
+@pytest.mark.asyncio
+async def test_bridge_reads_session_id_from_stderr_and_strips_mcp_prefix(tmp_path):
+    """Hermes prints ``session_id`` to STDERR and namespaces MCP tools as
+    ``mcp_<server>_<tool>``. The adapter must (a) recover the session id from
+    stderr so the export runs at all, and (b) strip the MCP prefix so the
+    extracted tool name matches what the scorer asserts on. Without either,
+    every bridged scenario scores 0 (no tool calls / hallucinated tool)."""
+    base_config = tmp_path / "user_config.yaml"
+    base_config.write_text("providers: {}\n")
+
+    async def fake_subprocess(*args, **kwargs):
+        proc = AsyncMock()
+        if "chat" in args:
+            # stdout carries only the final text; session_id is on stderr.
+            proc.communicate = AsyncMock(return_value=(
+                b"The weather in Warsaw is 7C and cloudy.\n",
+                _BRIDGE_STDERR_SID.encode(),
+            ))
+            proc.returncode = 0
+        elif "export" in args:
+            target = args[args.index("export") + 1]
+            Path(target).write_text(_BRIDGE_SESSION_MCP_PREFIXED + "\n")
+            proc.communicate = AsyncMock(return_value=(b"ok\n", b""))
+            proc.returncode = 0
+        else:
+            proc.communicate = AsyncMock(return_value=(b"", b""))
+            proc.returncode = 0
+        return proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=fake_subprocess):
+        adapter = HermesAdapter(
+            cli_path="hermes", mcp_bridge=True, base_config_path=str(base_config),
+            base_url="http://localhost:8888/v1", api_key="sk-local",
+        )
+        trace = await adapter.run_scenario(_scenario(), model="m", timeout=10)
+
+    assert trace.error is None
+    assert trace.adapter_metadata["session_id"] == "20260531_204140_47b1a9"
+    # MCP prefix stripped → matches the scorer's allowed tool name
+    assert [tc.name for tc in trace.tool_calls] == ["get_weather"]
+    assert trace.tool_calls[0].args == {"location": "Warsaw"}
 
 
 @pytest.mark.asyncio

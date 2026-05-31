@@ -35,17 +35,34 @@ def build_bridge_config(
     server_name: str,
     command: str,
     scenario_json_path: str,
+    base_url: str | None = None,
+    api_key: str | None = None,
 ) -> dict:
     """Return a copy of ``base_config`` with our stdio MCP server injected.
 
-    The user's existing config (providers/endpoint/agent settings) is preserved
-    so Hermes still reaches the configured LLM; we only add an ``mcp_servers``
-    entry pointing at ``python -m toolery.tools.mcp_server <scenario.json>``.
-    Tool restriction to *only* this server is done at the CLI via ``-t``.
+    The user's existing config (providers/agent settings) is preserved, but the
+    LLM endpoint is overridden with the run's ``base_url``/``api_key`` so Hermes
+    hits the SAME model as the raw adapter — apples-to-apples. Without this the
+    bridge inherits the user's stale ``model.base_url`` (e.g. a host that is no
+    longer reachable) and every scenario dies with a connection error that the
+    scorer then mislabels ``model_crash``. When ``base_url`` is None the user's
+    model config is left untouched.
+
+    We also add an ``mcp_servers`` entry pointing at ``python -m
+    toolery.tools.mcp_server <scenario.json>``; tool restriction to *only* this
+    server is done at the CLI via ``-t``.
     """
     import copy
 
     cfg = copy.deepcopy(base_config)
+    if base_url:
+        model = cfg.setdefault("model", {})
+        model["base_url"] = base_url
+        # OpenAI-compatible custom endpoint (vLLM/llama.cpp): force the provider
+        # so Hermes honors base_url instead of routing to a named provider.
+        model["provider"] = "custom"
+        if api_key:
+            model["api_key"] = api_key
     cfg.setdefault("mcp_servers", {})[server_name] = {
         "command": command,
         "args": ["-m", "toolery.tools.mcp_server", scenario_json_path],
@@ -80,6 +97,9 @@ class HermesAdapter:
 
     name = "hermes"
     version = "0.2-cli"
+    # Hermes exposes MCP tools to the model as ``mcp_<server>_<tool>``. The
+    # scorer asserts on the bare tool name, so we strip this prefix on extract.
+    _MCP_SERVER_NAME = "toolery_mock"
 
     def __init__(
         self,
@@ -90,6 +110,12 @@ class HermesAdapter:
         use_worktree: bool = True,
         mcp_bridge: bool = True,
         base_config_path: str | None = None,
+        # The run's LLM endpoint. In bridge mode this overrides the user
+        # config's model.base_url/api_key so Hermes hits the SAME model the raw
+        # adapter does (see build_bridge_config). Defaults preserve the user's
+        # configured endpoint when not supplied.
+        base_url: str | None = None,
+        api_key: str | None = None,
         # Kept for backward-compat with existing CLI wiring; ignored.
         api_url: str | None = None,
         gateway_url: str | None = None,
@@ -124,6 +150,14 @@ class HermesAdapter:
         self.base_config_path = base_config_path or os.path.expanduser(
             "~/.hermes/config.yaml"
         )
+        # Normalise to a `/vN` endpoint the same way the raw adapter does, so
+        # both hit the identical URL whether the caller passed `localhost:8888`
+        # or `localhost:8888/v1` — true apples-to-apples.
+        if base_url:
+            from toolery.adapters.openai_raw import _normalise_base_url
+            base_url = _normalise_base_url(base_url)
+        self.base_url = base_url
+        self.api_key = api_key
         # `--worktree` runs `git worktree add`/`remove` against the shared repo,
         # whose .git locks are NOT safe to touch from several processes at once.
         # With concurrency > 1 the parallel hermes scenarios collide on those
@@ -161,7 +195,7 @@ class HermesAdapter:
         import yaml
 
         started = time.monotonic()
-        server_name = "toolery_mock"
+        server_name = self._MCP_SERVER_NAME
         home = tempfile.mkdtemp(prefix="hermes-mcp-")
         try:
             scenario_json = os.path.join(home, "scenario.json")
@@ -173,6 +207,8 @@ class HermesAdapter:
                 server_name=server_name,
                 command=sys.executable,
                 scenario_json_path=scenario_json,
+                base_url=self.base_url,
+                api_key=self.api_key,
             )
             with open(os.path.join(home, "config.yaml"), "w", encoding="utf-8") as f:
                 yaml.safe_dump(cfg, f)
@@ -239,9 +275,10 @@ class HermesAdapter:
     ) -> TraceResult:
         error: str | None = None
         stdout_bytes = b""
+        stderr_bytes = b""
 
         async def _spawn() -> None:
-            nonlocal error, stdout_bytes
+            nonlocal error, stdout_bytes, stderr_bytes
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -283,7 +320,12 @@ class HermesAdapter:
             error = f"hermes CLI not found: {e}"
 
         stdout_text = stdout_bytes.decode(errors="replace")
+        stderr_text = stderr_bytes.decode(errors="replace")
         session_id, final_response_stdout = self._parse_stdout(stdout_text)
+        # Hermes prints `session_id:` to STDERR (not stdout); without recovering
+        # it here the session export never runs and tool_calls come back empty.
+        if session_id is None:
+            session_id = self._parse_session_id(stderr_text)
 
         # Pull structured tool_calls + final assistant message from session export.
         tool_calls: list[ToolCall] = []
@@ -319,6 +361,20 @@ class HermesAdapter:
             error=error,
             adapter_metadata={"session_id": session_id, "model": model, "cli": "hermes"},
         )
+
+    @classmethod
+    def _strip_mcp_prefix(cls, name: str) -> str:
+        """``mcp_toolery_mock_get_weather`` → ``get_weather``. No-op for the
+        standalone path where tool names are already bare."""
+        prefix = f"mcp_{cls._MCP_SERVER_NAME}_"
+        return name[len(prefix):] if name.startswith(prefix) else name
+
+    @staticmethod
+    def _parse_session_id(text: str) -> str | None:
+        for line in text.splitlines():
+            if line.startswith("session_id:"):
+                return line.split(":", 1)[1].strip()
+        return None
 
     def _parse_stdout(self, text: str) -> tuple[str | None, str | None]:
         session_id: str | None = None
@@ -366,6 +422,7 @@ class HermesAdapter:
                         for tc in (msg.get("tool_calls") or []):
                             fn = tc.get("function", {}) if isinstance(tc, dict) else {}
                             name = fn.get("name") or tc.get("name", "<unknown>")
+                            name = self._strip_mcp_prefix(name)
                             raw_args = fn.get("arguments", tc.get("arguments", "{}"))
                             if isinstance(raw_args, str):
                                 try:

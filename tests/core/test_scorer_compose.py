@@ -34,6 +34,33 @@ def _trace(*calls, response="ok"):
     )
 
 
+def _error_trace(error: str):
+    return TraceResult(
+        scenario_id="test-01-x", adapter="hermes", trial_index=0,
+        messages=[], tool_calls=[], final_response=None,
+        started_at_iso="2026-05-23T18:00:00Z", duration_ms=10, error=error,
+    )
+
+
+def test_evaluate_classifies_connection_error():
+    """A connection failure must not be mislabeled model_crash — that hid a
+    stale-endpoint bug in the hermes bridge for a whole run."""
+    r = evaluate(_scenario(Scoring()), _error_trace(
+        "API call failed after 3 retries: Connection error."))
+    assert r.status == "error"
+    assert r.failure_kind == "connection_error"
+
+
+def test_evaluate_classifies_timeout():
+    r = evaluate(_scenario(Scoring()), _error_trace("hermes: timeout"))
+    assert r.failure_kind == "timeout"
+
+
+def test_evaluate_unknown_error_stays_model_crash():
+    r = evaluate(_scenario(Scoring()), _error_trace("Segmentation fault (core dumped)"))
+    assert r.failure_kind == "model_crash"
+
+
 def test_evaluate_pass_all_required():
     scoring = Scoring(
         required=[

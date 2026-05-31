@@ -146,6 +146,11 @@ def run(
                 # MCP-bridge on by default (apples-to-apples mock tools over MCP);
                 # set HERMES_MCP_BRIDGE=0 to fall back to standalone-agent mode.
                 mcp_bridge=os.environ.get("HERMES_MCP_BRIDGE", "1") != "0",
+                # Point Hermes at the SAME endpoint as raw/cloud, overriding any
+                # stale model.base_url in ~/.hermes/config.yaml (else hermes hits
+                # the wrong host → connection error → every scenario model_crash).
+                base_url=base_url,
+                api_key=local_key,
                 api_url=os.environ.get("HERMES_API_URL", "http://localhost:8644"),
                 gateway_url=os.environ.get("HERMES_GATEWAY_URL", "http://localhost:8642"),
                 token=os.environ.get("HERMES_TOKEN", ""),
