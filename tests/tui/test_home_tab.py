@@ -206,6 +206,18 @@ def test_row_trace_path_none_for_upcoming_or_out_of_range():
     assert _row_trace_path(plan, {}, {}, None) is None    # no cursor
 
 
+def test_row_trace_path_none_for_running_row():
+    from toolery.tui.home_tab import _row_trace_path
+    plan = [("t-01-x", "raw", 0)]
+    # A row classifies as "running" when its key is in `running` (and not in
+    # `completed`). _fetch_running_units builds these payloads from
+    # store.fetch_in_flight_for_run rows; _classify_plan only needs the key
+    # to be present, so the exact payload shape is opaque to row resolution.
+    running = {("t-01-x", "raw", 0): {"started_at": "x"}}
+    # A running row has no completed trace yet → None.
+    assert _row_trace_path(plan, {}, running, 0) is None
+
+
 from toolery.tui.home_tab import _detail_block_running, _detail_block_upcoming
 
 
@@ -344,3 +356,82 @@ def test_detail_block_missing_trace_falls_back_to_path(tmp_path):
         trace_path="traces/nope.json", checks_json="[]", run_dir=tmp_path,
     ).plain
     assert "traces/nope.json" in text  # graceful fallback, no crash
+
+
+@pytest.mark.asyncio
+async def test_view_trace_opens_and_closes_modal(tmp_path, monkeypatch):
+    """Integration: a completed row with an on-disk trace opens TraceModal on
+    't', and escape pops it off the screen stack.
+
+    Drives the real HomeTab + Store wiring action_view_trace uses
+    (self._store / self._current_run_id / self._results_cache / self._plan),
+    mirroring the _Host(App)-yields-HomeTab pattern used elsewhere in this
+    file and the modal pilot pattern from test_history_tab.py.
+    """
+    from textual.app import App
+    from textual.widgets import DataTable
+
+    from toolery.core.store import Store
+    from toolery.tui.home_tab import HomeTab, TraceModal
+
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path))
+
+    run_id = "trace-modal-run"
+    # action_view_trace resolves the trace at
+    # store.path.parent / "runs" / run_id / <rel>, so write it exactly there.
+    store = Store(tmp_path / "runs.db")
+    store.init_schema()
+    run_dir = store.path.parent / "runs" / run_id
+    rel = _write_trace(run_dir)  # reuse the helper: scenario t-01-x / raw / trial 0
+
+    async def never_called(*_a, **_kw):
+        return []
+
+    class _Host(App):
+        def compose(self):
+            yield HomeTab(id="home-tab", scanner=never_called,
+                          known_models_provider=lambda: set(), store=store)
+
+    app = _Host()
+    async with app.run_test(size=(120, 50)) as pilot:
+        await pilot.pause()
+        tab = app.query_one(HomeTab)
+
+        # Pin the in-memory state action_view_trace reads. Stop the periodic
+        # refresh first so a 2s tick can't clobber this between setup and act.
+        for timer in list(tab._timers):
+            timer.stop()
+        tab._current_run_id = run_id
+        tab._plan = [("t-01-x", "raw", 0)]
+        tab._results_cache = [{
+            "scenario_id": "t-01-x", "adapter": "raw", "trial_index": 0,
+            "status": "pass", "trace_path": rel,
+        }]
+        tab._displayed_run_id = run_id
+        tab._last_signature = None
+        tab._refresh_scenarios_table()
+        await pilot.pause()
+
+        sc = app.query_one("#scenarios-table", DataTable)
+        assert sc.row_count == 1
+        sc.focus()
+        sc.move_cursor(row=0)
+        await pilot.pause()
+
+        await pilot.press("t")
+        # action_view_trace is @work + push_screen_wait; let the worker run and
+        # the modal mount. Pause a couple of times to settle the worker.
+        await pilot.pause()
+        await pilot.pause()
+
+        assert any(isinstance(s, TraceModal) for s in app.screen_stack)
+        assert isinstance(app.screen, TraceModal)
+        # Confirm we took the real "trace resolved" path, not "no trace": the
+        # title carries the row reference and the modal holds the loaded trace.
+        assert app.screen._title == "trace — row 0"
+        assert app.screen._trace is not None
+
+        await pilot.press("escape")
+        await pilot.pause()
+        await pilot.pause()
+        assert not any(isinstance(s, TraceModal) for s in app.screen_stack)
