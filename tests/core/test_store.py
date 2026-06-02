@@ -223,6 +223,7 @@ def test_token_columns_round_trip(tmp_path):
     rows = store.fetch_results_for_run("run1")
     assert rows[0]["completion_tokens"] == 20
     assert rows[0]["gen_ms"] == 400
+    assert rows[0]["prompt_tokens"] == 100
 
 
 def test_fetch_run_token_totals_sums(tmp_path):
