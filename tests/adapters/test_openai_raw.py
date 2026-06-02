@@ -172,10 +172,8 @@ async def test_captures_usage_per_turn():
         })
     )
     adapter = OpenAIRawAdapter(base_url="http://localhost:8000", api_key="x")
-    try:
-        trace = await adapter.run_scenario(_scenario(), model="m", timeout=30)
-    finally:
-        await adapter.aclose()
+    trace = await adapter.run_scenario(_scenario(), model="m", timeout=30)
+    await adapter.aclose()
 
     assert len(trace.usage) == 1
     u = trace.usage[0]
@@ -188,6 +186,43 @@ async def test_captures_usage_per_turn():
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_captures_usage_across_multiple_turns():
+    # Two-request flow: first response is a tool call, second is the final
+    # answer. Each turn reports DIFFERENT usage, so we can assert per-turn
+    # capture and sequential turn_index — the scenario this feature exists for.
+    first = {
+        "choices": [{
+            "message": {"role": "assistant", "content": None, "tool_calls": [
+                {"id": "tc_1", "type": "function",
+                 "function": {"name": "get_weather", "arguments": json.dumps({"location": "Warsaw"})}}
+            ]}
+        }],
+        "usage": {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120},
+    }
+    second = {
+        "choices": [{"message": {"role": "assistant", "content": "It's 7°C and cloudy."}}],
+        "usage": {"prompt_tokens": 150, "completion_tokens": 35, "total_tokens": 185},
+    }
+    respx.post("http://localhost:8000/v1/chat/completions").mock(
+        side_effect=[httpx.Response(200, json=first), httpx.Response(200, json=second)]
+    )
+    adapter = OpenAIRawAdapter(base_url="http://localhost:8000", api_key="x")
+    trace = await adapter.run_scenario(_scenario(), model="m", timeout=30)
+    await adapter.aclose()
+
+    assert trace.error is None
+    assert len(trace.usage) == 2
+    assert trace.usage[0].turn_index == 0
+    assert trace.usage[1].turn_index == 1
+    assert trace.usage[0].prompt_tokens == 100
+    assert trace.usage[0].completion_tokens == 20
+    assert trace.usage[1].prompt_tokens == 150
+    assert trace.usage[1].completion_tokens == 35
+    assert trace.token_totals()[:2] == (250, 55)
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_missing_usage_field_records_zeros():
     respx.post("http://localhost:8000/v1/chat/completions").mock(
         return_value=httpx.Response(200, json={
@@ -195,10 +230,8 @@ async def test_missing_usage_field_records_zeros():
         })
     )
     adapter = OpenAIRawAdapter(base_url="http://localhost:8000", api_key="x")
-    try:
-        trace = await adapter.run_scenario(_scenario(), model="m", timeout=30)
-    finally:
-        await adapter.aclose()
+    trace = await adapter.run_scenario(_scenario(), model="m", timeout=30)
+    await adapter.aclose()
     assert len(trace.usage) == 1
     assert trace.token_totals() == (0, 0, trace.usage[0].latency_ms)
 
