@@ -59,6 +59,25 @@ def test_full_renders_error():
     assert "timeout" in text
 
 
+def test_parallel_calls_get_distinct_sequential_numbers():
+    from toolery.core.models import ToolCall, TraceResult
+    # Two tool calls in the SAME turn (same index=0) — must still be numbered 1 and 2.
+    t = TraceResult(
+        scenario_id="par", adapter="raw", trial_index=0,
+        messages=[], final_response="ok", started_at_iso="x", duration_ms=10,
+        tool_calls=[
+            ToolCall(index=0, name="get_a", args={}, result=1, result_kind="json", latency_ms=3),
+            ToolCall(index=0, name="get_b", args={}, result=2, result_kind="json", latency_ms=4),
+        ],
+        usage=[],
+    )
+    compact = render_trace_compact(t).plain
+    full = render_trace_full(t).plain
+    # Sequential numbering: a "1" line for get_a and a "2" line for get_b in both views.
+    assert "1 get_a" in compact and "2 get_b" in compact
+    assert "1. get_a" in full and "2. get_b" in full
+
+
 def test_compact_rate_na_when_usage_has_latency_but_no_tokens():
     from toolery.core.models import TurnUsage
     t = _trace()

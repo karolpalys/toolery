@@ -43,9 +43,9 @@ def render_trace_compact(trace: TraceResult) -> Text:
     out.append(f"\ntool calls ({len(calls)}):\n", style="bold")
     if not calls:
         out.append("  (none)\n", style="dim")
-    for c in calls:
+    for n, c in enumerate(calls, 1):
         marker = "err" if c.result_kind == "error" else _short(c.result, 24)
-        out.append(f"  {c.index + 1} ", style="cyan")
+        out.append(f"  {n} ", style="cyan")
         out.append(c.name, style="bold")
         out.append(f" {_short(c.args, 40)}", style="dim")
         out.append(" → ", style="dim")
@@ -66,8 +66,8 @@ def render_trace_full(trace: TraceResult) -> Text:
     out.append("tool calls:\n", style="bold")
     if not trace.tool_calls:
         out.append("  (none)\n", style="dim")
-    for c in trace.tool_calls:
-        out.append(f"  {c.index + 1}. ", style="cyan")
+    for n, c in enumerate(trace.tool_calls, 1):
+        out.append(f"  {n}. ", style="cyan")
         out.append(f"{c.name}", style="bold")
         out.append(f"  ({c.latency_ms}ms)\n", style="dim")
         out.append(f"     args:   {_short(c.args, 140)}\n", style="dim")
