@@ -2,6 +2,55 @@ import pytest
 from pydantic import ValidationError
 
 from toolery.core.models import Budget, Category, Scenario, Tier, TraceResult
+from toolery.core.models import (
+    TurnUsage, ScenarioResult, effective_tps,
+)
+
+
+def _trace_with_usage(usage):
+    return TraceResult(
+        scenario_id="t-01-x", adapter="raw", trial_index=0,
+        messages=[], tool_calls=[], final_response="done",
+        started_at_iso="2026-06-02T00:00:00Z", duration_ms=1000,
+        usage=usage,
+    )
+
+
+def test_traceresult_usage_defaults_empty():
+    # Old trace JSON predates the usage field; it must still parse.
+    t = TraceResult.model_validate_json(
+        '{"scenario_id":"t-01-x","adapter":"raw","trial_index":0,'
+        '"messages":[],"tool_calls":[],"started_at_iso":"x","duration_ms":5}'
+    )
+    assert t.usage == []
+    assert t.token_totals() == (0, 0, 0)
+
+
+def test_token_totals_sums_across_turns():
+    t = _trace_with_usage([
+        TurnUsage(turn_index=0, prompt_tokens=100, completion_tokens=20, latency_ms=400),
+        TurnUsage(turn_index=1, prompt_tokens=130, completion_tokens=30, latency_ms=600),
+    ])
+    assert t.token_totals() == (230, 50, 1000)
+
+
+def test_effective_tps_basic():
+    # 50 completion tokens over 1.0s = 50 tok/s
+    assert effective_tps(50, 1000) == 50.0
+
+
+def test_effective_tps_zero_time_is_none():
+    assert effective_tps(0, 0) is None
+    assert effective_tps(10, 0) is None
+
+
+def test_scenario_result_token_fields_default_zero():
+    r = ScenarioResult(
+        scenario_id="t-01-x", adapter="raw", trial_index=0, status="pass",
+        score=1.0, call_count=0, budget_max=1, latency_ms=5, failure_kind=None,
+        checks=[], trace=_trace_with_usage([]),
+    )
+    assert (r.prompt_tokens, r.completion_tokens, r.gen_ms) == (0, 0, 0)
 
 
 def test_scenario_minimal_valid():

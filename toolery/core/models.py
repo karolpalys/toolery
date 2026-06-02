@@ -103,6 +103,20 @@ class ToolCall(BaseModel):
     latency_ms: int = 0
 
 
+class TurnUsage(BaseModel):
+    """Token usage + wall-time for a single model request (one assistant turn).
+
+    Usage is reported per API call, not per tool call — one turn can emit
+    several tool calls — so it lives here rather than on ToolCall. latency_ms
+    is the wall-time of the successful HTTP POST only (retry backoff excluded),
+    so it is a clean denominator for effective-throughput math.
+    """
+    turn_index: int
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    latency_ms: int = 0
+
+
 class Message(BaseModel):
     role: Literal["system", "user", "assistant", "tool"]
     content: str | None = None
@@ -121,6 +135,14 @@ class TraceResult(BaseModel):
     duration_ms: int
     error: str | None = None
     adapter_metadata: dict[str, Any] = {}
+    usage: list[TurnUsage] = []
+
+    def token_totals(self) -> tuple[int, int, int]:
+        """(prompt_tokens, completion_tokens, gen_ms) summed across all turns."""
+        p = sum(u.prompt_tokens for u in self.usage)
+        c = sum(u.completion_tokens for u in self.usage)
+        ms = sum(u.latency_ms for u in self.usage)
+        return p, c, ms
 
 
 class CheckResult(BaseModel):
@@ -143,5 +165,20 @@ class ScenarioResult(BaseModel):
     # only thing ignored were a tool-call budget overrun. None until computed
     # (older rows backfilled from trace files). See scorer._correctness_score.
     correctness_score: float | None = None
+    # Token usage + generation wall-time aggregated from the trace, so the
+    # effective tokens/s can be recomputed (token-weighted) at any level
+    # without re-reading trace files. Zero when the adapter reports no usage
+    # (e.g. hermes subprocess) or for runs predating capture.
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    gen_ms: int = 0
     checks: list[CheckResult]
     trace: TraceResult
+
+
+def effective_tps(completion_tokens: int, gen_ms: int) -> float | None:
+    """Effective generation throughput: completion tokens / generation seconds.
+    Returns None when gen_ms <= 0 (no usable timing) so callers render 'n/a'."""
+    if gen_ms <= 0:
+        return None
+    return completion_tokens / (gen_ms / 1000)
