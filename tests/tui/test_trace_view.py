@@ -48,4 +48,12 @@ def test_compact_truncates_long_values():
     t = _trace()
     t.tool_calls[0].args = {"blob": "x" * 500}
     text = render_trace_compact(t).plain
-    assert max(len(line) for line in text.splitlines()) < 200
+    assert max(len(line) for line in text.splitlines()) < 120
+
+
+def test_full_renders_error():
+    t = _trace()
+    t.error = "timeout"
+    text = render_trace_full(t).plain
+    assert "error:" in text
+    assert "timeout" in text
