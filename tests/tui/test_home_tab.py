@@ -188,6 +188,24 @@ def test_classify_plan_running_after_done_marks_live_edge():
     assert last_running == 2
 
 
+def test_row_trace_path_returns_path_for_done_row():
+    from toolery.tui.home_tab import _row_trace_path
+    plan = [("t-01-x", "raw", 0), ("t-02-x", "raw", 0)]
+    completed = {
+        ("t-01-x", "raw", 0): {"status": "pass", "trace_path": "traces/a.json"},
+    }
+    running = {}
+    assert _row_trace_path(plan, completed, running, 0) == "traces/a.json"
+
+
+def test_row_trace_path_none_for_upcoming_or_out_of_range():
+    from toolery.tui.home_tab import _row_trace_path
+    plan = [("t-01-x", "raw", 0)]
+    assert _row_trace_path(plan, {}, {}, 0) is None       # upcoming, no trace yet
+    assert _row_trace_path(plan, {}, {}, 5) is None       # out of range
+    assert _row_trace_path(plan, {}, {}, None) is None    # no cursor
+
+
 from toolery.tui.home_tab import _detail_block_running, _detail_block_upcoming
 
 

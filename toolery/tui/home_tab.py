@@ -21,7 +21,7 @@ from toolery.core import endpoint_scanner
 from toolery.core.endpoint_scanner import EndpointInfo
 from toolery.core.models import TraceResult
 from toolery.core.store import Store
-from toolery.tui.trace_view import render_trace_compact
+from toolery.tui.trace_view import render_trace_compact, render_trace_full
 
 
 class ConfirmRunActionModal(ModalScreen[bool]):
@@ -75,6 +75,41 @@ class ConfirmRunActionModal(ModalScreen[bool]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(event.button.id == "confirm")
+
+
+class TraceModal(ModalScreen[None]):
+    """Full-screen modal showing the complete tool-call trace for a result row."""
+
+    DEFAULT_CSS = """
+    TraceModal {
+        align: center middle;
+    }
+    TraceModal #trace-box {
+        width: 90%;
+        height: 85%;
+        border: round $primary;
+        background: $surface;
+        padding: 1 2;
+    }
+    """
+    BINDINGS = [Binding("escape", "dismiss", "Close")]
+
+    def __init__(self, title: str, trace: TraceResult | None) -> None:
+        super().__init__()
+        self._title = title
+        self._trace = trace
+
+    def compose(self) -> ComposeResult:
+        with VerticalScroll(id="trace-box"):
+            yield Static(self._title, classes="trace-modal-title")
+            if self._trace is None:
+                yield Static("trace unavailable", classes="dim")
+            else:
+                yield Static(render_trace_full(self._trace))
+
+    def action_dismiss(self) -> None:
+        self.dismiss(None)
+
 
 DEFAULT_PORTS = sorted({5000, 5001, 11434, *range(8000, 9001)})
 
@@ -195,6 +230,21 @@ def _classify_plan(plan: list[tuple[str, str, int]],
             rows.append(("upcoming", key, None))
             upcoming_count += 1
     return rows
+
+
+def _row_trace_path(plan, completed, running, idx) -> str | None:
+    """Resolve the trace_path for a row index in the scenarios table, or None
+    if the row is not a completed result. Reuses _classify_plan so ordering
+    matches exactly what the table renders."""
+    if idx is None:
+        return None
+    rows = _classify_plan(plan, completed, running)
+    if idx >= len(rows):
+        return None
+    state, _key, payload = rows[idx]
+    if state != "done":
+        return None
+    return payload.get("trace_path")
 
 
 def _why_summary(status: str, failure_kind: str | None,
@@ -375,6 +425,8 @@ def _profile_run(results: list[dict]) -> Text:
 
 class HomeTab(Container):
     """Combined endpoint scanner + live run dashboard + post-run model profile."""
+
+    BINDINGS = [Binding("t", "view_trace", "Trace")]
 
     DEFAULT_CSS = """
     HomeTab {
@@ -914,6 +966,27 @@ class HomeTab(Container):
             )
             return
         await opener(endpoint)
+
+    @work
+    async def action_view_trace(self) -> None:
+        tbl = self.query_one("#scenarios-table", DataTable)
+        if tbl.row_count == 0 or tbl.cursor_row is None:
+            return
+        completed = {
+            (r["scenario_id"], r["adapter"], r["trial_index"]): r
+            for r in self._results_cache
+        }
+        running = self._fetch_running_units()
+        rel = _row_trace_path(self._plan, completed, running, tbl.cursor_row)
+        trace = None
+        if rel and self._store is not None and self._current_run_id:
+            run_dir = self._store.path.parent / "runs" / self._current_run_id
+            try:
+                trace = TraceResult.model_validate_json((run_dir / rel).read_text())
+            except Exception:
+                trace = None
+        title = f"trace — row {tbl.cursor_row}" if rel else "no trace for this row"
+        await self.app.push_screen_wait(TraceModal(title, trace))
 
     def _on_scenario_selected(self, idx: int | None) -> None:
         if idx is None:
