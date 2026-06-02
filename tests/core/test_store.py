@@ -192,3 +192,79 @@ def test_write_and_read_correctness_score(tmp_path):
     )
     rows = s.fetch_results_for_run("r1")
     assert rows[0]["correctness_score"] == result.correctness_score
+
+
+# ── token columns persistence (Task 4) ─────────────────────────────────────
+
+def _result_with_tokens(prompt, completion, gen_ms, scenario_id="t-01-x"):
+    trace = TraceResult(
+        scenario_id=scenario_id, adapter="raw", trial_index=0,
+        messages=[], tool_calls=[], final_response="x",
+        started_at_iso="x", duration_ms=gen_ms,
+    )
+    return ScenarioResult(
+        scenario_id=scenario_id, adapter="raw", trial_index=0, status="pass",
+        score=1.0, call_count=0, budget_max=1, latency_ms=gen_ms,
+        failure_kind=None, checks=[], trace=trace,
+        prompt_tokens=prompt, completion_tokens=completion, gen_ms=gen_ms,
+    )
+
+
+def test_token_columns_round_trip(tmp_path):
+    from toolery.core.store import Store
+    store = Store(tmp_path / "runs.db")
+    store.init_schema()
+    store.create_run("run1", "m", "http://x", "2026-06-02T00:00:00Z", "{}", "h")
+    store.write_scenario_result(
+        "run1", _result_with_tokens(100, 20, 400),
+        tags=[], ranking_dims=["overall"], scenario_hash="",
+        category="tool_selection", tier="easy", trace_path="traces/a.json",
+    )
+    rows = store.fetch_results_for_run("run1")
+    assert rows[0]["completion_tokens"] == 20
+    assert rows[0]["gen_ms"] == 400
+
+
+def test_fetch_run_token_totals_sums(tmp_path):
+    from toolery.core.store import Store
+    store = Store(tmp_path / "runs.db")
+    store.init_schema()
+    store.create_run("run1", "m", "http://x", "2026-06-02T00:00:00Z", "{}", "h")
+    for i, (p, c, ms) in enumerate([(100, 20, 400), (80, 30, 600)]):
+        store.write_scenario_result(
+            "run1", _result_with_tokens(p, c, ms, scenario_id=f"t-0{i+1}-x"),
+            tags=[], ranking_dims=["overall"], scenario_hash="",
+            category="tool_selection", tier="easy",
+            trace_path=f"traces/{i}.json",
+        )
+    completion, gen_ms = store.fetch_run_token_totals("run1")
+    assert (completion, gen_ms) == (50, 1000)
+
+
+def test_old_db_migrates_token_columns(tmp_path):
+    # Old DB: scenario_results WITHOUT token columns; init_schema must add them.
+    import sqlite3
+    db = tmp_path / "old.db"
+    con = sqlite3.connect(db)
+    con.executescript("""
+        CREATE TABLE scenario_results (
+          result_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          run_id TEXT, scenario_id TEXT NOT NULL, scenario_hash TEXT NOT NULL,
+          tier TEXT NOT NULL, category TEXT NOT NULL,
+          tags_json TEXT, ranking_dims_json TEXT,
+          adapter TEXT NOT NULL, trial_index INTEGER NOT NULL,
+          status TEXT, score REAL NOT NULL,
+          call_count INTEGER NOT NULL, budget_max INTEGER,
+          latency_ms INTEGER, failure_kind TEXT,
+          trace_path TEXT, checks_json TEXT
+        );
+    """)
+    con.commit()
+    con.close()
+
+    from toolery.core.store import Store
+    store = Store(db)
+    store.init_schema()  # must not raise
+    with store.conn() as c:
+        cols = {r[1] for r in c.execute("PRAGMA table_info(scenario_results)").fetchall()}
+    assert {"prompt_tokens", "completion_tokens", "gen_ms"} <= cols
