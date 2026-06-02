@@ -447,8 +447,7 @@ def test_profile_run_shows_effective_tps():
     ]
     text = _profile_run(results).plain
     # 100 completion tokens / 1.0s = 100 gen t/s, labeled as tool-test measured.
-    assert "100" in text
-    assert "t/s" in text
+    assert "eff gen t/s (tool tests): 100.0" in text
 
 
 def test_profile_run_tps_na_without_tokens():
@@ -459,3 +458,13 @@ def test_profile_run_tps_na_without_tokens():
     ]
     text = _profile_run(results).plain
     assert "n/a" in text
+
+
+def test_profile_run_tps_na_with_none_columns():
+    from toolery.tui.home_tab import _profile_run
+    results = [
+        {"scenario_id": "a", "tier": "easy", "status": "pass", "score": 1.0,
+         "ranking_dims_json": "[\"overall\"]", "completion_tokens": None, "gen_ms": None},
+    ]
+    text = _profile_run(results).plain
+    assert "eff gen t/s (tool tests): n/a" in text
