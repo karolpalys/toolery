@@ -19,7 +19,9 @@ from textual.widgets import Button, DataTable, Label, ProgressBar, Static
 
 from toolery.core import endpoint_scanner
 from toolery.core.endpoint_scanner import EndpointInfo
+from toolery.core.models import TraceResult
 from toolery.core.store import Store
+from toolery.tui.trace_view import render_trace_compact
 
 
 class ConfirmRunActionModal(ModalScreen[bool]):
@@ -214,7 +216,8 @@ def _why_summary(status: str, failure_kind: str | None,
 def _detail_block(scenario_id: str, adapter: str, trial: int, status: str,
                   failure_kind: str | None, latency_ms: int | None,
                   call_count: int | None, budget_max: int | None,
-                  trace_path: str | None, checks_json: str | None) -> Text:
+                  trace_path: str | None, checks_json: str | None,
+                  run_dir: Path | None = None) -> Text:
     """Renders the right-hand panel content for the selected scenario row."""
     out = Text()
     out.append(f"{scenario_id}\n", style="bold")
@@ -245,6 +248,15 @@ def _detail_block(scenario_id: str, adapter: str, trial: int, status: str,
         if detail:
             out.append(f": {detail}", style="dim")
         out.append("\n")
+    trace = None
+    if run_dir is not None and trace_path:
+        try:
+            trace = TraceResult.model_validate_json(
+                (Path(run_dir) / trace_path).read_text())
+        except Exception:
+            trace = None  # missing/corrupt trace → fall back to path only
+    if trace is not None:
+        out.append(render_trace_compact(trace))
     if trace_path:
         out.append(f"\ntrace: {trace_path}\n", style="dim")
     return out
@@ -917,6 +929,11 @@ class HomeTab(Container):
         state, key, payload = rows[idx]
         scenario_id, adapter, trial_index = key
         if state == "done":
+            run_dir = None
+            if self._store is not None and self._current_run_id:
+                run_dir = (
+                    self._store.path.parent / "runs" / self._current_run_id
+                )
             block = _detail_block(
                 scenario_id=scenario_id, adapter=adapter, trial=trial_index,
                 status=payload.get("status") or "?",
@@ -926,6 +943,7 @@ class HomeTab(Container):
                 budget_max=payload.get("budget_max"),
                 trace_path=payload.get("trace_path"),
                 checks_json=payload.get("checks_json"),
+                run_dir=run_dir,
             )
         elif state == "running":
             block = _detail_block_running(

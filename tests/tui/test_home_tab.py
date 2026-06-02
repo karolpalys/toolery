@@ -1,9 +1,13 @@
+import json
+from pathlib import Path
+
 import pytest
 from textual.app import App
 from textual.widgets import DataTable, Static
 
 from toolery.core.endpoint_scanner import EndpointInfo
-from toolery.tui.home_tab import HomeTab
+from toolery.core.models import ToolCall, TraceResult
+from toolery.tui.home_tab import HomeTab, _detail_block
 
 
 class _Host(App):
@@ -285,3 +289,40 @@ async def test_refresh_from_db_aborts_stale_run(tmp_path, monkeypatch):
     refreshed = store.fetch_run(run_id)
     assert refreshed["status"] == "aborted"
     assert store.fetch_in_flight_for_run(run_id) == []
+
+
+def _write_trace(run_dir):
+    from toolery.core.models import ToolCall, TraceResult
+    trace = TraceResult(
+        scenario_id="t-01-x", adapter="raw", trial_index=0,
+        messages=[], final_response="done", started_at_iso="x", duration_ms=10,
+        tool_calls=[ToolCall(index=0, name="get_weather",
+                             args={"location": "Warsaw"}, result={"temp_c": 7},
+                             result_kind="json", latency_ms=5)],
+    )
+    (run_dir / "traces").mkdir(parents=True, exist_ok=True)
+    rel = "traces/t-01-x__raw__t0.json"
+    (run_dir / rel).write_text(trace.model_dump_json())
+    return rel
+
+
+def test_detail_block_inlines_tool_calls(tmp_path):
+    from toolery.tui.home_tab import _detail_block
+    rel = _write_trace(tmp_path)
+    text = _detail_block(
+        scenario_id="t-01-x", adapter="raw", trial=0, status="pass",
+        failure_kind=None, latency_ms=10, call_count=1, budget_max=1,
+        trace_path=rel, checks_json="[]", run_dir=tmp_path,
+    ).plain
+    assert "tool calls (1)" in text
+    assert "get_weather" in text
+
+
+def test_detail_block_missing_trace_falls_back_to_path(tmp_path):
+    from toolery.tui.home_tab import _detail_block
+    text = _detail_block(
+        scenario_id="t-01-x", adapter="raw", trial=0, status="pass",
+        failure_kind=None, latency_ms=10, call_count=1, budget_max=1,
+        trace_path="traces/nope.json", checks_json="[]", run_dir=tmp_path,
+    ).plain
+    assert "traces/nope.json" in text  # graceful fallback, no crash
