@@ -117,3 +117,13 @@ def test_details_md_effective_tps_na_without_tokens():
                 "completion_tokens": 0, "gen_ms": 0}]
     md = _build_details_md(_run(), results, perf_rows=[], adapters=["raw"])
     assert "n/a" in md
+
+
+def test_details_md_effective_tps_na_with_none_columns():
+    from toolery.tui.history_tab import _build_details_md
+    # Old-DB rows: token columns absent entirely (None / missing).
+    results = [{"scenario_id": "a", "tier": "easy", "status": "pass", "score": 1.0,
+                "completion_tokens": None, "gen_ms": None}]
+    md = _build_details_md(_run(), results, perf_rows=[], adapters=["raw"])
+    assert "Eff gen t/s" in md
+    assert "n/a" in md
