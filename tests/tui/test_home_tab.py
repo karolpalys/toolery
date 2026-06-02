@@ -435,3 +435,27 @@ async def test_view_trace_opens_and_closes_modal(tmp_path, monkeypatch):
         await pilot.pause()
         await pilot.pause()
         assert not any(isinstance(s, TraceModal) for s in app.screen_stack)
+
+
+def test_profile_run_shows_effective_tps():
+    from toolery.tui.home_tab import _profile_run
+    results = [
+        {"scenario_id": "a", "tier": "easy", "status": "pass", "score": 1.0,
+         "ranking_dims_json": "[\"overall\"]", "completion_tokens": 40, "gen_ms": 400},
+        {"scenario_id": "b", "tier": "easy", "status": "pass", "score": 1.0,
+         "ranking_dims_json": "[\"overall\"]", "completion_tokens": 60, "gen_ms": 600},
+    ]
+    text = _profile_run(results).plain
+    # 100 completion tokens / 1.0s = 100 gen t/s, labeled as tool-test measured.
+    assert "100" in text
+    assert "t/s" in text
+
+
+def test_profile_run_tps_na_without_tokens():
+    from toolery.tui.home_tab import _profile_run
+    results = [
+        {"scenario_id": "a", "tier": "easy", "status": "pass", "score": 1.0,
+         "ranking_dims_json": "[\"overall\"]", "completion_tokens": 0, "gen_ms": 0},
+    ]
+    text = _profile_run(results).plain
+    assert "n/a" in text

@@ -19,7 +19,7 @@ from textual.widgets import Button, DataTable, Label, ProgressBar, Static
 
 from toolery.core import endpoint_scanner
 from toolery.core.endpoint_scanner import EndpointInfo
-from toolery.core.models import TraceResult
+from toolery.core.models import TraceResult, effective_tps
 from toolery.core.store import Store
 from toolery.tui.trace_view import render_trace_compact, render_trace_full
 
@@ -420,6 +420,13 @@ def _profile_run(results: list[dict]) -> Text:
             "Mixed profile — no dimension is decisively strong or weak.\n",
             style="dim",
         )
+
+    total_completion = sum(int(r.get("completion_tokens") or 0) for r in results)
+    total_gen_ms = sum(int(r.get("gen_ms") or 0) for r in results)
+    tps = effective_tps(total_completion, total_gen_ms)
+    out.append("\neff gen t/s (tool tests): ", style="bold")
+    out.append(f"{tps:.1f}\n" if tps is not None else "n/a\n",
+               style="green" if tps is not None else "dim")
     return out
 
 
