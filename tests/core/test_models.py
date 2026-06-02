@@ -44,6 +44,12 @@ def test_effective_tps_zero_time_is_none():
     assert effective_tps(10, 0) is None
 
 
+def test_effective_tps_none_when_no_completion_tokens():
+    # Server omitted usage but the request was still timed: 0 tokens over 400ms
+    # must read as n/a (None), not 0.0.
+    assert effective_tps(0, 400) is None
+
+
 def test_scenario_result_token_fields_default_zero():
     r = ScenarioResult(
         scenario_id="t-01-x", adapter="raw", trial_index=0, status="pass",

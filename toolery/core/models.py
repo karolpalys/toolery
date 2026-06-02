@@ -178,7 +178,10 @@ class ScenarioResult(BaseModel):
 
 def effective_tps(completion_tokens: int, gen_ms: int) -> float | None:
     """Effective generation throughput: completion tokens / generation seconds.
-    Returns None when gen_ms <= 0 (no usable timing) so callers render 'n/a'."""
-    if gen_ms <= 0:
+    Returns None (callers render 'n/a') when there is no usable data — either no
+    timing (gen_ms <= 0) or no generated tokens (completion_tokens <= 0, e.g. a
+    server that omits the `usage` field). Zero tokens over real time is 'n/a',
+    not 0.0 t/s."""
+    if gen_ms <= 0 or completion_tokens <= 0:
         return None
     return completion_tokens / (gen_ms / 1000)

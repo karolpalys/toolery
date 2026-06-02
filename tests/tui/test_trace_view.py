@@ -57,3 +57,13 @@ def test_full_renders_error():
     text = render_trace_full(t).plain
     assert "error:" in text
     assert "timeout" in text
+
+
+def test_compact_rate_na_when_usage_has_latency_but_no_tokens():
+    from toolery.core.models import TurnUsage
+    t = _trace()
+    t.usage = [TurnUsage(turn_index=0, prompt_tokens=0, completion_tokens=0, latency_ms=400)]
+    text = render_trace_compact(t).plain
+    # Must NOT claim "0 gen t/s"; the rate is n/a because no tokens were generated.
+    assert "0 gen t/s" not in text
+    assert "n/a" in text
