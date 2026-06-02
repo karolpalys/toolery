@@ -674,6 +674,7 @@ def _correctness_score(scenario, required, forbidden_clean: bool, hallucinated: 
 def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
     calls = trace.tool_calls
     response = trace.final_response
+    pt, ct, gen_ms = trace.token_totals()
 
     if trace.error:
         return ScenarioResult(
@@ -682,6 +683,7 @@ def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
             budget_max=scenario.budget.max_tool_calls, latency_ms=trace.duration_ms,
             failure_kind=_classify_error(trace.error), checks=[], trace=trace,
             correctness_score=0.0,
+            prompt_tokens=pt, completion_tokens=ct, gen_ms=gen_ms,
         )
 
     def run(chk):
@@ -742,6 +744,7 @@ def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
             latency_ms=trace.duration_ms, failure_kind=kind,
             checks=all_checks, trace=trace,
             correctness_score=_correctness_score(scenario, required, forbidden_clean, hallucinated),
+            prompt_tokens=pt, completion_tokens=ct, gen_ms=gen_ms,
         )
 
     # Required + forbidden all-pass → status="pass" with full score, regardless
@@ -756,4 +759,5 @@ def evaluate(scenario: Scenario, trace: TraceResult) -> ScenarioResult:
         latency_ms=trace.duration_ms, failure_kind=None,
         checks=all_checks, trace=trace,
         correctness_score=scenario.scoring.weights["pass"],
+        prompt_tokens=pt, completion_tokens=ct, gen_ms=gen_ms,
     )

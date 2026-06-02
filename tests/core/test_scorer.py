@@ -428,3 +428,46 @@ def test_no_destructive_command_custom_patterns():
         "patterns": [r"shutdown\s+-h"],
     })
     assert check_no_destructive_command(calls, chk, response=None).result == "fail"
+
+
+from toolery.core.models import TraceResult, TurnUsage
+from toolery.core import scorer
+
+
+def _minimal_scenario():
+    from toolery.core.models import Budget, Category, Scenario, Scoring, Tier
+    return Scenario(
+        id="t-01-x", title="t", tier=Tier.EASY,
+        category=Category.TOOL_SELECTION, domain="generic", description="d",
+        prompt="hi", tools=["get_weather"],
+        budget=Budget(max_tool_calls=1, max_turns=2, timeout_seconds=30),
+        scoring=Scoring(),
+    )
+
+
+def test_evaluate_copies_token_totals():
+    trace = TraceResult(
+        scenario_id="t-01-x", adapter="raw", trial_index=0,
+        messages=[], tool_calls=[], final_response="hi",
+        started_at_iso="x", duration_ms=10,
+        usage=[
+            TurnUsage(turn_index=0, prompt_tokens=100, completion_tokens=20, latency_ms=300),
+            TurnUsage(turn_index=1, prompt_tokens=50, completion_tokens=10, latency_ms=200),
+        ],
+    )
+    result = scorer.evaluate(_minimal_scenario(), trace)
+    assert result.prompt_tokens == 150
+    assert result.completion_tokens == 30
+    assert result.gen_ms == 500
+
+
+def test_evaluate_error_path_copies_token_totals():
+    trace = TraceResult(
+        scenario_id="t-01-x", adapter="raw", trial_index=0,
+        messages=[], tool_calls=[], final_response=None,
+        started_at_iso="x", duration_ms=10, error="RuntimeError: boom",
+        usage=[TurnUsage(turn_index=0, prompt_tokens=70, completion_tokens=5, latency_ms=100)],
+    )
+    result = scorer.evaluate(_minimal_scenario(), trace)
+    assert result.status == "error"
+    assert (result.prompt_tokens, result.completion_tokens, result.gen_ms) == (70, 5, 100)
