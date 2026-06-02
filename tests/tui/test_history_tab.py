@@ -90,3 +90,30 @@ async def test_enter_opens_details_modal(seeded_results_dir):
         assert isinstance(app.screen, MarkdownModal)
         await pilot.press("escape")
         await pilot.pause()
+
+
+def _run():
+    return {"run_id": "run1", "model": "m", "status": "done",
+            "started_at": "x", "finished_at": "y", "duration_s": 1.0,
+            "cluster": None, "base_url": "http://x", "config_json": "{}"}
+
+
+def test_details_md_includes_effective_tps():
+    from toolery.tui.history_tab import _build_details_md
+    results = [
+        {"scenario_id": "a", "tier": "easy", "status": "pass", "score": 1.0,
+         "completion_tokens": 40, "gen_ms": 400},
+        {"scenario_id": "b", "tier": "easy", "status": "pass", "score": 1.0,
+         "completion_tokens": 60, "gen_ms": 600},
+    ]
+    md = _build_details_md(_run(), results, perf_rows=[], adapters=["raw"])
+    assert "Eff gen t/s" in md
+    assert "100.0" in md  # 100 tok / 1.0s
+
+
+def test_details_md_effective_tps_na_without_tokens():
+    from toolery.tui.history_tab import _build_details_md
+    results = [{"scenario_id": "a", "tier": "easy", "status": "pass", "score": 1.0,
+                "completion_tokens": 0, "gen_ms": 0}]
+    md = _build_details_md(_run(), results, perf_rows=[], adapters=["raw"])
+    assert "n/a" in md

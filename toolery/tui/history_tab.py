@@ -14,6 +14,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, Markdown, Static
 
 from toolery.compare import compare_runs
+from toolery.core.models import effective_tps
 from toolery.core.store import Store
 from toolery.tui.home_tab import _DIM_LABEL
 
@@ -292,6 +293,12 @@ def _build_details_md(run: dict, results: list[dict],
             for kind, n in fail_kinds.most_common(8):
                 lines.append(f"- `{kind}` — {n}")
             lines.append("")
+        total_completion = sum(int(r.get("completion_tokens") or 0) for r in results)
+        total_gen_ms = sum(int(r.get("gen_ms") or 0) for r in results)
+        tps = effective_tps(total_completion, total_gen_ms)
+        rate = f"{tps:.1f}" if tps is not None else "n/a"
+        lines.append(f"- **Eff gen t/s (tool tests):** {rate}")
+        lines.append("")
     else:
         lines.append("_No scenario results recorded for this run._")
         lines.append("")
