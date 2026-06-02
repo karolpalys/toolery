@@ -4,9 +4,23 @@ import httpx
 import pytest
 import respx
 
+import toolery.adapters.openai_raw as openai_raw_mod
 import toolery.tools.generic  # noqa: F401 — registers tools into ToolRegistry
 from toolery.adapters.openai_raw import OpenAIRawAdapter
 from toolery.core.models import Budget, Category, Scenario, Scoring, Tier, ToolResponseRule
+
+
+@pytest.fixture
+def captured_sleeps(monkeypatch):
+    """Replace asyncio.sleep in the adapter with a no-op that records the
+    requested delays, so retry/backoff tests assert timing without waiting."""
+    delays: list[float] = []
+
+    async def _fake_sleep(seconds):
+        delays.append(seconds)
+
+    monkeypatch.setattr(openai_raw_mod.asyncio, "sleep", _fake_sleep)
+    return delays
 
 
 def _scenario():
@@ -76,3 +90,129 @@ async def test_openai_raw_handles_tool_call_then_final():
     assert trace.tool_calls[0].name == "get_weather"
     assert trace.tool_calls[0].args == {"location": "Warsaw"}
     assert trace.final_response == "It's 7°C and cloudy."
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_retries_on_429_then_succeeds(captured_sleeps):
+    """Cloud endpoints (MiniMax etc.) rate-limit with HTTP 429. The adapter must
+    retry rather than record the scenario as a model failure."""
+    ok = {"choices": [{"message": {"role": "assistant", "content": "It's 7°C."}}]}
+    route = respx.post("http://localhost:8000/v1/chat/completions").mock(
+        side_effect=[
+            httpx.Response(429),
+            httpx.Response(429),
+            httpx.Response(200, json=ok),
+        ]
+    )
+    adapter = OpenAIRawAdapter(base_url="http://localhost:8000", api_key="x")
+    trace = await adapter.run_scenario(_scenario(), model="test-model", timeout=10)
+    assert trace.error is None
+    assert trace.final_response == "It's 7°C."
+    assert route.call_count == 3
+    assert len(captured_sleeps) == 2  # backed off before each retry
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_429_honors_retry_after_header(captured_sleeps):
+    """When the server tells us how long to wait via Retry-After, obey it
+    instead of the default exponential backoff."""
+    ok = {"choices": [{"message": {"role": "assistant", "content": "ok"}}]}
+    respx.post("http://localhost:8000/v1/chat/completions").mock(
+        side_effect=[
+            httpx.Response(429, headers={"Retry-After": "7"}),
+            httpx.Response(200, json=ok),
+        ]
+    )
+    adapter = OpenAIRawAdapter(base_url="http://localhost:8000", api_key="x")
+    trace = await adapter.run_scenario(_scenario(), model="test-model", timeout=10)
+    assert trace.error is None
+    assert captured_sleeps == [7.0]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_retries_on_5xx_then_succeeds(captured_sleeps):
+    """Transient server errors (502/503 from an overloaded cloud gateway) are
+    retryable, same as 429."""
+    ok = {"choices": [{"message": {"role": "assistant", "content": "ok"}}]}
+    route = respx.post("http://localhost:8000/v1/chat/completions").mock(
+        side_effect=[httpx.Response(503), httpx.Response(200, json=ok)]
+    )
+    adapter = OpenAIRawAdapter(base_url="http://localhost:8000", api_key="x")
+    trace = await adapter.run_scenario(_scenario(), model="test-model", timeout=10)
+    assert trace.error is None
+    assert route.call_count == 2
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_does_not_retry_on_4xx_client_error(captured_sleeps):
+    """A 400 (malformed request) or 401 (bad key) is a real client error — retry
+    would just waste tokens/quota. Fail fast, record the error, no backoff."""
+    route = respx.post("http://localhost:8000/v1/chat/completions").mock(
+        side_effect=[httpx.Response(400), httpx.Response(200, json={})]
+    )
+    adapter = OpenAIRawAdapter(base_url="http://localhost:8000", api_key="x")
+    trace = await adapter.run_scenario(_scenario(), model="test-model", timeout=10)
+    assert trace.error is not None and "400" in trace.error
+    assert route.call_count == 1
+    assert captured_sleeps == []
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_captures_usage_per_turn():
+    # Single turn, no tool calls — model answers directly and reports usage.
+    respx.post("http://localhost:8000/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={
+            "choices": [{"message": {"role": "assistant", "content": "It's cloudy."}}],
+            "usage": {"prompt_tokens": 123, "completion_tokens": 45, "total_tokens": 168},
+        })
+    )
+    adapter = OpenAIRawAdapter(base_url="http://localhost:8000", api_key="x")
+    try:
+        trace = await adapter.run_scenario(_scenario(), model="m", timeout=30)
+    finally:
+        await adapter.aclose()
+
+    assert len(trace.usage) == 1
+    u = trace.usage[0]
+    assert u.turn_index == 0
+    assert u.prompt_tokens == 123
+    assert u.completion_tokens == 45
+    assert u.latency_ms >= 0
+    assert trace.token_totals()[:2] == (123, 45)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_missing_usage_field_records_zeros():
+    respx.post("http://localhost:8000/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={
+            "choices": [{"message": {"role": "assistant", "content": "hi"}}],
+        })
+    )
+    adapter = OpenAIRawAdapter(base_url="http://localhost:8000", api_key="x")
+    try:
+        trace = await adapter.run_scenario(_scenario(), model="m", timeout=30)
+    finally:
+        await adapter.aclose()
+    assert len(trace.usage) == 1
+    assert trace.token_totals() == (0, 0, trace.usage[0].latency_ms)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_gives_up_after_max_retries(captured_sleeps):
+    """Persistent 429 must terminate after max_retries+1 attempts and record an
+    error rather than loop forever."""
+    route = respx.post("http://localhost:8000/v1/chat/completions").mock(
+        return_value=httpx.Response(429)
+    )
+    adapter = OpenAIRawAdapter(base_url="http://localhost:8000", api_key="x", max_retries=2)
+    trace = await adapter.run_scenario(_scenario(), model="test-model", timeout=10)
+    assert trace.error is not None and "429" in trace.error
+    assert route.call_count == 3  # initial + 2 retries
+    assert len(captured_sleeps) == 2
