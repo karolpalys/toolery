@@ -386,6 +386,9 @@ class HistoryTab(Container):
         # Diff anchor: first run picked with `d`. Second `d` on a different
         # row triggers the diff. `d` on the same row clears the anchor.
         self._diff_anchor: str | None = None
+        # Signature of the runs last rendered; the auto-refresh poll only
+        # rebuilds the table when this changes (see `_poll_for_new_runs`).
+        self._last_sig: tuple | None = None
 
     def compose(self) -> ComposeResult:
         yield Static(
@@ -414,9 +417,45 @@ class HistoryTab(Container):
         except Exception:
             pass
         self.refresh_data()
+        # New runs land in the DB while this tab is open (or while the user is
+        # on another tab). Poll so they appear without pressing Ctrl+R; the
+        # poll is silent unless the set of runs actually changed.
+        self._last_sig = self._db_sig()
+        self.set_interval(3.0, self._poll_for_new_runs)
+
+    def on_show(self) -> None:
+        # Refresh whenever the user switches into the History tab.
+        self._poll_for_new_runs()
+
+    def _db_sig(self) -> tuple:
+        """Cheap fingerprint of the run set; changes when a run is added,
+        removed, or its status/duration is updated."""
+        return tuple(
+            (r["run_id"], r["status"], r["duration_s"])
+            for r in self._store().fetch_all_runs()
+        )
+
+    def _current_filter(self) -> str:
+        try:
+            return self.query_one("#hist-filter", Input).value
+        except Exception:
+            return ""
+
+    def _poll_for_new_runs(self) -> None:
+        """Rebuild the table only when the run set changed, so the periodic
+        poll stays quiet (and keeps the cursor steady) while the user browses,
+        yet surfaces freshly completed runs on its own."""
+        sig = self._db_sig()
+        if sig == self._last_sig:
+            return
+        self._last_sig = sig
+        self.refresh_data(self._current_filter())
 
     def refresh_data(self, filter_str: str = "") -> None:
         tbl = self.query_one("#history-table", DataTable)
+        # Preserve the highlighted run across the rebuild so auto-refresh
+        # doesn't yank the cursor back to the top while the user is browsing.
+        prev_run_id = self._row_run_id(tbl.cursor_row) if tbl.row_count else None
         tbl.clear()
         store = self._store()
         _STATUS_EMOJI = {
@@ -426,6 +465,7 @@ class HistoryTab(Container):
             "aborted": "⚠ aborted",
         }
         i = 0
+        row_run_ids: list[str] = []
         for r in store.fetch_all_runs():
             if filter_str and filter_str.lower() not in (r["run_id"] + r["model"]).lower():
                 continue
@@ -439,6 +479,9 @@ class HistoryTab(Container):
             tbl.add_row(str(i), r["run_id"], r["model"], status_cell,
                         r["started_at"] or "", f"{r['duration_s'] or 0:.1f}",
                         ",".join(adapters))
+            row_run_ids.append(r["run_id"])
+        if prev_run_id and prev_run_id in row_run_ids:
+            tbl.move_cursor(row=row_run_ids.index(prev_run_id))
 
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
