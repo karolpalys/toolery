@@ -1,7 +1,16 @@
 import pytest
 
 from toolery.adapters.base import MockAdapter, ScenarioPlan
-from toolery.core.models import Budget, Category, Scenario, Scoring, ScoringCheck, Tier, ToolCall
+from toolery.core.models import (
+    Budget,
+    Category,
+    Scenario,
+    Scoring,
+    ScoringCheck,
+    Tier,
+    ToolCall,
+    TraceResult,
+)
 from toolery.core.runner import Runner
 
 
@@ -84,6 +93,55 @@ async def test_runner_should_stop_drains_inflight_skips_pending():
     assert len(starts) == 1
     # Pending (skipped) units must not leak into the returned result list.
     assert returned == results
+
+
+@pytest.mark.asyncio
+async def test_runner_scales_timeout_for_slow_adapters():
+    """Cloud/reasoning adapters need more wall-clock than the local-tuned
+    timeout_seconds. timeout_scale multiplies the per-scenario allowance so a
+    slow remote model isn't killed mid-answer. The scaled value must reach the
+    adapter (and govern the runner's hard wait_for)."""
+    received: dict[str, int] = {}
+
+    class SpyAdapter:
+        name = "spy"
+        version = "0.1"
+
+        async def run_scenario(self, scenario, model, timeout):
+            received["timeout"] = timeout
+            return TraceResult(
+                scenario_id=scenario.id, adapter=self.name, trial_index=0,
+                messages=[], final_response="ok",
+                tool_calls=[ToolCall(index=0, name="get_weather", args={"location": "Warsaw"})],
+                started_at_iso="2026-01-01T00:00:00Z", duration_ms=1, error=None,
+            )
+
+    runner = Runner(adapters={"spy": SpyAdapter()}, trials=1, model="x", timeout_scale=4.0)
+    await runner.run([_scenario()])  # scenario timeout_seconds=30
+    assert received["timeout"] == 120  # 30 * 4.0
+
+
+@pytest.mark.asyncio
+async def test_runner_default_timeout_scale_is_unchanged():
+    """Default timeout_scale=1.0 leaves local runs exactly as before."""
+    received: dict[str, int] = {}
+
+    class SpyAdapter:
+        name = "spy"
+        version = "0.1"
+
+        async def run_scenario(self, scenario, model, timeout):
+            received["timeout"] = timeout
+            return TraceResult(
+                scenario_id=scenario.id, adapter=self.name, trial_index=0,
+                messages=[], final_response="ok",
+                tool_calls=[ToolCall(index=0, name="get_weather", args={"location": "Warsaw"})],
+                started_at_iso="2026-01-01T00:00:00Z", duration_ms=1, error=None,
+            )
+
+    runner = Runner(adapters={"spy": SpyAdapter()}, trials=1, model="x")
+    await runner.run([_scenario()])
+    assert received["timeout"] == 30  # unchanged
 
 
 @pytest.mark.asyncio

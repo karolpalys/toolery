@@ -103,6 +103,9 @@ def run(
     base_url: str = typer.Option("http://localhost:8000", "--base-url"),
     scenarios_dir: Path = typer.Option(Path("scenarios")),  # noqa: B008
     concurrency: int = typer.Option(4),
+    timeout_scale: float = typer.Option(1.0, "--timeout-scale",
+                                        help="multiply each scenario's timeout_seconds; "
+                                             "bump for slow cloud/reasoning endpoints (e.g. 4.0)"),
     no_tui: bool = typer.Option(True, "--no-tui/--tui", help="MVP: --no-tui only"),
     with_perf: bool = typer.Option(False, "--with-perf"),
     perf_only: bool = typer.Option(False, "--perf-only",
@@ -147,6 +150,7 @@ def run(
         category = _rcfg.get("category", category)
         trials = int(_rcfg.get("trials", trials) or trials)
         concurrency = int(_rcfg.get("concurrency", concurrency) or concurrency)
+        timeout_scale = float(_rcfg.get("timeout_scale", timeout_scale) or timeout_scale)
         with_perf = bool(_rcfg.get("with_perf", with_perf))
         perf_only = bool(_rcfg.get("perf_only", perf_only))
         cluster = _rcfg.get("cluster", cluster)
@@ -231,7 +235,8 @@ def run(
         cluster = "single"
     cfg = {"model": model, "served_model": api_model, "adapter": list(adapters),
            "tier": tier, "category": category, "trials": trials, "base_url": base_url,
-           "concurrency": concurrency, "total_units": total_units,
+           "concurrency": concurrency, "timeout_scale": timeout_scale,
+           "total_units": total_units,
            "scenarios_count": 0 if perf_only else len(xs),
            "with_perf": bool(with_perf or perf_only),
            "perf_only": bool(perf_only), "cluster": cluster}
@@ -285,6 +290,7 @@ def run(
         runner = Runner(
             adapters=adapters, trials=trials, model=api_model, concurrency=concurrency,
             on_start=_on_start, on_end=_on_end, skip=resume_skip,
+            timeout_scale=timeout_scale,
         )
         console.print(f"[bold]Running {len(xs)} scenarios × {len(adapters)} adapters × {trials} trials"
                       f" = {total_units} units[/bold]")

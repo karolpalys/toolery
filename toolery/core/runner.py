@@ -42,16 +42,21 @@ class Runner:
     skip: set[tuple[str, str, int]] | None = None
     on_start: StartCallback | None = None
     on_end: EndCallback | None = None
+    # Multiplier on each scenario's timeout_seconds. The budgets are tuned for
+    # fast local serving; a cloud/reasoning adapter (high RTT + long CoT) gets
+    # killed mid-answer at scale 1.0. Bump for remote endpoints (e.g. 4.0).
+    timeout_scale: float = 1.0
 
     async def _run_one(self, scenario: Scenario, adapter_name: str, adapter: Adapter,
                        trial_index: int) -> ScenarioResult:
         started_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
         await _maybe_call(self.on_start, scenario.id, adapter_name, trial_index, started_at)
+        eff_timeout = int(scenario.budget.timeout_seconds * self.timeout_scale)
         try:
             try:
                 trace = await asyncio.wait_for(
-                    adapter.run_scenario(scenario, self.model, scenario.budget.timeout_seconds),
-                    timeout=scenario.budget.timeout_seconds + 5,
+                    adapter.run_scenario(scenario, self.model, eff_timeout),
+                    timeout=eff_timeout + 5,
                 )
             except TimeoutError:
                 from toolery.core.models import TraceResult
@@ -59,7 +64,7 @@ class Runner:
                     scenario_id=scenario.id, adapter=adapter_name, trial_index=trial_index,
                     messages=[], tool_calls=[], final_response=None,
                     started_at_iso=started_at,
-                    duration_ms=scenario.budget.timeout_seconds * 1000,
+                    duration_ms=eff_timeout * 1000,
                     error="timeout",
                 )
             trace = trace.model_copy(update={"adapter": adapter_name, "trial_index": trial_index})
