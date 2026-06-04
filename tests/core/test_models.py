@@ -1,9 +1,15 @@
 import pytest
 from pydantic import ValidationError
 
-from toolery.core.models import Budget, Category, Scenario, Tier, TraceResult
 from toolery.core.models import (
-    TurnUsage, ScenarioResult, effective_tps,
+    Budget,
+    Category,
+    Scenario,
+    ScenarioResult,
+    Tier,
+    TraceResult,
+    TurnUsage,
+    effective_tps,
 )
 
 

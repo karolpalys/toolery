@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 
 import pytest
 from textual.app import App
@@ -322,7 +320,6 @@ async def test_refresh_from_db_aborts_stale_run(tmp_path, monkeypatch):
 
 
 def _write_trace(run_dir):
-    from toolery.core.models import ToolCall, TraceResult
     trace = TraceResult(
         scenario_id="t-01-x", adapter="raw", trial_index=0,
         messages=[], final_response="done", started_at_iso="x", duration_ms=10,
@@ -337,7 +334,6 @@ def _write_trace(run_dir):
 
 
 def test_detail_block_inlines_tool_calls(tmp_path):
-    from toolery.tui.home_tab import _detail_block
     rel = _write_trace(tmp_path)
     text = _detail_block(
         scenario_id="t-01-x", adapter="raw", trial=0, status="pass",
@@ -349,7 +345,6 @@ def test_detail_block_inlines_tool_calls(tmp_path):
 
 
 def test_detail_block_missing_trace_falls_back_to_path(tmp_path):
-    from toolery.tui.home_tab import _detail_block
     text = _detail_block(
         scenario_id="t-01-x", adapter="raw", trial=0, status="pass",
         failure_kind=None, latency_ms=10, call_count=1, budget_max=1,

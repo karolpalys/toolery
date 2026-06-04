@@ -430,8 +430,8 @@ def test_no_destructive_command_custom_patterns():
     assert check_no_destructive_command(calls, chk, response=None).result == "fail"
 
 
-from toolery.core.models import TraceResult, TurnUsage
 from toolery.core import scorer
+from toolery.core.models import TraceResult, TurnUsage
 
 
 def _minimal_scenario():

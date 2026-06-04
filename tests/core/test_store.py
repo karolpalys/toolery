@@ -1,9 +1,15 @@
 import sqlite3
 from datetime import UTC, datetime
-from pathlib import Path
 
 from toolery.core.models import (
-    Budget, Category, Message, Scenario, ScenarioResult, Scoring, Tier, ToolCall, TraceResult,
+    Budget,
+    Category,
+    Message,
+    Scenario,
+    ScenarioResult,
+    Scoring,
+    Tier,
+    TraceResult,
 )
 from toolery.core.scorer import evaluate
 from toolery.core.store import Store
@@ -244,7 +250,6 @@ def test_fetch_run_token_totals_sums(tmp_path):
 
 def test_old_db_migrates_token_columns(tmp_path):
     # Old DB: scenario_results WITHOUT token columns; init_schema must add them.
-    import sqlite3
     db = tmp_path / "old.db"
     con = sqlite3.connect(db)
     con.executescript("""
