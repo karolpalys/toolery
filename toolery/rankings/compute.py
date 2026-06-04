@@ -66,13 +66,10 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
             pairs: list[tuple[float, float]] = []
             for r in recent:
                 items = r["scores"]  # list of (score, tier, ranking_dims_json) tuples
-                if dim == "overall":
-                    weights_per_item = [
-                        _TIER_WEIGHTS.get(t, 1.0) * _scenario_dim_weight(json.loads(d))
-                        for _, t, d in items
-                    ]
-                else:
-                    weights_per_item = [_TIER_WEIGHTS.get(t, 1.0) for _, t, _ in items]
+                # Every column — Overall included — is tier-weighted only; no
+                # per-dimension weighting. Use-case persona columns are emitted
+                # separately below with their own weights.
+                weights_per_item = [_TIER_WEIGHTS.get(t, 1.0) for _, t, _ in items]
                 w_sum = sum(weights_per_item)
                 if w_sum <= 0:
                     continue
@@ -153,7 +150,7 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
                 items = r["scores"]
                 weights_per_item = [
                     _TIER_WEIGHTS.get(t, 1.0) * _scenario_dim_weight(
-                        json.loads(d), weights_override=use_case_weights
+                        json.loads(d), use_case_weights
                     )
                     for _, t, d in items
                 ]
@@ -209,36 +206,20 @@ def _parse_iso(s: str) -> datetime:
 # Without these, 11 easy tests dilute 7 very_hard tests at equal weight.
 _TIER_WEIGHTS = {"easy": 1.0, "medium": 2.0, "hard": 3.0, "very_hard": 4.0}
 
-# Per-dimension weights applied ONLY when computing the `overall` dimension —
-# every other column (Coding, Terminal, etc.) keeps the existing tier-only weighting
-# so that e.g. a model's `Coding` score reflects raw coding performance, not blend.
-# A scenario's overall weight is the MAX of the weights of its non-overall dims
-# (fallback 1.0 if none of its dims are in this map).
-_DIM_WEIGHTS: dict[str, float] = {
-    "coding": 2.0,
-    "debugging": 2.0,
-    "terminal": 2.0,
-    "agentic": 2.0,
-    "adversarial_robustness": 2.0,
-    "instruction_following": 2.0,
-    "localization": 0.5,
-    "long_context": 0.5,
-}
-
-
 def _scenario_dim_weight(
     ranking_dims: list[str],
-    weights_override: dict[str, float] | None = None,
+    weights_map: dict[str, float],
 ) -> float:
-    """Compute the per-scenario weight for the Overall (or use-case) column.
+    """Compute the per-scenario weight for a use-case persona column.
 
-    Returns the MAX of the weights of the scenario's non-overall dimensions.
-    Dimensions not in the weights map fall back to 1.0.
+    Returns the MAX of the persona weights of the scenario's non-overall
+    dimensions; dimensions absent from `weights_map` fall back to 1.0, and an
+    empty or overall-only dim list yields 1.0.
 
-    When `weights_override` is None, uses the default `_DIM_WEIGHTS` map.
-    When provided, uses the override (e.g. a use-case persona's weights).
+    Used ONLY for use-case persona columns. The standard `overall` column (and
+    every per-dimension column) applies no per-dimension weighting — scenarios
+    count at their tier weight alone, i.e. every dimension is effectively 1.0.
     """
-    weights_map = weights_override if weights_override is not None else _DIM_WEIGHTS
     weights = [weights_map.get(d, 1.0) for d in ranking_dims if d != "overall"]
     return max(weights) if weights else 1.0
 
@@ -452,9 +433,9 @@ def compute_matrix(
     must handle missing keys.
 
     When `use_case_weights` is provided, additionally emits `scores['use_case']`
-    per pair, computed with the same formula as `overall` but using the given
-    weights map (e.g. from a use-case persona) instead of the default
-    `_DIM_WEIGHTS`. The standard `overall` score remains unchanged.
+    per pair, computed like `overall` but additionally weighting each scenario
+    by the given use-case persona weights map. The standard `overall` score
+    applies tier weighting only (no per-dimension weighting).
 
     When `cluster_filter` is provided (e.g. 'single', 'dual', 'triple', 'quad',
     'octa'), only runs with that cluster topology contribute to the matrix.
@@ -520,13 +501,9 @@ def compute_matrix(
             run_scores: list[float] = []
             for rid in recent:
                 items_in_run = by_run[rid]
-                if dim == "overall":
-                    weights = [
-                        _TIER_WEIGHTS.get(t, 1.0) * _scenario_dim_weight(json.loads(d))
-                        for _, t, d in items_in_run
-                    ]
-                else:
-                    weights = [_TIER_WEIGHTS.get(t, 1.0) for _, t, _ in items_in_run]
+                # Tier-weighted only for every column, Overall included; the
+                # use-case persona column below re-weights by dimension.
+                weights = [_TIER_WEIGHTS.get(t, 1.0) for _, t, _ in items_in_run]
                 w_sum = sum(weights)
                 if w_sum <= 0:
                     continue
@@ -542,14 +519,14 @@ def compute_matrix(
             total_runs = max(total_runs, len(runs_sorted))
             # If a use-case is active AND we're processing the overall dim,
             # compute an extra `use_case` score from the SAME per-run items
-            # but with use-case weights instead of the default _DIM_WEIGHTS.
+            # but additionally weighted by the use-case persona weights.
             if dim == "overall" and use_case_weights is not None:
                 uc_decay_pairs: list[tuple[float, float]] = []
                 for rid in recent:
                     items_in_run = by_run[rid]
                     uc_weights = [
                         _TIER_WEIGHTS.get(t, 1.0) * _scenario_dim_weight(
-                            json.loads(d), weights_override=use_case_weights
+                            json.loads(d), use_case_weights
                         )
                         for _, t, d in items_in_run
                     ]
