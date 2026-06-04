@@ -19,3 +19,6 @@ htmlcov/
 .idea/
 .vscode/
 .worktrees/
+
+# Throwaway endpoint smoke scripts (local scratch, never released)
+smoke_*.py
