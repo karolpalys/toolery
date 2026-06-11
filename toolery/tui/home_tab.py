@@ -20,6 +20,7 @@ from textual.widgets import Button, DataTable, Label, ProgressBar, Static
 from toolery.core import endpoint_scanner
 from toolery.core.endpoint_scanner import EndpointInfo
 from toolery.core.models import TraceResult, effective_tps
+from toolery.core.scenario import display_name, load_all_scenarios
 from toolery.core.store import Store
 from toolery.tui.trace_view import render_trace_compact, render_trace_full
 
@@ -1240,33 +1241,48 @@ class HomeTab(Container):
             for r in store.fetch_in_flight_for_run(self._current_run_id)
         }
 
+    def _scenario_tier(self, scenario_id: str) -> str:
+        """Tier from the scenario definition — the single source of truth for
+        difficulty, known for every row regardless of run state (pending rows
+        used to show '—' even though the tier is fixed at definition time)."""
+        cache = getattr(self, "_scenario_tier_map", None)
+        if cache is None:
+            try:
+                cache = {s.id: s.tier.value
+                         for s in load_all_scenarios(Path("scenarios"))}
+            except Exception:
+                cache = {}
+            self._scenario_tier_map = cache
+        return cache.get(scenario_id, "?")
+
     def _format_row(self, state: str, key: tuple[str, str, int],
                     payload: dict | None) -> tuple:
         scenario_id, adapter, trial_index = key
+        # Tier always comes from the scenario definition, not the result row —
+        # so it's correct for pending/running rows too, and consistent with the
+        # (prefix-stripped) scenario name beside it.
+        tier = self._scenario_tier(scenario_id)
         if state == "done":
             status = payload.get("status") or "?"
             style = _STATUS_STYLE.get(status, "bold")
             display = _STATUS_DISPLAY.get(status, status)
             why = _why_summary(status, payload.get("failure_kind"),
                                payload.get("checks_json"))
-            tier = payload.get("tier") or "?"
             score = f"{payload.get('score') or 0.0:.2f}"
         elif state == "running":
             style = _STATUS_STYLE["running"]
             display = _STATUS_DISPLAY["running"]
             why = "—"
-            tier = "—"
             score = "—"
         else:  # upcoming
             style = _STATUS_STYLE["upcoming"]
             display = _STATUS_DISPLAY["upcoming"]
             why = "—"
-            tier = "—"
             score = "—"
         idx = len(self.query_one("#scenarios-table", DataTable).rows) + 1
         return (
             Text(str(idx), style=style),
-            Text(scenario_id, style=style),
+            Text(display_name(scenario_id), style=style),
             Text(str(tier), style=style),
             Text(adapter, style=style),
             Text(str(trial_index), style=style),

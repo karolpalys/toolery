@@ -10,7 +10,7 @@ from textual.containers import Container, Vertical, VerticalScroll
 from textual.widgets import DataTable, Select, Static
 
 from toolery.core.models import Scenario
-from toolery.core.scenario import load_all_scenarios
+from toolery.core.scenario import display_name, load_all_scenarios
 from toolery.core.store import Store
 
 
@@ -85,7 +85,7 @@ class ScenariosTab(Container):
         except FileNotFoundError:
             scenarios = []
         self._scenarios = {s.id: s for s in scenarios}
-        options = [(f"{s.tier.value} · {s.id}", s.id) for s in scenarios]
+        options = [(f"{s.tier.value} · {display_name(s.id)}", s.id) for s in scenarios]
         sel.set_options(options)
         if options:
             sel.value = options[0][1]
