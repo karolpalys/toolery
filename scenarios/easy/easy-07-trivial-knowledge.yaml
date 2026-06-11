@@ -1,6 +1,6 @@
 id: easy-07-trivial-knowledge
 title: "Answer trivia without tools"
-tier: easy
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 100.0% (3 modele)
 category: restraint_refusal
 domain: generic
 description: "Basic factual question should be answered from model knowledge, not by calling tools."

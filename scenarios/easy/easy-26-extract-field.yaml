@@ -1,6 +1,6 @@
 id: easy-26-extract-field
 title: "Extract price from a 1k-token changelog"
-tier: easy
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 93.3% (3 modele)
 category: structured_output
 domain: generic
 description: |

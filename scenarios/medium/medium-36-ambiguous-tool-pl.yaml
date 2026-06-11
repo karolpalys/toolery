@@ -1,6 +1,6 @@
 id: medium-36-ambiguous-tool-pl
 title: "Ask before guessing between 2 tools"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 80.0% (3 modele)
 category: restraint_refusal
 domain: generic
 description: |

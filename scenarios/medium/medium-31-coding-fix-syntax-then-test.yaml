@@ -1,6 +1,6 @@
 id: medium-31-coding-fix-syntax-then-test
 title: "Fix a syntax error, then verify with pytest"
-tier: medium
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 66.7% (3 modele)
 category: coding
 domain: dev_ops
 description: |
@@ -58,7 +58,7 @@ scoring:
       equals: 4
     - check: response_satisfies
       any_of:
-        - ["passed", "green", "success"]
+        - ["passed", "green", "success", "pass", "all tests"]
       none_of: ["failed", "0 passed", "no test"]
     - check: no_hallucinated_tool
       allowed: [read_file, write_file, bash_exec, list_files]

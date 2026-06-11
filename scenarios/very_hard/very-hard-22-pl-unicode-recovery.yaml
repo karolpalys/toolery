@@ -1,6 +1,6 @@
 id: very-hard-22-pl-unicode-recovery
 title: "PL: Polish chars cause tool error, recover with escapes"
-tier: very_hard
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg very_hard, pass-rate 33.3% (3 modele)
 category: error_recovery
 domain: dev_ops
 description: |

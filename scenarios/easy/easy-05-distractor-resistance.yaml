@@ -1,6 +1,6 @@
 id: easy-05-distractor-resistance
 title: "Pick stock_price among distractors (tool-agnostic v0.2)"
-tier: easy
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 100.0% (3 modele)
 category: tool_selection
 domain: generic
 description: |

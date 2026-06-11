@@ -1,6 +1,6 @@
 id: very-hard-24-debug-instrument-then-fix
 title: "Add instrumentation, re-run, then fix"
-tier: very_hard
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg very_hard, pass-rate 20.0% (3 modele)
 category: debugging
 domain: dev_ops
 description: |
@@ -23,12 +23,27 @@ budget:
   timeout_seconds: 180
 tool_responses:
   read_file:
+    # Stateful-ish file sim via match_index: the first read shows the buggy
+    # code; later re-reads (the model verifying its edits) show the fixed
+    # version. The old static rule returned the bug forever, so models that
+    # verified their edit_file calls concluded the edit failed and burned
+    # the budget on retries.
     - match: { path: "src/invoice.py" }
+      match_index: 0
       returns: |
         def compute_total(invoice):
             subtotal = 0
             for item in invoice["items"]:
                 subtotal += item["price"]  # silently skips quantity
+            tax = subtotal * 0.20
+            return round(subtotal + tax, 2)
+    - match: { path: "src/invoice.py" }
+      match_index: ">=1"
+      returns: |
+        def compute_total(invoice):
+            subtotal = 0
+            for item in invoice["items"]:
+                subtotal += item["price"] * item["quantity"]
             tax = subtotal * 0.20
             return round(subtotal + tax, 2)
     - match: { path: "tests/test_invoice.py" }

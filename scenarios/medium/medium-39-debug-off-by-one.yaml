@@ -1,6 +1,6 @@
 id: medium-39-debug-off-by-one
 title: "Off-by-one in pagination slice"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 86.7% (3 modele)
 category: debugging
 domain: dev_ops
 description: |
@@ -49,10 +49,14 @@ scoring:
       any_of:
         - ["start + page_size", "page_size", "minus 1", "- 1"]
       none_of: ["random", "page is wrong"]
+    # Jedna grupa = OR: nazwanie konceptu (off-by-one) LUB podanie dokladnego
+    # fixa wystarcza. Wczesniej dwie grupy = AND wymagaly OBU naraz, wiec
+    # model dajacy poprawny `end = start + page_size` bez slowa "off-by-one"
+    # oblewał mimo poprawnej odpowiedzi.
     - check: response_satisfies
       any_of:
-        - ["off-by-one", "off by one", "exclusive", "slice end"]
-        - ["end = start + page_size"]
+        - ["off-by-one", "off by one", "exclusive", "slice end",
+           "end = start + page_size"]
   forbidden: []
   partial:
     - check: response_contains

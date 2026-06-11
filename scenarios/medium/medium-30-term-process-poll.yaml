@@ -1,6 +1,6 @@
 id: medium-30-term-process-poll
 title: "Start a background command, poll until done, report exit"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: terminal_handling
 domain: dev_ops
 description: |
@@ -36,8 +36,9 @@ scoring:
       n: 3
     - check: response_satisfies
       any_of:
-        - ["exit code 0", "exit 0", "code: 0", "exit_code: 0", "successfully",
-           "success", "completed cleanly", "without error", "zakończ"]
+        - ["exit code 0", "exit 0", "code 0", "code: 0", "exit_code: 0",
+           "successfully", "success", "completed cleanly", "without error",
+           "zakończ"]
     - check: response_satisfies
       any_of:
         - ["exit", "exited", "success", "completed"]

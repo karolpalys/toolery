@@ -1,6 +1,6 @@
 id: medium-13-er-rate-limit
 title: "Handle HTTP 429 rate-limit by retrying with backoff"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 80.0% (3 modele)
 category: error_recovery
 domain: dev_ops
 description: |

@@ -1,6 +1,6 @@
 id: medium-20-api-bearer-auth
 title: "Pass a bearer token from a prior login response into a protected GET"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 80.0% (3 modele)
 category: multi_step_chains
 domain: dev_ops
 description: |

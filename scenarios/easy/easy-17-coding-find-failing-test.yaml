@@ -1,6 +1,6 @@
 id: easy-17-coding-find-failing-test
 title: "Identify which pytest test failed"
-tier: easy
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 26.7% (3 modele)
 category: coding
 domain: dev_ops
 description: |

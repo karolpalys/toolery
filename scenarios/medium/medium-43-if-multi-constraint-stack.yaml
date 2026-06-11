@@ -1,6 +1,6 @@
 id: medium-43-if-multi-constraint-stack
 title: "Four simultaneous constraints in one prompt"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 86.7% (3 modele)
 category: instruction_following
 domain: generic
 description: |

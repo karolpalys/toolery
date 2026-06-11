@@ -1,6 +1,6 @@
 id: hard-29-debug-cross-file-chain
 title: "Error visible in cache.py, root cause in config.py"
-tier: hard
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 100.0% (3 modele)
 category: debugging
 domain: dev_ops
 description: |

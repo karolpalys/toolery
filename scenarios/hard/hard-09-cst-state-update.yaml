@@ -1,6 +1,6 @@
 id: hard-09-cst-state-update
 title: "Update calendar event based on a prior lookup"
-tier: hard
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 80.0% (3 modele)
 category: context_state_tracking
 domain: generic
 description: |
@@ -21,7 +21,9 @@ budget:
   timeout_seconds: 60
 tool_responses:
   get_contacts:
-    - match: { name: "Alice" }
+    # Regex match: models reasonably pass the full name from the prompt
+    # ("Alice Nowak"); exact-match "Alice" made the scenario unpassable.
+    - match: { name_regex: "(?i)alice" }
       returns:
         - name: "Alice Nowak"
           email: "alice.nowak@company.com"
@@ -45,7 +47,10 @@ scoring:
     - check: tool_args_match_regex
       tool: add_calendar_event
       arg: start
-      pattern: "2026-06-04T14:00(:00)?(\\+02:00|Europe/Warsaw)"
+      # Correct slot propagated is the point; timezone correctness is already
+      # enforced by the tool_args_contain timezone check, so a bare local
+      # time ("2026-06-04T14:00:00") with timezone arg is acceptable.
+      pattern: "2026-06-04T14:00"
     - check: tool_args_match_regex
       tool: add_calendar_event
       arg: attendees
@@ -58,9 +63,10 @@ scoring:
   partial:
     - check: tool_called
       tool: get_contacts
-    - check: tool_args_contain
+    - check: tool_args_match_regex
       tool: get_contacts
-      args: { name: "Alice" }
+      arg: name
+      pattern: "(?i)alice"
     - check: tool_called
       tool: add_calendar_event
   weights:

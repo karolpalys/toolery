@@ -1,6 +1,6 @@
 id: medium-45-if-stylistic-constraints
 title: "Stylistic constraints — past tense + each line starts with 'The'"
-tier: medium
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 73.3% (3 modele)
 category: instruction_following
 domain: generic
 description: |

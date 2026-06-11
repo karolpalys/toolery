@@ -1,6 +1,6 @@
 id: hard-35-if-priority-resolution
 title: "Pick exactly one option and clearly say which"
-tier: hard
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 80.0% (3 modele)
 category: instruction_following
 domain: generic
 description: |

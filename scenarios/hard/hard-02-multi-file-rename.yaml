@@ -1,6 +1,6 @@
 id: hard-02-multi-file-rename
 title: "Rename function across multiple files"
-tier: hard
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 0.0% (3 modele)
 category: coding
 domain: dev_ops
 description: |

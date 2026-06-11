@@ -1,6 +1,6 @@
 id: hard-07-long-context-restraint
 title: "Long-context restraint — answer from context, do not call tools"
-tier: hard
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 100.0% (3 modele)
 category: context_state_tracking
 domain: generic
 description: |

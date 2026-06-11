@@ -1,6 +1,6 @@
 id: medium-17-so-markdown-table
 title: "Emit a markdown table with header, separator, and data rows"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: structured_output
 domain: generic
 description: |

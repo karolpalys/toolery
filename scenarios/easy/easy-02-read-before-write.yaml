@@ -1,6 +1,6 @@
 id: easy-02-read-before-write
 title: "Read before write"
-tier: easy
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 100.0% (3 modele)
 category: coding
 domain: dev_ops
 description: "Read existing file content before overwriting to avoid data loss."

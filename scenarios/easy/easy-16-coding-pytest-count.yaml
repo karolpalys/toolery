@@ -1,6 +1,6 @@
 id: easy-16-coding-pytest-count
 title: "Run pytest, count passing tests"
-tier: easy
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 0.0% (3 modele)
 category: coding
 domain: dev_ops
 description: |

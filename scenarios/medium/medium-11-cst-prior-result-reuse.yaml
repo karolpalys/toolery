@@ -1,6 +1,6 @@
 id: medium-11-cst-prior-result-reuse
 title: "Reuse a prior tool result instead of recomputing"
-tier: medium
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: context_state_tracking
 domain: generic
 description: |

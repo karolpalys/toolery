@@ -1,6 +1,6 @@
 id: very-hard-10-term-tmux-tui-debug
 title: "Find 89% CPU process in a colored htop-like TTY buffer"
-tier: very_hard
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg very_hard, pass-rate 100.0% (3 modele)
 category: terminal_handling
 domain: dev_ops
 description: |

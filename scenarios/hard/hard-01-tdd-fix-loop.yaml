@@ -1,6 +1,6 @@
 id: hard-01-tdd-fix-loop
 title: "TDD fix loop under tight budget"
-tier: hard
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 0.0% (3 modele)
 category: coding
 domain: dev_ops
 description: "Failing test → read code → edit src → tests pass. Tests file must not be modified. Budget 6."
@@ -22,11 +22,23 @@ tool_responses:
     - match: any
       returns: "PASSED 12 tests, 0 failed."
   read_file:
+    # Stateful-ish file sim via match_index: first read shows the bug;
+    # re-reads (typically the model verifying its edit) show the fixed file.
+    # The old single static rule returned the buggy code forever, so a model
+    # that verified its own edit concluded the edit failed and burned the
+    # budget on retries.
     - match: { path: "src/parser.py" }
+      match_index: 0
       returns: |
         def parse_int(s: str) -> int:
             # BUG: missing minus sign handling
             return int(s.lstrip('-+'))
+    - match: { path: "src/parser.py" }
+      match_index: ">=1"
+      returns: |
+        def parse_int(s: str) -> int:
+            sign = -1 if s.strip().startswith('-') else 1
+            return sign * int(s.lstrip('-+'))
     - match: { path: "tests/test_parser.py" }
       returns: |
         from src.parser import parse_int

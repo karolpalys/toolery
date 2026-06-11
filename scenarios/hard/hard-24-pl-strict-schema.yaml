@@ -1,6 +1,6 @@
 id: hard-24-pl-strict-schema
 title: "PL: profil klienta JSON wg schematu + wybór toolu"
-tier: hard
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 100.0% (3 modele)
 category: structured_output
 domain: generic
 description: |

@@ -1,6 +1,6 @@
 id: very-hard-11-coding-bug-bisect
 title: "Bisect: which of 3 commits broke the test?"
-tier: very_hard
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg very_hard, pass-rate 40.0% (3 modele)
 category: coding
 domain: dev_ops
 description: |
@@ -27,6 +27,29 @@ tool_responses:
         stderr: ""
         exit_code: 0
         duration_ms: 12
+    # Compound forms FIRST (rules match in order): models reasonably chain
+    # "git checkout <sha> && pytest" in one call; without these rules the
+    # plain-checkout rule swallowed the pytest part and the model had to
+    # spend an extra call re-running tests. c003 is the broken commit
+    # (HEAD); c002/c001 predate the bug and pass.
+    - match: { command_regex: 'git\s+checkout\s+c003.*pytest' }
+      returns:
+        stdout: "HEAD is now at c003abc\nFAILED tests/test_parser.py::test_negative_numbers\n0 passed, 1 failed in 0.20s\n"
+        stderr: ""
+        exit_code: 1
+        duration_ms: 210
+    - match: { command_regex: 'git\s+checkout\s+c002.*pytest' }
+      returns:
+        stdout: "HEAD is now at c002def\n1 passed in 0.20s\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 210
+    - match: { command_regex: 'git\s+checkout\s+c001.*pytest' }
+      returns:
+        stdout: "HEAD is now at c001abc\n1 passed in 0.20s\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 210
     - match: { command_regex: 'git\s+checkout\s+c003' }
       returns: { stdout: "HEAD is now at c003abc\n", stderr: "", exit_code: 0, duration_ms: 8 }
     - match: { command_regex: 'git\s+checkout\s+c002' }
@@ -41,15 +64,19 @@ tool_responses:
         stderr: ""
         exit_code: 0
         duration_ms: 15
+    # match_index (per-rule counter), NOT call_index (global per-tool
+    # counter): the model's first bash_exec is `git log`, so with call_index
+    # the FIRST pytest run already had index 1 and reported "1 passed" on a
+    # broken HEAD — the scenario was unpassable.
     - match: { command_regex: 'pytest' }
-      call_index: 0
+      match_index: 0
       returns:
         stdout: "FAILED tests/test_parser.py::test_negative_numbers\n0 passed, 1 failed in 0.20s\n"
         stderr: ""
         exit_code: 1
         duration_ms: 200
     - match: { command_regex: 'pytest' }
-      call_index: ">=1"
+      match_index: ">=1"
       returns:
         stdout: "1 passed in 0.20s\n"
         stderr: ""

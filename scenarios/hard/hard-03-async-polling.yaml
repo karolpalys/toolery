@@ -1,6 +1,6 @@
 id: hard-03-async-polling
 title: "Submit async job and poll until done"
-tier: hard
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 100.0% (3 modele)
 category: multi_step_chains
 domain: dev_ops
 description: |

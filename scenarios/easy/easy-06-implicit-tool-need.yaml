@@ -1,6 +1,6 @@
 id: easy-06-implicit-tool-need
 title: "Infer two-step chain from intent (tool-agnostic v0.2)"
-tier: easy
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 0.0% (3 modele)
 category: tool_selection
 domain: generic
 description: |

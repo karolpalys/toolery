@@ -1,6 +1,6 @@
 id: easy-04-parallel-fanout
 title: "Parallel weather fan-out"
-tier: easy
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 100.0% (3 modele)
 category: multi_step_chains
 domain: generic
 description: "Three independent get_weather calls must be issued in one parallel batch."

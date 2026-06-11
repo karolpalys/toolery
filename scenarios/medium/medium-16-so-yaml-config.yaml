@@ -1,6 +1,6 @@
 id: medium-16-so-yaml-config
 title: "Produce a valid YAML config block matching a spec"
-tier: medium
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: structured_output
 domain: dev_ops
 description: |

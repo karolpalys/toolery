@@ -1,6 +1,6 @@
 id: hard-31-debug-version-drift
 title: "Dependency API change broke our code"
-tier: hard
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 6.7% (3 modele)
 category: debugging
 domain: dev_ops
 description: |

@@ -1,6 +1,6 @@
 id: very-hard-16-strict-schema-types
 title: "JSON with null + enum — missing fields as null, don't invent"
-tier: very_hard
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg very_hard, pass-rate 100.0% (3 modele)
 category: structured_output
 domain: generic
 description: |

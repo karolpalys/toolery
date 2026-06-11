@@ -1,6 +1,6 @@
 id: medium-22-db-describe-then-query
 title: "Describe a table, then query it with the correct column names"
-tier: medium
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 40.0% (3 modele)
 category: multi_step_chains
 domain: dev_ops
 description: |

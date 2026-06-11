@@ -1,6 +1,6 @@
 id: hard-13-lc-multi-fact-extraction
 title: "Extract 5 distinct facts scattered across a long financial report"
-tier: hard
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 100.0% (3 modele)
 category: context_state_tracking
 domain: generic
 description: |

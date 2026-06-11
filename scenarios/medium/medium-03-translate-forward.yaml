@@ -1,6 +1,6 @@
 id: medium-03-translate-forward
 title: "Translate then email"
-tier: medium
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: multi_step_chains
 domain: generic
 description: "User asks to email Bob a German translation. Model produces translation and uses it in the email body."

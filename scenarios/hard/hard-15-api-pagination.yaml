@@ -1,6 +1,6 @@
 id: hard-15-api-pagination
 title: "Paginate until next_cursor is null and aggregate results"
-tier: hard
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 100.0% (3 modele)
 category: multi_step_chains
 domain: dev_ops
 description: |
@@ -20,10 +20,9 @@ budget:
   timeout_seconds: 45
 tool_responses:
   http_paginate:
-    - match: { url: "https://api.example.com/v1/users" }
-      returns:
-        items: [{ "id": 1 }, { "id": 2 }, { "id": 3 }]   # page 1: 3 items
-        next_cursor: "cur-page-2"
+    # Specific cursor rules FIRST — rules are matched in order, and the old
+    # cursor-less page-1 rule shadowed pages 2/3 (every call with a cursor
+    # still got page 1 → infinite pagination loop, scenario unpassable).
     - match: { url: "https://api.example.com/v1/users", cursor: "cur-page-2" }
       returns:
         items: [{ "id": 51 }]                            # page 2: 1 item
@@ -32,6 +31,10 @@ tool_responses:
       returns:
         items: [{ "id": 101 }]                           # page 3: 1 item
         next_cursor: null
+    - match: { url: "https://api.example.com/v1/users", cursor: null }
+      returns:
+        items: [{ "id": 1 }, { "id": 2 }, { "id": 3 }]   # page 1: 3 items
+        next_cursor: "cur-page-2"
     # If the model calls again after null cursor, complain.
     - match: any
       returns: { error: "pagination_complete_already" }

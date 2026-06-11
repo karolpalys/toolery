@@ -1,6 +1,6 @@
 id: easy-25-remember-result
 title: "Remember the result from previous turn — no re-call"
-tier: easy
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 86.7% (3 modele)
 category: context_state_tracking
 domain: generic
 description: |

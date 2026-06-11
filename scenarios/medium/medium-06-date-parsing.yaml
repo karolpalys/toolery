@@ -1,6 +1,6 @@
 id: medium-06-date-parsing
 title: "Parse relative date + timezone"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 93.3% (3 modele)
 category: parameter_precision
 domain: generic
 description: |

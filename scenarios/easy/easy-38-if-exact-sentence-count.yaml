@@ -1,6 +1,6 @@
 id: easy-38-if-exact-sentence-count
 title: "Reply as exactly 3 numbered points"
-tier: easy
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 100.0% (3 modele)
 category: instruction_following
 domain: generic
 description: |

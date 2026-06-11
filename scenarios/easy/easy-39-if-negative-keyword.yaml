@@ -1,6 +1,6 @@
 id: easy-39-if-negative-keyword
 title: "Describe pandas (Python) without saying 'library' or 'package'"
-tier: easy
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 80.0% (3 modele)
 category: instruction_following
 domain: generic
 description: |

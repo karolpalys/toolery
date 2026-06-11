@@ -1,6 +1,6 @@
 id: medium-27-term-pipe-grep
 title: "Count 503 errors in nginx.log via grep | wc -l"
-tier: medium
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 66.7% (3 modele)
 category: terminal_handling
 domain: dev_ops
 description: |

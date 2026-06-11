@@ -1,6 +1,6 @@
 id: hard-17-db-query-then-decide
 title: "Query → analyze result → decide which follow-up action to take"
-tier: hard
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 93.3% (3 modele)
 category: multi_step_chains
 domain: dev_ops
 description: |

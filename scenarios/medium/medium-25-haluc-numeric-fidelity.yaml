@@ -1,6 +1,6 @@
 id: medium-25-haluc-numeric-fidelity
 title: "Repeat a numeric tool result verbatim — no rounding, no drift"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: hallucination
 domain: generic
 description: |

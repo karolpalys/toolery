@@ -1,6 +1,6 @@
 id: easy-20-pl-cities-json
 title: "PL: 3 polskie miasta nad Bałtykiem jako JSON"
-tier: easy
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 100.0% (3 modele)
 category: structured_output
 domain: generic
 description: |

@@ -1,6 +1,6 @@
 id: easy-40-if-format-only-list
 title: "Output exactly 5 prime numbers as bullets, no preamble"
-tier: easy
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 93.3% (3 modele)
 category: instruction_following
 domain: generic
 description: |

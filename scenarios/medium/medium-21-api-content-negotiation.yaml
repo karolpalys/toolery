@@ -1,6 +1,6 @@
 id: medium-21-api-content-negotiation
 title: "Set Accept header to choose JSON over default HTML"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 93.3% (3 modele)
 category: parameter_precision
 domain: dev_ops
 description: |

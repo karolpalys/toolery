@@ -1,6 +1,6 @@
 id: medium-32-coding-write-test-from-fn
 title: "Write a pytest test for an existing function, then verify"
-tier: medium
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 73.3% (3 modele)
 category: coding
 domain: dev_ops
 description: |

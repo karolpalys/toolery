@@ -1,6 +1,6 @@
 id: hard-12-lc-needle-in-haystack
 title: "Find a single fact buried in a long brief"
-tier: hard
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 100.0% (3 modele)
 category: context_state_tracking
 domain: generic
 description: |

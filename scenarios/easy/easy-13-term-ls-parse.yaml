@@ -1,6 +1,6 @@
 id: easy-13-term-ls-parse
 title: "List .log files in /etc"
-tier: easy
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 73.3% (3 modele)
 category: terminal_handling
 domain: dev_ops
 description: |

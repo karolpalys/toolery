@@ -1,6 +1,6 @@
 id: very-hard-20-near-twin-tools
 title: "Parameter precision: model must include date arg for forecast call"
-tier: very_hard
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg very_hard, pass-rate 0.0% (3 modele)
 category: parameter_precision
 domain: generic
 description: |

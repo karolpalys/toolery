@@ -1,6 +1,6 @@
 id: very-hard-08-multi-tool-discovery
 title: "Compose 4 tools the user did not name to answer one question"
-tier: very_hard
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg very_hard, pass-rate 80.0% (3 modele)
 category: multi_step_chains
 domain: generic
 description: |

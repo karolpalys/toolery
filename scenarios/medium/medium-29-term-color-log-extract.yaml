@@ -1,6 +1,6 @@
 id: medium-29-term-color-log-extract
 title: "Extract port from a colored ERROR log line"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: terminal_handling
 domain: dev_ops
 description: |

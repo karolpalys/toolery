@@ -1,6 +1,6 @@
 id: medium-35-back-ref-list
 title: "Status of the second and fourth tasks in the list"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: context_state_tracking
 domain: dev_ops
 description: |

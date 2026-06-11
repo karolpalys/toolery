@@ -1,6 +1,6 @@
 id: medium-01-git-hygiene
 title: "Git commit hygiene"
-tier: medium
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 66.7% (3 modele)
 category: coding
 domain: dev_ops
 description: "Stage only the new file (not unrelated modifications) and commit with a non-trivial message."

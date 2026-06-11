@@ -1,6 +1,6 @@
 id: easy-33-debug-traceback-locate
 title: "Locate bug from Python traceback"
-tier: easy
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 100.0% (3 modele)
 category: debugging
 domain: dev_ops
 description: |

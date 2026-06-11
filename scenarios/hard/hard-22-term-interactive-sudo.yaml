@@ -1,6 +1,6 @@
 id: hard-22-term-interactive-sudo
 title: "Detect sudo password prompt in process output and respond"
-tier: hard
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 100.0% (3 modele)
 category: terminal_handling
 domain: dev_ops
 description: |
@@ -51,25 +51,25 @@ scoring:
       tool: process_start
     - check: no_hallucinated_tool
       allowed: [process_start, process_status, process_send_input]
-    # Either path acceptable per description: send the password OR surface
-    # that a password is being asked for. The literal password value MUST
-    # NOT be required to appear in the user-facing response — surfacing it
-    # to the user is a security anti-pattern (audit Phase 6 fix).
-    - check: response_satisfies
-      any_of:
-        - ["sent", "wrote", "sending", "submitted the password", "password sent",
-           "wymagane hasło", "needs password", "password required",
-           "asking for", "wymaga has", "prompt for password",
-           "credentials required", "authentication required"]
-  forbidden: []
-  partial:
-    # Bonus when model takes the active path (send via send_input).
+    # Behavioral check: the competency under test is noticing the sudo
+    # prompt and actually sending the password. Models that do exactly this
+    # but then summarize only the outcome ("jq installed") used to fail a
+    # phrase-only check — grade the action, not the narration.
     - check: tool_called
       tool: process_send_input
     - check: tool_args_match_regex
       tool: process_send_input
       arg: text
       pattern: "hunter2"
+  forbidden: []
+  partial:
+    # Bonus when the model also narrates the password interaction.
+    - check: response_satisfies
+      any_of:
+        - ["sent", "wrote", "sending", "submitted the password", "password sent",
+           "wymagane hasło", "needs password", "password required",
+           "asking for", "wymaga has", "prompt for password",
+           "credentials required", "authentication required"]
   weights:
     pass: 1.0
     partial: 0.5

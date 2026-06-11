@@ -1,6 +1,6 @@
 id: easy-23-back-reference
 title: "Summarize the third point from a list in a document"
-tier: easy
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 100.0% (3 modele)
 category: context_state_tracking
 domain: generic
 description: |

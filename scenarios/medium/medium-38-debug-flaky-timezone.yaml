@@ -1,6 +1,6 @@
 id: medium-38-debug-flaky-timezone
 title: "Flaky test: passes locally, fails in CI (timezone)"
-tier: medium
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 33.3% (3 modele)
 category: debugging
 domain: dev_ops
 description: |

@@ -1,6 +1,6 @@
 id: medium-07-multi-value-extraction
 title: "Split one request into multiple tool calls"
-tier: medium
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: multi_step_chains
 domain: generic
 description: |

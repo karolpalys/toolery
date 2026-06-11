@@ -1,6 +1,6 @@
 id: hard-14-pp-dst-transition
 title: "Pick the right side of a DST transition when scheduling"
-tier: hard
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 86.7% (3 modele)
 category: parameter_precision
 domain: generic
 description: |
@@ -33,12 +33,16 @@ scoring:
     - check: tool_args_contain
       tool: add_calendar_event
       args: { title: "Post-DST sync", timezone: "Europe/Warsaw" }
-    # 08:00 local CET is 07:00 UTC on 2026-10-25. Accept either local-with-offset
-    # or UTC form. Critical: it must be 2026-10-25 (not 10-26 or 10-24).
+    # 08:00 local CET is 07:00 UTC on 2026-10-25. Accept local-with-offset,
+    # UTC form, or a bare local time — the required tool_args_contain check
+    # already demands timezone=Europe/Warsaw, so "2026-10-25T08:00:00" +
+    # timezone arg is unambiguous; only an explicit wrong offset (+02:00,
+    # caught below as forbidden) is an error.
+    # Critical: it must be 2026-10-25 (not 10-26 or 10-24).
     - check: tool_args_match_regex
       tool: add_calendar_event
       arg: start
-      pattern: "2026-10-25T08:00.*(\\+01:00|Europe/Warsaw)|2026-10-25T07:00.*(\\+00:00|Z|UTC)"
+      pattern: "2026-10-25T08:00(:00)?([^+]*$|.*(\\+01:00|Europe/Warsaw))|2026-10-25T07:00.*(\\+00:00|Z|UTC)"
     - check: call_count_at_most
       n: 1
   forbidden:

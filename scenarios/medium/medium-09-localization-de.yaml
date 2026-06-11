@@ -1,6 +1,6 @@
 id: medium-09-localization-de
 title: "German weather query — respond in German"
-tier: medium
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: tool_selection
 domain: generic
 description: "German prompt — model must call get_weather AND answer in German."

@@ -1,6 +1,6 @@
 id: medium-02-tdd-explain
 title: "Explain fix without executing"
-tier: medium
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 0.0% (3 modele)
 category: coding
 domain: dev_ops
 description: |

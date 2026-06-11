@@ -1,6 +1,6 @@
 id: easy-10-unit-handling
 title: "Pass requested units parameter"
-tier: easy
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 100.0% (3 modele)
 category: parameter_precision
 domain: generic
 description: "User explicitly asks for Fahrenheit — model must pass units=fahrenheit to the tool."

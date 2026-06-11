@@ -1,6 +1,6 @@
 id: very-hard-17-pl-evolving-json
 title: "PL: schema JSON ewoluuje — zachowaj poprzednie pola"
-tier: very_hard
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg very_hard, pass-rate 93.3% (3 modele)
 category: structured_output
 domain: generic
 description: |

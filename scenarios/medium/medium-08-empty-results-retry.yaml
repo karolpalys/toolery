@@ -1,6 +1,6 @@
 id: medium-08-empty-results-retry
 title: "Retry search with broader query after empty result"
-tier: medium
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: error_recovery
 domain: generic
 description: "First web_search returns empty. Model must retry with a different/broader query, not give up."

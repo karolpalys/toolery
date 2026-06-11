@@ -1,6 +1,6 @@
 id: hard-30-debug-state-leak
 title: "Test passes alone, fails when run after another (global state)"
-tier: hard
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg hard, pass-rate 93.3% (3 modele)
 category: debugging
 domain: dev_ops
 description: |

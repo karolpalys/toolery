@@ -1,6 +1,6 @@
 id: easy-34-debug-keyerror-cause
 title: "KeyError → identify the missing dict key access"
-tier: easy
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 73.3% (3 modele)
 category: debugging
 domain: dev_ops
 description: |
@@ -41,10 +41,16 @@ scoring:
       tool: read_file
     - check: response_satisfies
       all_of: ["line 7"]
+    # Catch only DIRECT attribution of the bug to line 2/4/9 — not a correct
+    # answer that cites those lines as the SAFE .get() contrast (e.g. "line 7
+    # raises KeyError, unlike .get() on line 2"). Bounded to a single clause
+    # ([^.]*) and requires the line number to be the subject/object of the
+    # bug claim, not merely co-occur with "raises" somewhere in the sentence.
     - check: response_matches_regex
       none_of:
-        - "(?:bug|raises|culprit|fix).*\\bline\\s*[249]\\b"
-        - "\\bline\\s*[249]\\b.*(?:is\\s+the\\s+bug|raises|to\\s+fix)"
+        - "(?:the\\s+)?(?:bug|culprit|problem|error)\\s+(?:is\\s+)?(?:on|at|in)?\\s*line\\s*[249]\\b"
+        - "\\bline\\s*[249]\\b[^.]*(?:is\\s+the\\s+(?:bug|culprit|problem)|needs\\s+the\\s+fix|to\\s+fix\\b)"
+        - "fix\\s+(?:is\\s+(?:on|at)\\s+)?line\\s*[249]\\b"
   forbidden:
     - check: response_contains
       patterns: ["request_body.get('roles'"]

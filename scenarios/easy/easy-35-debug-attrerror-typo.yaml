@@ -1,6 +1,6 @@
 id: easy-35-debug-attrerror-typo
 title: "AttributeError: typo in attribute name"
-tier: easy
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 53.3% (3 modele)
 category: debugging
 domain: dev_ops
 description: |

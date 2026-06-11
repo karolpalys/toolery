@@ -1,6 +1,6 @@
 id: medium-28-term-git-status-parse
 title: "Parse git status --porcelain into modified vs untracked"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 93.3% (3 modele)
 category: terminal_handling
 domain: dev_ops
 description: |

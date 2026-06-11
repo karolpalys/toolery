@@ -1,6 +1,6 @@
 id: medium-37-debug-bad-caller
 title: "Find which caller passes a bad format to parse_date()"
-tier: medium
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 0.0% (3 modele)
 category: debugging
 domain: dev_ops
 description: |

@@ -1,6 +1,6 @@
 id: medium-18-pp-enum-currency
 title: "Use a valid ISO-4217 currency code, not a free-form name"
-tier: medium
+tier: medium  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 100.0% (3 modele)
 category: parameter_precision
 domain: generic
 description: |

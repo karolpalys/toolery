@@ -35,6 +35,12 @@ EXPECTED_COUNTS = {
     "localization": 13,
 }
 
+# Tier counts keep the original hand-designed balance (40/45/34/24), but as of
+# the 2026-06-11 empirical re-tiering the *membership* of each tier is assigned
+# by measured pass-rate across 3 models (MiniMax-M2.7-AWQ, Nex-N2-Pro-W4A16,
+# Qwen3.6-35B): scenarios ranked easiest→hardest, then sliced into these quotas
+# (quantile assignment). This preserves the balanced shape while making the
+# difficulty ordering empirical rather than hand-guessed.
 EXPECTED_TIER_COUNTS = {
     "easy": 40,
     "medium": 45,

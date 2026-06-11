@@ -1,6 +1,6 @@
 id: medium-40-debug-symptom-vs-cause
 title: "Distinguish symptom from root cause in error logs"
-tier: medium
+tier: very_hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg medium, pass-rate 13.3% (3 modele)
 category: debugging
 domain: dev_ops
 description: |

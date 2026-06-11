@@ -1,6 +1,6 @@
 id: easy-18-coding-import-error-module
 title: "Identify missing module from Python traceback"
-tier: easy
+tier: easy  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg easy, pass-rate 100.0% (3 modele)
 category: coding
 domain: dev_ops
 description: |
@@ -17,7 +17,7 @@ budget:
   timeout_seconds: 40
 tool_responses:
   bash_exec:
-    - match: { command_regex: 'python\s.*script\.py' }
+    - match: { command_regex: 'python3?\s.*script\.py' }
       returns:
         stdout: ""
         stderr: "Traceback (most recent call last):\n  File \"/workspace/script.py\", line 3, in <module>\n    import requests\nModuleNotFoundError: No module named 'requests'\n"

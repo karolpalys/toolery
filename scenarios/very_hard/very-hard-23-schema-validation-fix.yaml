@@ -1,6 +1,6 @@
 id: very-hard-23-schema-validation-fix
 title: "Schema validator: missing id — fill it in and resubmit"
-tier: very_hard
+tier: hard  # re-tiering kwantylowy 2026-06-11 (kwoty 40/45/34/24, empiryczna trudnosc): oryg very_hard, pass-rate 73.3% (3 modele)
 category: error_recovery
 domain: dev_ops
 description: |
