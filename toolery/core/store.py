@@ -127,7 +127,7 @@ class Store:
                 c.execute("PRAGMA foreign_keys=ON")
 
     def create_run(self, run_id, model, base_url, started_at, config_json, scenarios_hash,
-                   llm_test_version: str = "0.2.0", total_units: int | None = None,
+                   llm_test_version: str = "0.3.0", total_units: int | None = None,
                    cluster: str | None = None) -> None:
         with self.conn() as c:
             c.execute(

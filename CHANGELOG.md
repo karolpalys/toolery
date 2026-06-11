@@ -6,6 +6,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-11
+
+### Changed
+- Empirical re-tiering of all 143 scenarios. Tiers are now assigned by measured
+  pass-rate across three models (MiniMax-M2.7-AWQ, Nex-N2-Pro-W4A16, Qwen3.6):
+  scenarios ranked easiest→hardest and sliced into the existing balanced quotas
+  (40/45/34/24) via quantile assignment. Only the `tier:` field changed; scenario
+  ids keep their historical prefix as a stable key, so an id like `easy-39` may
+  now legitimately sit in a different tier.
+
+### Added
+- `toolery run --ids <a,b,...>` runs an explicit scenario subset.
+- `golden_probe.py`: replays a hand-authored ideal play through the live mock +
+  scorer to prove a scenario is solvable (passability guard).
+- Standard competition ranking ("1224") for tied scores in both the generated
+  `.md` rankings and the TUI matrix podium: tied models share a medal and the
+  next distinct score skips ahead (two 100% → both gold, next bronze).
+
+### Fixed
+- Grader robustness to model output style: unicode-folded + markdown-stripped
+  phrase matching, integer patterns match the integer part of decimals,
+  digit-leading patterns are token-bounded, numeric CSV cells compared by value,
+  and structured-output unwrapping tolerates a prose preamble / multiple fenced
+  blocks (takes the last). Eliminates a class of false-negatives where correct
+  answers failed on presentation.
+- Mock runtime supports a generic `<param>_regex` matcher (not just
+  `command_regex`); `get_weather_global` gained optional `date`/`units` params
+  and lost a misleading description. Several scenarios were unpassable before
+  these fixes (e.g. `query_contains` was never a real matcher).
+- TUI: scenario display name decoupled from tier — the name drops its tier
+  prefix and the tier column is sourced from the scenario definition for every
+  row (pending/running included), so name and tier no longer contradict.
+
 ## [0.2.0] - 2026-06-04
 
 ### Added
