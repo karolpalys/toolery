@@ -7,7 +7,7 @@ Score reflects each model under its **best-performing adapter** — averaging ac
 | # | Model | Score | Best adapter | Runs |
 |---|-------|------:|--------------|-----:|
 {% for row in rows -%}
-| {{ loop.index }} | {{ row.model }} | {{ "%.1f%%"|format(row.score*100) }} | {{ row.best_adapter }} | {{ row.runs }} |
+| {{ row.rank }} | {{ row.model }} | {{ "%.1f%%"|format(row.score*100) }} | {{ row.best_adapter }} | {{ row.runs }} |
 {% endfor %}
 
 ## Per-(model, adapter) breakdown

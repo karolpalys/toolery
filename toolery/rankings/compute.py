@@ -101,6 +101,7 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
             })
 
         rows_out.sort(key=lambda r: -r["score"])
+        _assign_ranks(rows_out)
         # Flat breakdown (model, adapter) sorted by score for the appendix.
         breakdown = sorted(pair_rows, key=lambda p: -p["score"])
         tmpl = _env.get_template("ranking.md.j2")
@@ -184,6 +185,7 @@ def regenerate_rankings(*, store: Store, dimensions: list[str], out_dir: Path,
                 "adapter_breakdown": prs,
             })
         rows_out_uc.sort(key=lambda r: -r["score"])
+        _assign_ranks(rows_out_uc)
         breakdown_uc = sorted(pair_rows_uc, key=lambda p: -p["score"])
         tmpl = _env.get_template("ranking.md.j2")
         md = tmpl.render(
@@ -205,6 +207,23 @@ def _parse_iso(s: str) -> datetime:
 # Tier weights — harder scenarios count more in every dimension's run mean.
 # Without these, 11 easy tests dilute 7 very_hard tests at equal weight.
 _TIER_WEIGHTS = {"easy": 1.0, "medium": 2.0, "hard": 3.0, "very_hard": 4.0}
+
+
+def _assign_ranks(rows: list[dict]) -> list[dict]:
+    """Standard competition ranking ("1224"): tied models share a rank and the
+    next distinct score skips ahead. Two models at 100% are both #1; the next
+    is #3, not #2. Ties are judged on the DISPLAYED score (rounded to 0.1%) so
+    two rows showing the same percentage always share a medal. Mutates and
+    returns ``rows`` (must already be sorted by score, descending)."""
+    prev_key = None
+    rank = 0
+    for i, row in enumerate(rows, start=1):
+        key = round(row["score"] * 100, 1)
+        if key != prev_key:
+            rank = i
+            prev_key = key
+        row["rank"] = rank
+    return rows
 
 def _scenario_dim_weight(
     ranking_dims: list[str],

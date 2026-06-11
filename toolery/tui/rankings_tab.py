@@ -160,6 +160,28 @@ _LEGEND_PREAMBLE = (
 _PODIUM_ICON = {1: "🥇", 2: "🥈", 3: "🥉"}
 
 
+def _podium_with_ties(scored: list, round_key) -> dict[int, int]:
+    """Per-column podium ranks with tie handling (standard competition / '1224').
+
+    ``scored`` is a list of ``(row_index, value)`` already sorted descending.
+    Tied values (compared on the DISPLAYED rounding via ``round_key``) share a
+    rank, and the next distinct value skips ahead — two columns at 100% both get
+    🥇, the next gets 🥉, not 🥈. Only medal positions (rank ≤ 3) are returned.
+    """
+    out: dict[int, int] = {}
+    prev_key = None
+    rank = 0
+    for pos, (i, v) in enumerate(scored, start=1):
+        key = round_key(v)
+        if key != prev_key:
+            rank = pos
+            prev_key = key
+        if rank > 3:
+            break
+        out[i] = rank
+    return out
+
+
 def _fmt_score(value: float | None, podium_rank: int | None) -> Text:
     if value is None:
         return Text("—", style="bold dim")
@@ -559,19 +581,22 @@ class RankingsTab(Container):
         # default ascending sort by negative score yields top-down ordering.
 
         # Per-column podium ranks: recomputed for current visible ordering.
+        # Ties share a medal (two 100% → both 🥇, next 🥉). Compared on the
+        # displayed rounding: scores show as N.N% (round value*100 to 1dp),
+        # perf shows as N.N (round value to 1dp).
         podium_score: dict[tuple[int, str], int] = {}
         for dim in _DIMENSIONS:
             scored = [(i, r["scores"].get(dim)) for i, r in enumerate(rows)
                       if r["scores"].get(dim) is not None]
             scored.sort(key=lambda kv: kv[1], reverse=True)
-            for rank, (i, _v) in enumerate(scored[:3], start=1):
+            for i, rank in _podium_with_ties(scored, lambda v: round(v * 100, 1)).items():
                 podium_score[(i, dim)] = rank
         podium_perf: dict[tuple[int, str], int] = {}
         for p in _PERF_COLS:
             scored = [(i, r["perf"].get(p)) for i, r in enumerate(rows)
                       if r["perf"].get(p) is not None]
             scored.sort(key=lambda kv: kv[1], reverse=True)
-            for rank, (i, _v) in enumerate(scored[:3], start=1):
+            for i, rank in _podium_with_ties(scored, lambda v: round(v, 1)).items():
                 podium_perf[(i, p)] = rank
 
         for i, r in enumerate(rows):
