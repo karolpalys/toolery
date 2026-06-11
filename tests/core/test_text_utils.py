@@ -68,9 +68,17 @@ def test_unwrap_structured_payload_clears_common_wrappers(raw, expected):
     assert unwrap_structured_payload(raw) == expected
 
 
-def test_unwrap_structured_payload_only_unwraps_full_fence():
-    """A code fence that's only part of the payload should not be unwrapped —
-    the response has prose around it, so leaving the fence is correct."""
-    # NOT a clean fence wrap (text before/after the fence) → leave as-is.
+def test_unwrap_structured_payload_extracts_fence_with_preamble():
+    """A fenced block preceded/followed by prose IS extracted — unwrap is only
+    called by structured (JSON/CSV/YAML) checks, which must parse the payload,
+    so a prose preamble like "Here's the JSON:" should be peeled off, not kept.
+    """
     raw = 'Here is the answer:\n```json\n{"x": 1}\n```\nLet me know.'
-    assert unwrap_structured_payload(raw) == raw
+    assert unwrap_structured_payload(raw) == '{"x": 1}'
+
+
+def test_unwrap_structured_payload_takes_last_of_multiple_blocks():
+    """Multiple fenced blocks (e.g. one accumulating snapshot per turn) → the
+    LAST block is the final/most-complete answer."""
+    raw = '```json\n{"a": 1}\n```\nthen updated:\n```json\n{"a": 1, "b": 2}\n```'
+    assert unwrap_structured_payload(raw) == '{"a": 1, "b": 2}'

@@ -246,6 +246,15 @@ REGISTRY.update({
 })
 
 
+_MATCH_CHAR_TRANS = str.maketrans({
+    "‘": "'", "’": "'",   # curly single quotes → ascii apostrophe
+    "“": '"', "”": '"',   # curly double quotes
+    "–": "-", "—": "-",   # en/em dash
+    " ": " ",                   # nbsp
+})
+_MD_EMPHASIS = re.compile(r"[*_`]+")
+
+
 def _pattern_found(text: str, pattern: object) -> bool:
     """Case-insensitive literal match with safer handling for tiny tokens.
 
@@ -253,24 +262,38 @@ def _pattern_found(text: str, pattern: object) -> bool:
     ``"rm"``. Plain substring matching makes those pass inside unrelated
     tokens (``17``, ``storm``). Keep literal matching for normal phrases, but
     require numeric and short word-like tokens to be token-bounded.
+
+    Models routinely emit curly apostrophes ("can’t") and markdown bold
+    ("does **not** include") while phrase lists in scenario YAMLs are plain
+    ASCII, so both sides are unicode-folded, and the text additionally gets a
+    second markdown-stripped matching attempt. Patterns themselves are never
+    markdown-stripped — a pattern like ``"```"`` must keep matching fences.
     """
-    pat = str(pattern)
-    lowered = text.lower()
-    needle = pat.lower()
+    pat = str(pattern).translate(_MATCH_CHAR_TRANS)
+    raw = text.translate(_MATCH_CHAR_TRANS)
+    candidates = (raw, _MD_EMPHASIS.sub("", raw))
 
     if re.fullmatch(r"[+-]?\d+(?:\.\d+)?", pat):
-        # Match the integer value as a standalone number OR as the integer
-        # part of an exact-equal decimal — e.g., pattern "1025" matches both
-        # "1025" and "1025.00" / "1025.0", but NOT "1025.5" (different value)
-        # and not "21025" (digit continuation handled by lookbehind).
-        # The lookahead `(?!\.\d*[1-9])` rejects only decimals containing a
-        # non-zero digit anywhere after the dot — pure-zero suffixes pass.
-        return re.search(rf"(?<![\w.]){re.escape(pat)}(?!\.\d*[1-9])(?!\w)", text, re.IGNORECASE) is not None
+        # Match the value as a standalone number or as the integer part of a
+        # decimal — pattern "710" matches "710", "710.00" and "710.49" (tool
+        # outputs are decimals, scenario patterns usually name the integer
+        # part), but not "2710" or "x710" (lookbehind) and not "7105"
+        # (lookahead).
+        rx = rf"(?<![\w.]){re.escape(pat)}(?!\w)"
+        return any(re.search(rx, t, re.IGNORECASE) for t in candidates)
 
     if len(pat) <= 2 and re.search(r"[A-Za-z]", pat):
-        return re.search(rf"(?<![A-Za-z]){re.escape(pat)}(?![A-Za-z])", text, re.IGNORECASE) is not None
+        rx = rf"(?<![A-Za-z]){re.escape(pat)}(?![A-Za-z])"
+        return any(re.search(rx, t, re.IGNORECASE) for t in candidates)
 
-    return needle in lowered
+    if re.match(r"\d", pat):
+        # Multi-token pattern that STARTS with digits ("20 mg", "5 km"): bound
+        # the leading number so "20 mg" cannot match inside "220 mg".
+        rx = rf"(?<![\d.]){re.escape(pat.lower())}"
+        return any(re.search(rx, t.lower()) for t in candidates)
+
+    needle = pat.lower()
+    return any(needle in t.lower() for t in candidates)
 
 
 def check_response_contains(calls, chk, response):
@@ -364,8 +387,23 @@ def check_response_csv(calls, chk, response):
         return _bad("response_csv", f"data row count {len(rows)-1} != {row_count}")
     expected_rows = d.get("rows") or []
     data_rows = rows[1:] if expected_header is not None else rows
+
+    def cell_eq(exp: object, got: object) -> bool:
+        # Numeric cells compare by value: tool responses serialize YAML
+        # floats like 245.30 as "245.3", so a literal match would make the
+        # scenario unpassable for a model that faithfully echoes the tool.
+        if str(exp) == str(got):
+            return True
+        e, g = _coerce_number(exp), _coerce_number(got)
+        return e is not None and g is not None and math.isclose(e, g)
+
+    def row_eq(exp_row: list, got_row: list) -> bool:
+        return len(exp_row) == len(got_row) and all(
+            cell_eq(e, g) for e, g in zip(exp_row, got_row)
+        )
+
     for expected in expected_rows:
-        if expected not in data_rows:
+        if not any(row_eq(expected, dr) for dr in data_rows):
             return _bad("response_csv", f"missing row {expected}")
     return _ok("response_csv", "CSV matched")
 

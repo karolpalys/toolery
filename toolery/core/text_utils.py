@@ -21,6 +21,11 @@ _REASONING_TAG_RE = re.compile(
 # Fenced code block wrapping the entire payload (optionally with a language tag).
 _FENCE_RE = re.compile(r"^```\w*\n?(.*?)\n?```\s*$", re.DOTALL)
 
+# Any fenced code block, anywhere in the text (not anchored to start/end).
+# Used to recover a structured payload even when the model adds a prose
+# preamble ("Here's the JSON:") or emits several blocks (one per turn).
+_ANY_FENCE_RE = re.compile(r"```\w*\n?(.*?)\n?```", re.DOTALL)
+
 
 def strip_reasoning_tags(text: str | None) -> str | None:
     """Remove <think>/<thinking>/<reasoning> blocks from model output.
@@ -39,9 +44,12 @@ def strip_reasoning_tags(text: str | None) -> str | None:
 def unwrap_structured_payload(text: str) -> str:
     """Prepare a model response for structured-output parsing.
 
-    Strips reasoning tags then peels a single surrounding fenced code block
-    (``​```json ... ``` ``) if present. Idempotent. Returns ``text``
-    unchanged when neither pattern applies.
+    Strips reasoning tags, then extracts a fenced code block. Handles three
+    shapes: (1) a fence wrapping the whole payload; (2) a fence preceded by a
+    prose preamble ("Here's the JSON:\n```...```"); (3) several fenced blocks
+    (e.g. one accumulating snapshot per turn) — the LAST block is taken, since
+    that is the model's final/most-complete answer. Falls back to the cleaned
+    text when no fence is present (bare JSON/YAML/CSV).
 
     Use this in scorer checks that try to parse JSON/YAML/CSV/markdown out
     of the response — it is defensive duplication of the adapter-level strip
@@ -49,7 +57,10 @@ def unwrap_structured_payload(text: str) -> str:
     structured rubrics.
     """
     cleaned = _REASONING_TAG_RE.sub("", text).strip()
-    match = _FENCE_RE.match(cleaned)
-    if match:
-        cleaned = match.group(1).strip()
+    # Collect every fenced block; the last one is the model's final answer.
+    # (findall handles full-wrap, prose-preamble, and multi-block uniformly —
+    # a full-wrap _FENCE_RE.match would mis-grab the middle when >1 block.)
+    blocks = _ANY_FENCE_RE.findall(cleaned)
+    if blocks:
+        return blocks[-1].strip()
     return cleaned

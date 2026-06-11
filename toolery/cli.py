@@ -99,6 +99,9 @@ def run(
     tier: str = typer.Option("all", help="easy|medium|hard|very_hard|all"),
     category: str = typer.Option("all", "--category",
                                  help="scenario category filter (see Category enum) or 'all'"),
+    ids: str = typer.Option("", "--ids",
+                            help="comma-separated scenario ids to run (exact match); "
+                                 "empty = no id filtering"),
     trials: int = typer.Option(5, "--trials"),
     base_url: str = typer.Option("http://localhost:8000", "--base-url"),
     scenarios_dir: Path = typer.Option(Path("scenarios")),  # noqa: B008
@@ -205,6 +208,9 @@ def run(
     category_set = {c.strip() for c in category.split(",") if c.strip()}
     if category_set and "all" not in category_set:
         xs = [s for s in xs if s.category.value in category_set]
+    id_set = {i.strip() for i in ids.split(",") if i.strip()}
+    if id_set:
+        xs = [s for s in xs if s.id in id_set]
     if not xs and not perf_only:
         console.print("[red]No scenarios match filter.[/red]")
         raise typer.Exit(2)

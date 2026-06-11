@@ -28,8 +28,12 @@ def _args_match(rule: ToolResponseRule, args: dict) -> bool:
     if not isinstance(rule.match, dict):
         return False
     for k, v in rule.match.items():
-        if k == "command_regex":
-            if not _re.search(str(v), str(args.get("command", ""))):
+        if k.endswith("_regex"):
+            # "<param>_regex" matches the named arg by regex search —
+            # "command_regex" → args["command"], "pattern_regex" →
+            # args["pattern"], "name_regex" → args["name"], etc.
+            param = k[: -len("_regex")]
+            if not _re.search(str(v), str(args.get(param, ""))):
                 return False
         elif args.get(k) != v:
             return False

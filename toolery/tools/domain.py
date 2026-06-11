@@ -41,8 +41,13 @@ register(_fn("get_risk", "Compute portfolio risk metrics",
 register(_fn("vllm_config_get", "Get current vLLM server config", {}, []))
 register(_fn("vllm_config_set", "Set a vLLM config parameter",
              {"key": {"type": "string"}, "value": {"type": "string"}}, ["key", "value"]))
-register(_fn("get_weather_global", "Get weather for non-European cities",
-             {"location": {"type": "string"}}, ["location"]))
+register(_fn("get_weather_global", "Get current or forecast weather for a city anywhere (pass date for a forecast)",
+             {"location": {"type": "string"},
+              "date": {"type": "string",
+                       "description": "Forecast date, YYYY-MM-DD (optional)"},
+              "units": {"type": "string",
+                        "description": "Temperature units, e.g. 'C' or 'F' (optional)"}},
+             ["location"]))
 register(_fn("search_flights", "Search flights",
              {"from": {"type": "string"}, "to": {"type": "string"},
               "date": {"type": "string"}, "max_price": {"type": "number"}},
