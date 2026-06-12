@@ -120,3 +120,58 @@ def test_unmatched_args_falls_through_to_any_rule():
     rt = MockToolRuntime(s)
     assert rt.respond("http_get", {"url": "/known"})[0]["status"] == 200
     assert rt.respond("http_get", {"url": "/unknown"})[0]["status"] == 404
+
+
+def test_if_tool_not_called_gates_until_other_tool_runs():
+    """hard-01 style: run_tests fails until edit_file happened, passes after.
+
+    Regression for the call_index:0 trap — a model that edited FIRST and ran
+    tests after got a false FAILED on correct code.
+    """
+    s = _scenario({
+        "run_tests": [
+            ToolResponseRule(match="any", if_tool_not_called="edit_file", returns="FAILED"),
+            ToolResponseRule(match="any", returns="PASSED"),
+        ],
+        "edit_file": [ToolResponseRule(match="any", returns={"ok": True})],
+    })
+    # TDD order: red → edit → green
+    rt = MockToolRuntime(s)
+    assert rt.respond("run_tests", {})[0] == "FAILED"
+    rt.respond("edit_file", {"path": "x"})
+    assert rt.respond("run_tests", {})[0] == "PASSED"
+    # Fix-first order: edit → tests must be green immediately
+    rt2 = MockToolRuntime(s)
+    rt2.respond("edit_file", {"path": "x"})
+    assert rt2.respond("run_tests", {})[0] == "PASSED"
+
+
+def test_if_tool_called_gates_on_prior_other_tool():
+    """medium-32 style: tests/ listing shows the file only after write_file."""
+    s = _scenario({
+        "list_files": [
+            ToolResponseRule(match={"path_regex": "tests"}, if_tool_called="write_file",
+                             returns=["test_calculator.py"]),
+            ToolResponseRule(match={"path_regex": "tests"}, returns=[]),
+            ToolResponseRule(match="any", returns=["calculator.py", "tests/"]),
+        ],
+        "write_file": [ToolResponseRule(match="any", returns={"ok": True})],
+    })
+    rt = MockToolRuntime(s)
+    assert rt.respond("list_files", {"path": "/workspace/tests"})[0] == []
+    assert rt.respond("list_files", {"path": "/workspace"})[0] == ["calculator.py", "tests/"]
+    rt.respond("write_file", {"path": "/workspace/tests/test_calculator.py"})
+    assert rt.respond("list_files", {"path": "/workspace/tests"})[0] == ["test_calculator.py"]
+
+
+def test_if_tool_gate_self_reference_counts_strictly_prior_calls():
+    """Gating a tool on itself counts calls BEFORE the current one."""
+    s = _scenario({
+        "ping": [
+            ToolResponseRule(match="any", if_tool_not_called="ping", returns="first"),
+            ToolResponseRule(match="any", returns="again"),
+        ],
+    })
+    rt = MockToolRuntime(s)
+    assert rt.respond("ping", {})[0] == "first"
+    assert rt.respond("ping", {})[0] == "again"

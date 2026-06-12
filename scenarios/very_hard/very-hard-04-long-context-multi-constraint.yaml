@@ -54,8 +54,48 @@ tool_responses:
         docs/style-guide.md:34:Use `to_snake()` for variable names.
         CHANGELOG.md:55:Renamed to_snake to_snake_case (planned).
   read_file:
+    # Real (abridged) contents — the old placeholder "(file content)" gave
+    # models nothing to base their edits on and provoked budget-burning probing.
+    - match: { path_regex: 'src/utils/strings\.py$' }
+      returns: |
+        import re
+
+        def to_snake(s):
+            return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
+
+        def from_snake(s):
+            return "".join(w.title() for w in s.split("_"))
+    - match: { path_regex: 'src/api/handlers\.py$' }
+      returns: |
+        from src.utils.strings import to_snake
+
+        def normalize(name):
+            return to_snake(name)
+    - match: { path_regex: 'src/cli\.py$' }
+      returns: |
+        from src.utils.strings import to_snake
+
+        def main(arg):
+            print(to_snake(arg))
+    - match: { path_regex: 'src/web/routes\.py$' }
+      returns: |
+        from src.utils.strings import from_snake
+
+        def route_key(route):
+            key = from_snake(route)
+            return key
+    - match: { path_regex: 'tests/test_strings\.py$' }
+      returns: |
+        from src.utils.strings import to_snake, from_snake
+
+        def test_roundtrip():
+            assert from_snake(to_snake("FooBar")) == "FooBar"
+    - match: { path_regex: 'docs/style-guide\.md$' }
+      returns: "Use `to_snake()` for variable names.\n"
+    - match: { path_regex: 'CHANGELOG' }
+      returns: "Renamed to_snake to_snake_case (planned).\n"
     - match: any
-      returns: "(file content)"
+      returns: { error: "not found" }
   edit_file:
     - match: any
       returns: { ok: true, lines_changed: 2 }

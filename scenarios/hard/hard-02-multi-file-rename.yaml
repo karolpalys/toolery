@@ -32,8 +32,41 @@ tool_responses:
     - match: any
       returns: ""
   read_file:
+    # Real (abridged) contents — the old placeholder "(file content)" gave
+    # models nothing to base their edits on and provoked budget-burning probing.
+    - match: { path_regex: 'src/core/billing\.py$' }
+      returns: |
+        def compute_total(items):
+            return sum(i["amount"] for i in items)
+
+        class Invoice:
+            def total(self):
+                return compute_total(self.items)
+    - match: { path_regex: 'src/api/handlers\.py$' }
+      returns: |
+        from src.core.billing import compute_total
+
+        def order_summary(order):
+            total = compute_total(order.items)
+            return {"total": total}
+    - match: { path_regex: 'src/cli\.py$' }
+      returns: |
+        from src.core.billing import compute_total
+
+        def main(parsed):
+            print(compute_total(parsed))
+    - match: { path_regex: 'tests/test_billing\.py$' }
+      returns: |
+        from src.core.billing import compute_total
+
+        def test_total():
+            assert compute_total([{"amount": 100}]) == 100
+    - match: { path_regex: 'CHANGELOG' }
+      returns: |
+        # Changelog
+        - Added compute_total()
     - match: any
-      returns: "(file content)"
+      returns: { error: "not found" }
   edit_file:
     - match: any
       returns: { ok: true, lines_changed: 2 }

@@ -16,11 +16,21 @@ budget:
   timeout_seconds: 60
 tool_responses:
   git_status:
+    # Stateful sim: after git_commit the new file is no longer untracked.
+    # The old stateless rule kept showing src/utils.py as untracked after a
+    # correct commit, sending models into a verification spiral past budget.
     - match: any
+      if_tool_not_called: git_commit
       returns: |
         Untracked files:
           src/utils.py
         Modified:
+          README.md     (whitespace only)
+          src/main.py   (unrelated debug print)
+    - match: any
+      returns: |
+        Last commit: abc1234 (src/utils.py committed)
+        Modified (not staged):
           README.md     (whitespace only)
           src/main.py   (unrelated debug print)
   git_diff:

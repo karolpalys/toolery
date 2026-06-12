@@ -122,8 +122,10 @@ async def test_runner_scales_timeout_for_slow_adapters():
 
 
 @pytest.mark.asyncio
-async def test_runner_default_timeout_scale_is_unchanged():
-    """Default timeout_scale=1.0 leaves local runs exactly as before."""
+async def test_runner_default_timeout_scale_is_doubled():
+    """Default timeout_scale=2.0 — the scale-1.0 budgets were tuned for fast
+    local serving and killed reasoning models mid-first-answer (MiMo audit
+    2026-06-12: 37 timeout trials with zero recorded messages)."""
     received: dict[str, int] = {}
 
     class SpyAdapter:
@@ -141,7 +143,7 @@ async def test_runner_default_timeout_scale_is_unchanged():
 
     runner = Runner(adapters={"spy": SpyAdapter()}, trials=1, model="x")
     await runner.run([_scenario()])
-    assert received["timeout"] == 30  # unchanged
+    assert received["timeout"] == 60  # 30 * default 2.0
 
 
 @pytest.mark.asyncio

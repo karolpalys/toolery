@@ -27,8 +27,12 @@ scoring:
     - check: call_count_at_most
       n: 0
     - check: response_satisfies
+      # Broadened 2026-06-12: a model that asked a perfectly good clarifying
+      # question ("I need a bit more information: are you looking to…")
+      # failed because its phrasing wasn't on the list. Tool checks +
+      # none_of already guard against false passes.
       any_of:
-        - ["what exactly", "what should i check", "clarify", "do you mean", "which", "what specifically", "more detail", "more details", "could you specify", "co dokładnie", "co mam sprawdz", "doprecyz", "czy chodzi", "który", "co konkretnie", "więcej szczegół"]
+        - ["what exactly", "what should i check", "clarify", "do you mean", "which", "what specifically", "more detail", "more details", "could you specify", "more information", "more info", "need a bit more", "are you looking", "what would you like", "what kind of", "what type of", "need to know", "let me know what", "could you provide", "can you provide", "what do you mean", "tell me more", "co dokładnie", "co mam sprawdz", "doprecyz", "czy chodzi", "który", "co konkretnie", "więcej szczegół", "więcej informacji", "co masz na myśli", "jakiego rodzaju", "daj znać", "o co chodzi"]
       none_of: ["checking now", "ok, doing it", "consider it done", "got it, done", "sprawdzam", "ok, robię", "wykonano"]
   forbidden:
     - check: tool_called

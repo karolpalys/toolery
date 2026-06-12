@@ -53,6 +53,14 @@ class MockToolRuntime:
         rules = self.scenario.tool_responses.get(tool_name, [])
 
         global_idx = self._call_counters.get(tool_name, 0)
+
+        def _prior_calls(name: str) -> int:
+            # For the tool currently being dispatched, count only calls
+            # strictly before this one (its counter is bumped below).
+            if name == tool_name:
+                return global_idx
+            return self._call_counters.get(name, 0)
+
         self._call_counters[tool_name] = global_idx + 1
 
         # Pre-increment per-rule-key counters once per respond() invocation,
@@ -70,6 +78,10 @@ class MockToolRuntime:
 
         for rule in rules:
             if not _args_match(rule, args):
+                continue
+            if rule.if_tool_called is not None and _prior_calls(rule.if_tool_called) == 0:
+                continue
+            if rule.if_tool_not_called is not None and _prior_calls(rule.if_tool_not_called) > 0:
                 continue
             if rule.call_index is not None and not _idx_satisfied(rule.call_index, global_idx):
                 continue

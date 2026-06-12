@@ -45,6 +45,14 @@ tool_responses:
     - match: any
       returns: { stdout: "", stderr: "not found", exit_code: 127, duration_ms: 2 }
   list_files:
+    # Path-aware, stateful listing — the old match:any returned the root
+    # listing for every path (tests/ "containing" calculator.py + tests/),
+    # which provoked confused probing past budget.
+    - match: { path_regex: 'tests' }
+      if_tool_called: write_file
+      returns: ["test_calculator.py"]
+    - match: { path_regex: 'tests' }
+      returns: []
     - match: any
       returns: ["calculator.py", "tests/"]
 scoring:

@@ -16,25 +16,26 @@ budget:
   timeout_seconds: 90
 tool_responses:
   run_tests:
+    # Stateful sim: tests fail until edit_file has happened, pass after.
+    # The old call_index:0 rule returned FAILED for the FIRST run regardless
+    # of state — a model that fixed the bug before running tests got a false
+    # FAILED on correct code and burned the budget "re-fixing" it.
     - match: any
-      call_index: 0
+      if_tool_not_called: edit_file
       returns: "FAILED tests/test_parser.py::test_negative_numbers - AssertionError: expected -3, got 3"
     - match: any
       returns: "PASSED 12 tests, 0 failed."
   read_file:
-    # Stateful-ish file sim via match_index: first read shows the bug;
-    # re-reads (typically the model verifying its edit) show the fixed file.
-    # The old single static rule returned the buggy code forever, so a model
-    # that verified its own edit concluded the edit failed and burned the
-    # budget on retries.
+    # Stateful file sim: buggy until edit_file happened, fixed after.
+    # (Previously match_index-based: a model that read the file twice
+    # BEFORE editing saw the fixed code on the second read.)
     - match: { path: "src/parser.py" }
-      match_index: 0
+      if_tool_not_called: edit_file
       returns: |
         def parse_int(s: str) -> int:
             # BUG: missing minus sign handling
             return int(s.lstrip('-+'))
     - match: { path: "src/parser.py" }
-      match_index: ">=1"
       returns: |
         def parse_int(s: str) -> int:
             sign = -1 if s.strip().startswith('-') else 1

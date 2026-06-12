@@ -37,8 +37,48 @@ tool_responses:
     - match: any
       returns: ""
   read_file:
+    # Real (abridged) file contents. The old single rule returned the
+    # literal placeholder "(file content)" for every path — models that
+    # insisted on actually reading the code before editing got garbage and
+    # flailed into run_bash probing until the budget died.
+    - match: { path_regex: 'src/core/billing\.py$' }
+      returns: |
+        SHIPPING = 5.0
+
+        def compute_total(items):
+            return sum(i["amount"] for i in items) + SHIPPING  # NOTE: this line is 88 chars in the real file (E501)
+
+        class Invoice:
+            def __init__(self, items):
+                self.items = items
+
+            def total(self):
+                return compute_total(self.items)
+    - match: { path_regex: 'src/api/handlers\.py$' }
+      returns: |
+        from src.core.billing import compute_total
+
+        def order_summary(order):
+            total = compute_total(order.items)
+            return {"total": total}
+    - match: { path_regex: 'src/cli\.py$' }
+      returns: |
+        from src.core.billing import compute_total
+
+        def main(parsed):
+            print(compute_total(parsed))
+    - match: { path_regex: 'tests/test_billing\.py$' }
+      returns: |
+        from src.core.billing import compute_total
+
+        def test_total():
+            assert compute_total([{"amount": 100}]) == 100
+    - match: { path_regex: 'CHANGELOG' }
+      returns: |
+        # Changelog
+        - Added compute_total()
     - match: any
-      returns: "(file content)"
+      returns: { error: "not found" }
   edit_file:
     - match: any
       returns: { ok: true, lines_changed: 2 }
@@ -70,8 +110,11 @@ tool_responses:
     - match: any
       returns: ["src/core/billing.py", "src/api/handlers.py", "src/cli.py", "tests/test_billing.py"]
   run_bash:
+    # Steer instead of a silent empty success — the old {stdout: ""} made
+    # models retry run_bash variants forever when the dedicated tools were
+    # the intended path.
     - match: any
-      returns: { stdout: "", stderr: "", returncode: 0 }
+      returns: { stdout: "", stderr: "bash is unavailable here; use the dedicated tools (read_file, edit_file, run_tests, run_lint, git_*)", returncode: 127 }
 scoring:
   required:
     - check: tool_called

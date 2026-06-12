@@ -100,6 +100,8 @@ _LEGEND: list[tuple[str, str]] = [
     # — aggregate score —
     ("Overall",
      "Tier-weighted mean across every scored scenario. Per-scenario weights: easy=1·, medium=2·, hard=3·, very_hard=4·. Aggregated across the last 5 runs with exponential time decay (half-life 14 days), so older runs influence less but are not dropped."),
+    ("Passed",
+     "Raw passed-trial count from this pair's MOST RECENT run — e.g. 512/715 means 512 of 715 trials (143 scenarios × 5 trials) scored a full pass; partials don't count. Unweighted and single-run, so it complements Overall (which is tier-weighted and time-decayed). Totals can differ across rows when a run used an older scenario set."),
     # — 14 capability dimensions —
     ("Calibr.",
      "Calibrated uncertainty / hallucination resistance. The model has to refuse, ask for clarification, or hedge when the prompt asks for something it cannot ground in tools or context — instead of confidently fabricating an answer."),
@@ -196,6 +198,13 @@ def _fmt_perf(value: float | None, podium_rank: int | None) -> Text:
     icon = _PODIUM_ICON.get(podium_rank, "")
     text = f"{icon} {value:.1f}" if icon else f"{value:.1f}"
     return Text(text, style="bold")
+
+
+def _fmt_pass_counts(pc: dict | None) -> Text:
+    """Render the Passed column as 'x/N' raw trial counts."""
+    if not pc or not pc.get("total"):
+        return Text("—", style="bold dim")
+    return Text(f"{pc['passed']}/{pc['total']}", style="bold")
 
 
 def _meta_cell(text: str, dim_style: str = "bold") -> Text:
@@ -427,6 +436,7 @@ class RankingsTab(Container):
             _round_items(r.get("scores")),
             _round_items(r.get("perf")),
             _round_items(r.get("stability", {}).get("overall")),
+            _round_items(r.get("pass_counts")),
             r.get("runs"), bool(r.get("stale")), r.get("cluster"),
         )
 
@@ -486,6 +496,9 @@ class RankingsTab(Container):
             tbl.add_column(header, key=key)
         for dim in _DIMENSIONS:
             tbl.add_column(_HEADERS[dim], key=f"dim:{dim}")
+            if dim == "overall":
+                # Raw passed-trials count sits right after the aggregate score.
+                tbl.add_column("Passed", key="passed")
         for p in _PERF_COLS:
             tbl.add_column(_PERF_HEADERS[p], key=f"perf:{p}")
         for s in _STABILITY_COLS:
@@ -496,6 +509,13 @@ class RankingsTab(Container):
         self._sort_keys = {
             "model": lambda r: r["model"].lower(),
             "adapter": lambda r: r["adapter"],
+            # Sort by pass FRACTION, not absolute count — totals can differ
+            # across rows (older scenario sets, model_mean sums adapters).
+            "passed": lambda r: -(
+                (r.get("pass_counts") or {}).get("passed", 0)
+                / ((r.get("pass_counts") or {}).get("total") or 1)
+                if r.get("pass_counts") else 1.0
+            ),
             "runs": lambda r: -(r.get("runs") or 0),
             "set": lambda r: 1 if r.get("stale") else 0,
             "cluster": lambda r: {"octa": 0, "quad": 1, "triple": 2, "dual": 3, "single": 4}.get(r.get("cluster"), 5),
@@ -608,6 +628,8 @@ class RankingsTab(Container):
             for dim in _DIMENSIONS:
                 cells.append(_fmt_score(r["scores"].get(dim),
                                         podium_score.get((i, dim))))
+                if dim == "overall":
+                    cells.append(_fmt_pass_counts(r.get("pass_counts")))
             for p in _PERF_COLS:
                 cells.append(_fmt_perf(r["perf"].get(p),
                                        podium_perf.get((i, p))))

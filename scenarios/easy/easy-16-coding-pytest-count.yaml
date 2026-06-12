@@ -17,12 +17,28 @@ budget:
   timeout_seconds: 40
 tool_responses:
   bash_exec:
-    - match: { command_regex: 'pytest' }
+    # pytest as an actual invocation (start of command or after &&/;/|),
+    # optionally via python -m — NOT inside `which pytest` or
+    # `find -name pytest.ini`.
+    - match: { command_regex: '(?:^|&&|;|\|)\s*(?:[\w/.]*/)?(?:python3?\s+-m\s+)?pytest\b' }
       returns:
         stdout: "..... [100%]\n5 passed in 0.42s\n"
         stderr: ""
         exit_code: 0
         duration_ms: 420
+    # Orientation commands return plausible output. Every model in the
+    # 2026-06 audit opened with `ls -la` to orient, got the absurd
+    # "ls: command not found", concluded the environment was broken and
+    # probed past budget — 0% pass across 8 models. The listing also
+    # hints at pytest (pytest.ini, tests/), so orient → run fits budget 2.
+    - match: { command_regex: '^\s*pwd\s*$' }
+      returns: { stdout: "/workspace\n", stderr: "", exit_code: 0, duration_ms: 2 }
+    - match: { command_regex: '^\s*(?:ls|pwd|find|tree)\b' }
+      returns: { stdout: "pytest.ini\nsrc/\ntests/\n", stderr: "", exit_code: 0, duration_ms: 3 }
+    - match: { command_regex: '^\s*which\b.*pytest' }
+      returns: { stdout: "/usr/bin/pytest\n", stderr: "", exit_code: 0, duration_ms: 2 }
+    - match: { command_regex: '^\s*which\b' }
+      returns: { stdout: "/usr/bin/python3\n", stderr: "", exit_code: 0, duration_ms: 2 }
     - match: any
       returns: { stdout: "", stderr: "command not found", exit_code: 127, duration_ms: 2 }
 scoring:

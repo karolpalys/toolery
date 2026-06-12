@@ -42,10 +42,13 @@ class Runner:
     skip: set[tuple[str, str, int]] | None = None
     on_start: StartCallback | None = None
     on_end: EndCallback | None = None
-    # Multiplier on each scenario's timeout_seconds. The budgets are tuned for
-    # fast local serving; a cloud/reasoning adapter (high RTT + long CoT) gets
-    # killed mid-answer at scale 1.0. Bump for remote endpoints (e.g. 4.0).
-    timeout_scale: float = 1.0
+    # Multiplier on each scenario's timeout_seconds. The per-scenario budgets
+    # were tuned for fast local serving at low concurrency; the MiMo-V2.5 audit
+    # (2026-06-12) showed reasoning models killed mid-first-answer at scale 1.0
+    # (37 trials, zero messages in trace, passes of the same scenarios landing
+    # at 96-100% of the limit). Default is 2.0 since then; bump higher for
+    # slow cloud/reasoning endpoints (e.g. 4.0).
+    timeout_scale: float = 2.0
 
     async def _run_one(self, scenario: Scenario, adapter_name: str, adapter: Adapter,
                        trial_index: int) -> ScenarioResult:

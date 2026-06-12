@@ -75,3 +75,13 @@ register(_fn("git_log", "Show commit history",
              {"path": {"type": "string"}, "max_count": {"type": "integer"}}, []))
 register(_fn("git_show", "Show contents of a specific commit",
              {"sha": {"type": "string"}}, ["sha"]))
+
+# --- Deployment tool for context-state-tracking scenarios (very-hard-19).
+# Before this existed the scenario expected models to invent a literal
+# `deploy --env staging ...` bash command — 0% pass across all models.
+register(_fn("deploy", "Deploy a version to a target environment",
+             {"env": {"type": "string",
+                      "description": "target environment (e.g. staging, production)"},
+              "version": {"type": "string",
+                          "description": "version tag to deploy (e.g. v1.2.3)"}},
+             ["env", "version"]))

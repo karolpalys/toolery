@@ -59,6 +59,13 @@ class ToolResponseRule(BaseModel):
     # call_index breaks for that intent if the same tool is invoked with
     # different args in between.
     match_index: int | str | None = None
+    # Cross-tool state gates: the rule only matches if the named OTHER tool
+    # has (not) been called earlier in the trial. Use for stateful sims like
+    # "run_tests fails until edit_file happened" or "git_status is clean
+    # after git_commit". Self-references (gating a tool on itself) count
+    # calls strictly BEFORE the current one.
+    if_tool_called: str | None = None
+    if_tool_not_called: str | None = None
 
 
 class Scoring(BaseModel):

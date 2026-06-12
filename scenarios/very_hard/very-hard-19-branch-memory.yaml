@@ -7,13 +7,21 @@ description: |
   Turn 1: user chooses path "B" (deploy to staging, not prod). Turn 2:
   intermediate confirmation. Turn 3: user says "OK, go ahead" — model must
   call deploy on STAGING (path B), not prod.
+
+  Redesigned 2026-06-12: the original gave only git_status + bash_exec and
+  expected models to invent the literal shell command `deploy --env staging
+  --version v2.3.1` — 0% pass across all models, so the scenario measured
+  command divination, not state tracking. Now there is a dedicated `deploy`
+  tool (env, version); bash_exec stays as a fair distractor that steers to
+  it. The thing under test — remembering the staging choice across
+  intervening turns — is unchanged.
 tags: [branching, multi_turn, deploy]
 ranking_dimensions: [overall, context_state_tracking, tool_selection]
 prompt: |
   Turn 1: "Deploy version v2.3.1. Staging first." (model confirms)
   Turn 2: "Show me git_status before the deploy."
   Turn 3: "OK, go ahead with the deploy."
-tools: [git_status, bash_exec]
+tools: [git_status, deploy, bash_exec]
 budget:
   max_tool_calls: 3
   max_turns: 4
@@ -22,29 +30,40 @@ tool_responses:
   git_status:
     - match: any
       returns: "On branch main\nnothing to commit, working tree clean"
-  bash_exec:
-    - match: { command: "deploy --env staging --version v2.3.1" }
+  deploy:
+    - match: { env_regex: '(?i)^stag', version_regex: 'v?2\.3\.1' }
       returns: { status: "deployed", env: "staging", version: "v2.3.1" }
-    - match: { command: "deploy --env production --version v2.3.1" }
-      returns: { error: "wrong_env_chosen" }
+    - match: { env_regex: '(?i)prod' }
+      returns: { error: "wrong_env_chosen", detail: "the user picked staging in turn 1" }
     - match: any
-      returns: { error: "unknown_command" }
+      returns: { error: "invalid_deploy_args", detail: "expected env + version tag" }
+  bash_exec:
+    - match: any
+      returns: { stdout: "", stderr: "deploys do not run from a raw shell here — use the deploy tool", exit_code: 127, duration_ms: 1 }
 scoring:
   required:
+    # Turn-2 task must actually happen, and before the deploy.
+    - check: tool_called_in_order
+      sequence: [git_status, deploy]
     - check: tool_args_match_regex
-      tool: bash_exec
-      arg: command
-      pattern: "staging.*v2\\.3\\.1|v2\\.3\\.1.*staging"
+      tool: deploy
+      arg: env
+      pattern: "(?i)^stag"
+    - check: tool_args_match_regex
+      tool: deploy
+      arg: version
+      pattern: "v?2\\.3\\.1"
   forbidden:
-    # Catch any production-env deploy regardless of exact flag spelling
-    # (--env production, --env prod, --environment production, etc.).
+    # Any production-env deploy means the turn-1 choice was forgotten.
     - check: tool_args_match_regex
-      tool: bash_exec
-      arg: command
-      pattern: "(--env|--environment)\\s+(production|prod)"
+      tool: deploy
+      arg: env
+      pattern: "(?i)prod"
   partial:
     - check: response_contains
       patterns: ["staging"]
+    - check: call_count_at_most
+      n: 2
   weights:
     pass: 1.0
     partial: 0.5

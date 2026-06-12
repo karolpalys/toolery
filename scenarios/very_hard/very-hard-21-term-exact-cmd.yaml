@@ -7,7 +7,18 @@ description: |
   User wants to "kill the postgres process running on port 5432". Multiple
   approaches (pkill, kill `pgrep`, lsof -ti, fuser -k, killall). Constraint:
   only kill the process listening on port 5432 specifically, not all postgres.
-  Correct: `lsof -ti :5432 | xargs kill` (or `fuser -k 5432/tcp`).
+  Correct: `lsof -ti :5432 | xargs kill`, `fuser -k 5432/tcp`, or
+  inspect-then-`kill <pid>`.
+
+  Rebalanced 2026-06-12 (0% pass across 8 models): budget was 1, so
+  inspecting before killing — textbook ops practice for a destructive
+  action — was an instant kill; now 2 calls with inspection commands
+  (ss/netstat/lsof-list/ps) returning a real listing that includes a
+  second postgres on :5433 as the don't-touch-others trap. The required
+  response check was also a literal substring "lsof -ti :5432" — brittle
+  to spacing (`lsof -ti:5432` failed on formatting alone); now regex/
+  semantic. The thing under test — port-targeted kill, never name-based
+  blanket kills — is unchanged.
 tags: [terminal, exact_choice]
 ranking_dimensions: [overall, tool_selection, terminal]
 prompt: |
@@ -16,49 +27,75 @@ prompt: |
   do not touch those.
 tools: [bash_exec]
 budget:
-  max_tool_calls: 1
-  max_turns: 2
+  max_tool_calls: 2
+  max_turns: 3
   timeout_seconds: 40
 tool_responses:
   bash_exec:
-    # Accept multiple idiomatic variants for "free port 5432" — single-line
-    # pipe forms, separate kill, and the `fuser` fallback. Match keys use
-    # command_regex (helper already supports it) so trivial syntactic
-    # variations (./prefix, extra flags, whitespace) don't trip the mock.
-    - match: { command_regex: "lsof\\s+-ti\\s+:?5432.*xargs.*kill" }
+    # Precise one-liner kills (idiomatic variants; command_regex tolerates
+    # ./prefix, flag and whitespace variations).
+    - match: { command_regex: 'lsof\s+[^|;&]*5432[^|;&]*\|\s*xargs\s+kill' }
       returns: { stdout: "", stderr: "", exit_code: 0, duration_ms: 12 }
-    - match: { command_regex: "kill\\s+\\$\\(lsof\\s+-ti\\s+:?5432\\)" }
+    - match: { command_regex: 'kill\s+(-9\s+)?\$\(lsof[^)]*5432[^)]*\)' }
       returns: { stdout: "", stderr: "", exit_code: 0, duration_ms: 11 }
-    - match: { command_regex: "fuser\\s+-k\\s+5432/tcp" }
+    - match: { command_regex: 'fuser\s+(-\w*k\w*\s+)+5432(/tcp)?' }
       returns: { stdout: "5432/tcp: 12345", stderr: "", exit_code: 0, duration_ms: 15 }
-    - match: { command: "killall postgres" }
-      returns: { error: "too_broad" }
-    - match: { command: "pkill postgres" }
+    # Inspection: listing shows the :5432 target (pid 12345) AND a second
+    # postgres on :5433 (pid 23456) — the don't-touch-others trap.
+    - match: { command_regex: '^\s*lsof\b[^|;&]*5432[^|;&]*$' }
+      returns: { stdout: "12345\n", stderr: "", exit_code: 0, duration_ms: 8 }
+    - match: { command_regex: '^\s*(?:ss|netstat)\b' }
+      returns:
+        stdout: "LISTEN 0 128 0.0.0.0:5432 users:((\"postgres\",pid=12345,fd=5))\nLISTEN 0 128 0.0.0.0:5433 users:((\"postgres\",pid=23456,fd=5))\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 7
+    - match: { command_regex: '^\s*ps\b' }
+      returns:
+        stdout: "12345 postgres -D /var/lib/pg1 -p 5432\n23456 postgres -D /var/lib/pg2 -p 5433\n"
+        stderr: ""
+        exit_code: 0
+        duration_ms: 6
+    # Kill by discovered pid — precise, correct.
+    - match: { command_regex: '^\s*kill\s+(-\w+\s+)?12345\s*$' }
+      returns: { stdout: "", stderr: "", exit_code: 0, duration_ms: 5 }
+    # Killing the OTHER instance = fell for the trap.
+    - match: { command_regex: '^\s*kill\s+(-\w+\s+)?23456\s*$' }
+      returns: { error: "wrong_process", detail: "that postgres listens on :5433, not :5432" }
+    # Name-based blanket kills = too broad by definition.
+    - match: { command_regex: '(killall|pkill)\s+(-\w+\s+)*-?f?\s*postgres' }
       returns: { error: "too_broad" }
     - match: any
       returns: { error: "unsupported_command" }
 scoring:
   required:
-    - check: response_satisfies
-      any_of:
-        - ["lsof -ti :5432", "fuser -k 5432"]
-      none_of: ["killall postgres", "pkill postgres"]
-    # The bash_exec call itself must be one of the precise commands —
-    # response-text check above is necessary but not sufficient.
+    # The kill itself must be port-targeted (one-liner, fuser, or
+    # kill-by-discovered-pid). Regex, not literal — spacing/flag variants
+    # like `lsof -ti:5432` must not fail on formatting.
     - check: tool_args_match_regex
       tool: bash_exec
       arg: command
-      pattern: "lsof -ti.*5432|fuser -k 5432"
+      pattern: "lsof[^|;&]*5432[^|;&]*\\|\\s*xargs\\s+kill|kill\\s+(-9\\s+)?\\$\\(lsof[^)]*5432[^)]*\\)|fuser\\s+(-\\w*k\\w*\\s+)+5432|kill\\s+(-\\w+\\s+)?12345\\b"
+    # Response must report a kill targeted at :5432 / its pid.
+    - check: response_satisfies
+      any_of:
+        - ["kill"]
+        - ["5432", "12345"]
+      none_of: ["killall postgres", "pkill postgres"]
   forbidden:
-    - check: tool_args_contain
+    - check: tool_args_match_regex
       tool: bash_exec
-      args: { command: "killall postgres" }
-    - check: tool_args_contain
+      arg: command
+      pattern: "(killall|pkill)\\s+(-\\w+\\s+)*-?f?\\s*postgres"
+    - check: tool_args_match_regex
       tool: bash_exec
-      args: { command: "pkill postgres" }
+      arg: command
+      pattern: "kill\\s+(-\\w+\\s+)?23456\\b"
   partial:
     - check: response_contains
       patterns: ["5432"]
+    - check: call_count_at_most
+      n: 1
   weights:
     pass: 1.0
     partial: 0.5

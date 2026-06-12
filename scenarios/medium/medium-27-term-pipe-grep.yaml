@@ -19,6 +19,12 @@ tool_responses:
   bash_exec:
     - match: { command_regex: 'grep.*503.*\|\s*wc\s+-l' }
       returns: { stdout: "42\n", stderr: "", exit_code: 0, duration_ms: 9 }
+    # `grep -c` / `grep --count` counts matching lines directly — every bit
+    # as correct as piping to wc -l. The old mock fell through to the
+    # line-dump rule and returned raw lines for a -c invocation, which is
+    # semantically wrong output for the flag the model passed.
+    - match: { command_regex: '^grep\b(?=[^|]*\s(?:-\w*c\w*|--count))(?=[^|]*503)[^|]*$' }
+      returns: { stdout: "42\n", stderr: "", exit_code: 0, duration_ms: 9 }
     - match: { command_regex: '^grep.*503' }
       returns:
         stdout: "10.0.0.1 - - 503 ...\n10.0.0.2 - - 503 ...\n... (42 lines total)\n"

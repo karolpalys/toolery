@@ -145,3 +145,34 @@ def test_compute_matrix_aggregates_same_config_reruns(tmp_path):
     # stability is computed from the run-to-run spread of the two runs
     assert row["stability"]["overall"]["worst"] == 0.0
     assert row["stability"]["overall"]["mean"] is not None
+
+
+def test_compute_matrix_pass_counts_from_latest_run(tmp_path):
+    """pass_counts = raw passed/total trial counts from the pair's MOST RECENT
+    run (feeds the rankings 'Passed x/N' column). Older runs don't blend in."""
+    from toolery.rankings.compute import compute_matrix
+    store = Store(tmp_path / "runs.db")
+    store.init_schema()
+    _seed_cluster_run(store, "r_old", "m", "raw", "single", [1.0, 1.0, 1.0])   # 3/3
+    _seed_cluster_run(store, "r_new", "m", "raw", "single", [1.0, 0.0, 0.0])   # 1/3
+
+    matrix = compute_matrix(store=store, dimensions=["overall"])
+    assert len(matrix) == 1
+    assert matrix[0]["pass_counts"] == {"passed": 1, "total": 3}
+
+
+def test_collapse_model_mean_sums_pass_counts():
+    from toolery.rankings.compute import collapse_matrix_rows
+    matrix = [
+        {"model": "m", "adapter": "raw", "cluster": None, "runs": 1,
+         "scores": {"overall": 0.4}, "perf": {}, "stability": {},
+         "scenarios_hashes": {"h"}, "pass_counts": {"passed": 2, "total": 5}},
+        {"model": "m", "adapter": "hermes", "cluster": None, "runs": 1,
+         "scores": {"overall": 0.8}, "perf": {}, "stability": {},
+         "scenarios_hashes": {"h"}, "pass_counts": {"passed": 4, "total": 5}},
+    ]
+    mean = collapse_matrix_rows(matrix, "model_mean")
+    assert mean[0]["pass_counts"] == {"passed": 6, "total": 10}
+    # model_best carries the winning adapter's counts through unchanged.
+    best = collapse_matrix_rows(matrix, "model_best")
+    assert best[0]["pass_counts"] == {"passed": 4, "total": 5}

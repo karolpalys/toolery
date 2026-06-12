@@ -106,9 +106,11 @@ def run(
     base_url: str = typer.Option("http://localhost:8000", "--base-url"),
     scenarios_dir: Path = typer.Option(Path("scenarios")),  # noqa: B008
     concurrency: int = typer.Option(4),
-    timeout_scale: float = typer.Option(1.0, "--timeout-scale",
-                                        help="multiply each scenario's timeout_seconds; "
-                                             "bump for slow cloud/reasoning endpoints (e.g. 4.0)"),
+    timeout_scale: float = typer.Option(2.0, "--timeout-scale",
+                                        help="multiply each scenario's timeout_seconds "
+                                             "(default 2.0 — scale-1.0 budgets killed reasoning "
+                                             "models mid-answer); bump for slow cloud/reasoning "
+                                             "endpoints (e.g. 4.0)"),
     no_tui: bool = typer.Option(True, "--no-tui/--tui", help="MVP: --no-tui only"),
     with_perf: bool = typer.Option(False, "--with-perf"),
     perf_only: bool = typer.Option(False, "--perf-only",

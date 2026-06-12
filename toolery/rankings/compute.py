@@ -403,6 +403,7 @@ def collapse_matrix_rows(matrix: list[dict], mode: str = "pair") -> list[dict]:
                 / sum(1 for r in rows if k in r.get("perf", {}))
                 for k in perf_keys
             }
+            pcs = [r["pass_counts"] for r in rows if r.get("pass_counts")]
             out.append({
                 "model": model,
                 "adapter": "mean",
@@ -413,6 +414,12 @@ def collapse_matrix_rows(matrix: list[dict], mode: str = "pair") -> list[dict]:
                 "perf": perf,
                 "scenarios_hashes": set().union(*(r.get("scenarios_hashes") or set() for r in rows)),
                 "stability": _merge_stability(rows),
+                # Adapters merged → sum each adapter's latest-run counts.
+                "pass_counts": (
+                    {"passed": sum(p["passed"] for p in pcs),
+                     "total": sum(p["total"] for p in pcs)}
+                    if pcs else None
+                ),
                 "ranking_mode": mode,
             })
         return out
@@ -480,6 +487,11 @@ def compute_matrix(
     pairs: dict[tuple[str, str, str | None], dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
     # (model, adapter, cluster) -> set of scenarios_hashes seen
     pair_hashes: dict[tuple[str, str, str | None], set[str]] = defaultdict(set)
+    # (model, adapter, cluster) -> run_id -> {"passed", "total", "started_at"}.
+    # Feeds the "Passed x/N" column: raw trial counts from the pair's MOST
+    # RECENT run only — a single run's fraction (e.g. 512/715) is meaningful,
+    # a decay-blend across 5 runs is not.
+    pair_run_counts: dict[tuple[str, str, str | None], dict[str, dict]] = defaultdict(dict)
     for r in all_results:
         meta = run_meta.get(r["run_id"])
         if not meta:
@@ -492,6 +504,12 @@ def compute_matrix(
         sh = meta.get("scenarios_hash") or ""
         if sh:
             pair_hashes[key].add(sh)
+        rc = pair_run_counts[key].setdefault(
+            r["run_id"], {"passed": 0, "total": 0, "started_at": meta["started_at"]}
+        )
+        rc["total"] += 1
+        if (r.get("status") or "") == "pass":
+            rc["passed"] += 1
         for dim in dimensions:
             if dim != "overall" and dim not in dims_for_r:
                 continue
@@ -562,10 +580,16 @@ def compute_matrix(
                 if uc_decay_pairs:
                     scores["use_case"] = decay_weighted_mean(uc_decay_pairs, half_life_days)
         if scores:
+            run_counts = pair_run_counts.get((model, adapter, cluster), {})
+            latest = max(run_counts.values(), key=lambda rc: rc["started_at"]) if run_counts else None
             matrix.append({
                 "model": model, "adapter": adapter, "cluster": cluster,
                 "runs": total_runs, "scores": scores,
                 "stability": stability,
                 "scenarios_hashes": pair_hashes[(model, adapter, cluster)],
+                "pass_counts": (
+                    {"passed": latest["passed"], "total": latest["total"]}
+                    if latest else None
+                ),
             })
     return matrix
