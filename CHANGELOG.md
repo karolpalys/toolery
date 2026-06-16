@@ -6,6 +6,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-16
+
+### Added
+- Rankings tab: the rank (`#`) and `Model` columns are now frozen — they stay
+  pinned and visible while the wide matrix scrolls horizontally (`Adapter` and
+  everything to its right still scroll).
+- Scenarios tab: English **Difficulty** and **Category** filter dropdowns that
+  narrow the scenario picker, plus a Task-panel metadata header showing the
+  live (empirically re-tiered) difficulty, category and tags. The picker is now
+  ordered by current tier instead of legacy folder order, so difficulties no
+  longer look jumbled.
+
+### Fixed
+- Rankings tab: horizontal scroll no longer snaps back to the leftmost column on
+  the 5s poll — columns are built once and only the rows refresh.
+- Rankings tab: the 5s poll no longer rebuilds the table on nearly every tick.
+  The change-detection signature now keys on discrete data signals (run count,
+  most-recent-run pass counts, non-decayed perf, cluster, stale flag) instead of
+  the continuously time-decayed score floats, eliminating the periodic jitter.
+- Rankings tab: the selected row's highlight is preserved across a genuine
+  rebuild (rows carry a stable `model|adapter|cluster` key) instead of snapping
+  back to the top row.
+- Rankings tab: the frozen columns now show the normal per-row zebra striping
+  instead of a flat blue (`datatable--fixed`) highlight.
+
 ## [0.4.0] - 2026-06-12
 
 ### Added
