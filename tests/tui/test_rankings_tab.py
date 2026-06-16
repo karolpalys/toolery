@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Static
+from textual.widgets import DataTable, Static
 
+from toolery.core.models import Message, ScenarioResult, TraceResult
 from toolery.core.store import Store
 from toolery.tui.rankings_tab import (
     _HEADERS,
@@ -11,6 +14,29 @@ from toolery.tui.rankings_tab import (
     _PERF_HEADERS,
     RankingsTab,
 )
+
+
+def _trace(sid, adapter):
+    return TraceResult(scenario_id=sid, adapter=adapter, trial_index=0,
+        messages=[Message(role="user", content="hi")], tool_calls=[],
+        final_response="ok", started_at_iso="2026-05-01T00:00:00Z",
+        duration_ms=10, error=None)
+
+
+def _seed(store, run_id, model, adapter, cluster, scores):
+    store.create_run(run_id=run_id, model=model, base_url="x",
+        started_at=datetime.now(UTC).isoformat(), config_json="{}",
+        scenarios_hash="h", cluster=cluster)
+    store.upsert_adapter(run_id, adapter, "0.1")
+    for i, s in enumerate(scores):
+        sid = f"easy-{i:02d}-test"
+        r = ScenarioResult(scenario_id=sid, adapter=adapter, trial_index=0,
+            status="pass" if s > 0.5 else "fail", score=s, call_count=1,
+            budget_max=1, latency_ms=10, failure_kind=None, checks=[], trace=_trace(sid, adapter))
+        store.write_scenario_result(run_id=run_id, result=r, tags=[],
+            ranking_dims=["overall"], scenario_hash="h", category="coding",
+            tier="easy", trace_path="x.json")
+    store.finish_run(run_id, datetime.now(UTC).isoformat(), 1.0)
 
 
 def test_legend_documents_every_table_column():
@@ -76,3 +102,45 @@ async def test_rankings_tab_renders_table_and_legend(tmp_path, monkeypatch):
         assert "Calibrated uncertainty" in text
         # The legend now documents every column, Overall included.
         assert "Overall" in text
+
+
+@pytest.mark.asyncio
+async def test_meta_columns_are_frozen(tmp_path, monkeypatch):
+    """The first two columns (# rank, Model) stay pinned while the rest of the
+    wide matrix scrolls horizontally, so the user never loses row identity."""
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path))
+    Store(tmp_path / "runs.db").init_schema()
+    app = _Host()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        tbl = app.query_one("#rank-matrix", DataTable)
+        # Adapter (3rd column) is intentionally left scrollable.
+        assert tbl.fixed_columns == 2
+
+
+@pytest.mark.asyncio
+async def test_horizontal_scroll_survives_reload(tmp_path, monkeypatch):
+    """The 5s poll occasionally flips the render signature (time-decay drift)
+    and triggers a rebuild. That rebuild must NOT yank the user's horizontal
+    scroll back to the leftmost column."""
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path))
+    store = Store(tmp_path / "runs.db")
+    store.init_schema()
+    _seed(store, "r1", "mymodel", "raw", "dual", [1.0, 0.0, 1.0])
+    app = _Host()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        tab = app.query_one(RankingsTab)
+        tbl = app.query_one("#rank-matrix", DataTable)
+        # The matrix is far wider than the 120-col viewport, so it scrolls.
+        assert tbl.virtual_size.width > tbl.size.width
+        tbl.scroll_to(x=30, y=0, animate=False)
+        await pilot.pause()
+        target = tbl.scroll_x
+        assert target > 0
+        # Force the data-changed rebuild path (what the periodic signature
+        # flip hits) and confirm the horizontal offset is preserved.
+        tab._last_render_sig = None
+        tab.reload()
+        await pilot.pause()
+        assert tbl.scroll_x == pytest.approx(target, abs=1.0)

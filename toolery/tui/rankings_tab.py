@@ -394,6 +394,10 @@ class RankingsTab(Container):
                 cursor_type="row",
                 header_height=2,
                 cell_padding=2,
+                # Pin the first two columns (# rank, Model) so the row identity
+                # stays visible while the wide matrix scrolls horizontally.
+                # Adapter (3rd col) intentionally stays scrollable.
+                fixed_columns=2,
             )
         with VerticalScroll(id="legend-section"):
             yield Static(self._legend_body(), id="rank-legend-body")
@@ -488,10 +492,26 @@ class RankingsTab(Container):
             return
         self._last_render_sig = sig
 
-        tbl.clear(columns=True)
-        # Re-register columns + sort accessors. Sort accessors are pure
-        # functions over a row dict — independent of current data — so
-        # rebuilding them here (only when data actually changed) is fine.
+        # Columns are structurally static — only row data changes between polls.
+        # Building them once (and refreshing rows via _populate_rows, which
+        # preserves the user's scroll) avoids clear(columns=True), the call that
+        # reset horizontal scroll every time the signature flipped.
+        self._ensure_columns(tbl)
+        self._populate_rows()
+        self._update_mode_buttons()
+        self._update_sparks_buttons()
+        self._refresh_summary()
+
+    def _ensure_columns(self, tbl: DataTable) -> None:
+        """Register columns + sort accessors once. No-op if already built.
+
+        Columns never change shape across the 5s poll, so they are torn down
+        only in the empty / no-DB branches of reload() (via clear(columns=True));
+        this rebuilds them when data first appears or after recovering from
+        empty. Sort accessors are pure functions over a row dict, independent of
+        current data, so registering them alongside the columns is fine."""
+        if tbl.columns:
+            return
         for key, header in [("rank", "#"), ("model", "Model"), ("adapter", "Adapter")]:
             tbl.add_column(header, key=key)
         for dim in _DIMENSIONS:
@@ -527,10 +547,6 @@ class RankingsTab(Container):
             self._sort_keys[f"perf:{p}"] = lambda r, p=p: -(r["perf"].get(p, -1.0))
         for s in _STABILITY_COLS:
             self._sort_keys[f"stab:{s}"] = lambda r, s=s: -(r.get("stability", {}).get("overall", {}).get(s) or -1.0)
-        self._populate_rows()
-        self._update_mode_buttons()
-        self._update_sparks_buttons()
-        self._refresh_summary()
 
     def _refresh_summary(self) -> None:
         try:
