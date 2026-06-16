@@ -13,6 +13,32 @@ from toolery.core.scenario import load_all_scenarios
 from toolery.core.store import Store
 from toolery.rankings.compute import collapse_matrix_rows, compute_matrix
 
+
+class _ZebraFixedDataTable(DataTable):
+    """DataTable whose frozen (fixed) columns keep the normal per-row zebra
+    striping instead of Textual's flat ``datatable--fixed`` highlight.
+
+    By default fixed columns are painted with a single ``datatable--fixed``
+    style (a $secondary-muted block — it reads as a blue stripe on the first
+    columns). We want the pinned columns to be visually identical to the
+    scrollable ones, so for data-row cells in a fixed column we substitute the
+    per-row zebra style that the scrollable cells already use.
+    """
+
+    def _effective_base_style(self, row_index: int, column_index: int, base_style):
+        # Header (row_index == -1) and fixed rows keep their own styling; only
+        # data-row cells inside a fixed COLUMN get swapped to the zebra style.
+        if row_index >= self.fixed_rows and 0 <= column_index < self.fixed_columns:
+            return self._get_row_style(row_index, base_style)
+        return base_style
+
+    def _render_cell(self, row_index, column_index, base_style, width,
+                     cursor=False, hover=False):
+        base_style = self._effective_base_style(row_index, column_index, base_style)
+        return super()._render_cell(row_index, column_index, base_style, width,
+                                    cursor=cursor, hover=hover)
+
+
 _RANKING_MODES = [
     ("model_best", "Model best", "best adapter per model"),
     ("pair", "Model+adapter", "one row per adapter"),
@@ -388,7 +414,7 @@ class RankingsTab(Container):
                 yield Button(label, id=f"sparks-filter-{key}", classes="sparks-filter")
         with Vertical(id="matrix-section"):
             yield Static("", id="rank-summary")
-            yield DataTable(
+            yield _ZebraFixedDataTable(
                 id="rank-matrix",
                 zebra_stripes=True,
                 cursor_type="row",

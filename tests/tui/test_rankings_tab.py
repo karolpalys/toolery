@@ -119,6 +119,29 @@ async def test_meta_columns_are_frozen(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_frozen_columns_keep_zebra_not_flat_fixed(tmp_path, monkeypatch):
+    """Pinned columns must look like the rest of the table: the per-row zebra
+    stripe, NOT Textual's flat `datatable--fixed` highlight (which read as a
+    blue block on the first two columns)."""
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path))
+    Store(tmp_path / "runs.db").init_schema()
+    app = _Host()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        tbl = app.query_one("#rank-matrix", DataTable)
+        flat_fixed = tbl.get_component_styles("datatable--fixed").rich_style
+        for ri in (0, 1):  # an even-row and an odd-row index
+            zebra = tbl._get_row_style(ri, flat_fixed)
+            # Fixed columns (#=0, Model=1) render with the per-row zebra style…
+            assert tbl._effective_base_style(ri, 0, flat_fixed) == zebra
+            assert tbl._effective_base_style(ri, 1, flat_fixed) == zebra
+            # …scrollable columns are untouched.
+            assert tbl._effective_base_style(ri, 5, zebra) == zebra
+        # The frozen columns are no longer the flat (blue) fixed highlight.
+        assert tbl._effective_base_style(0, 0, flat_fixed) != flat_fixed
+
+
+@pytest.mark.asyncio
 async def test_horizontal_scroll_survives_reload(tmp_path, monkeypatch):
     """The 5s poll occasionally flips the render signature (time-decay drift)
     and triggers a rebuild. That rebuild must NOT yank the user's horizontal
