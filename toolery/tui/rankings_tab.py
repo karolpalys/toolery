@@ -455,19 +455,31 @@ class RankingsTab(Container):
         self.reload()
 
     @staticmethod
-    def _signature_for_row(r: dict) -> tuple:
-        """Capture rendered fields only — used to detect 'nothing changed'.
+    def _row_key(r: dict) -> str:
+        """Stable identity for a matrix row — used as the DataTable row key so
+        the cursor/selection can follow the same (model, adapter, cluster)
+        across a rebuild even when the sort order changes."""
+        return f"{r.get('model')}\x1f{r.get('adapter')}\x1f{r.get('cluster')}"
 
-        Float values are rounded to display precision so the continuous
-        time-decay drift in scores doesn't make every poll look 'changed'
-        (see _round_items)."""
+    @staticmethod
+    def _signature_for_row(r: dict) -> tuple:
+        """Discrete 'has anything actually changed' fingerprint for the 5s poll.
+
+        Deliberately EXCLUDES the time-decayed score/stability floats. Those
+        drift by ~1e-6 every poll, so including them — even rounded to display
+        precision — made ~2 cells cross a rounding boundary every single tick
+        across the full matrix, flipping the signature and forcing a rebuild on
+        nearly every poll. Each rebuild reset the row cursor and made the table
+        jitter. Real data changes surface in DISCRETE fields instead: a new run
+        bumps ``runs`` and the most-recent-run ``pass_counts``; ``perf`` is a
+        plain (non-decayed) mean so it only moves when a fresh bench lands; the
+        score-key set catches a new dimension appearing."""
         return (
-            r.get("model"), r.get("adapter"),
-            _round_items(r.get("scores")),
-            _round_items(r.get("perf")),
-            _round_items(r.get("stability", {}).get("overall")),
+            r.get("model"), r.get("adapter"), r.get("cluster"),
+            r.get("runs"), bool(r.get("stale")),
             _round_items(r.get("pass_counts")),
-            r.get("runs"), bool(r.get("stale")), r.get("cluster"),
+            _round_items(r.get("perf"), 1),
+            tuple(sorted((r.get("scores") or {}).keys())),
         )
 
     # -- data loading --
@@ -623,10 +635,18 @@ class RankingsTab(Container):
     def _populate_rows(self) -> None:
         """Re-sort + re-render. Reads self._rows_cache + self._sort_by/_desc."""
         tbl = self.query_one("#rank-matrix", DataTable)
-        # clear() resets scroll to the origin. Capture the current offset so we
-        # can restore it after re-adding rows — otherwise the poll/re-sort yanks
-        # the user back to the leftmost column mid-scroll.
+        # clear() resets scroll AND the row cursor to the origin. Capture both
+        # so we can restore them after re-adding rows — otherwise the poll/
+        # re-sort yanks the user back to the top-left and drops their selection.
         prev_x, prev_y = tbl.scroll_x, tbl.scroll_y
+        prev_cursor_key: str | None = None
+        if tbl.row_count:
+            try:
+                prev_cursor_key = tbl.coordinate_to_cell_key(
+                    tbl.cursor_coordinate
+                ).row_key.value
+            except Exception:
+                prev_cursor_key = None
         # Clear data rows only — keep columns.
         tbl.clear()
         rows = list(self._rows_cache)
@@ -661,6 +681,7 @@ class RankingsTab(Container):
             for i, rank in _podium_with_ties(scored, lambda v: round(v, 1)).items():
                 podium_perf[(i, p)] = rank
 
+        seen_keys: set[str] = set()
         for i, r in enumerate(rows):
             cells: list[Text] = [
                 _meta_cell(str(i + 1)),
@@ -697,8 +718,27 @@ class RankingsTab(Container):
                 cells.append(Text("• single", style="bold"))
             else:
                 cells.append(Text("—", style="bold dim"))
+            # Stable per-row key so the cursor can be restored by identity.
+            # Guard against an (unexpected) identity collision so the 5s poll
+            # can never crash on a duplicate key.
+            key = self._row_key(r)
+            if key in seen_keys:
+                key = f"{key}\x1f{i}"
+            seen_keys.add(key)
             # height=2 → ≈1.5× visual size in the terminal.
-            tbl.add_row(*cells, height=2)
+            tbl.add_row(*cells, height=2, key=key)
+
+        # Restore the row selection by identity (no autoscroll — the scroll
+        # offset is restored separately below), so the highlight follows the
+        # same model across a rebuild instead of snapping to the top row.
+        if prev_cursor_key is not None:
+            try:
+                tbl.move_cursor(
+                    row=tbl.get_row_index(prev_cursor_key),
+                    animate=False, scroll=False,
+                )
+            except Exception:
+                pass
 
         # Restore the pre-clear scroll offset once the new virtual size is laid
         # out (clamped to the new bounds). Without the after-refresh defer the

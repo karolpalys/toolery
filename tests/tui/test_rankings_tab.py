@@ -54,29 +54,40 @@ def test_legend_documents_every_table_column():
     assert {"#", "Model", "Adapter"} <= legend_set
 
 
-def test_render_signature_ignores_decay_drift():
-    """Scores are time-decayed, so a pair's float drifts by ~1e-6 every poll.
-
-    Regression: that micro-drift must NOT change the render signature, or the
-    5s poll rebuilds the table every tick and resets the user's horizontal
-    scroll. A user-visible change (>= display precision) still must differ.
-    """
+def test_render_signature_ignores_score_drift_tracks_real_changes():
+    """The render signature must NOT move on time-decay drift of the score
+    floats — including those (even rounded) made ~2 cells cross a rounding
+    boundary per 5s tick, rebuilding the table every poll and killing the row
+    selection. Real data changes (a new run) surface in discrete fields."""
     base = {
         "model": "m", "adapter": "raw", "runs": 3,
         "stale": False, "cluster": "dual",
         "scores": {"overall": 0.523456, "coding": 0.811111},
         "perf": {"tg_tps": 1234.5},
         "stability": {"overall": {"mean": 0.5, "worst": 0.4}},
-    }
-    drifted = {
-        **base,
-        "scores": {"overall": 0.523457, "coding": 0.811112},  # +1e-6
+        "pass_counts": {"passed": 100, "total": 143},
     }
     sig_base = RankingsTab._signature_for_row(base)
+
+    # Pure decay micro-drift — signature unchanged.
+    drifted = {**base, "scores": {"overall": 0.523457, "coding": 0.811112}}
     assert RankingsTab._signature_for_row(drifted) == sig_base
 
-    visible = {**base, "scores": {"overall": 0.530000, "coding": 0.811111}}
-    assert RankingsTab._signature_for_row(visible) != sig_base
+    # Even a display-visible score move alone is decay/cosmetic and must NOT
+    # trigger a rebuild — only discrete new-data signals do.
+    visible = {**base, "scores": {"overall": 0.990000, "coding": 0.100000}}
+    assert RankingsTab._signature_for_row(visible) == sig_base
+
+    # A new run bumps the run count → signature changes.
+    assert RankingsTab._signature_for_row({**base, "runs": 4}) != sig_base
+    # The most-recent-run pass tally changing → signature changes.
+    assert RankingsTab._signature_for_row(
+        {**base, "pass_counts": {"passed": 101, "total": 143}}
+    ) != sig_base
+    # A fresh perf bench (non-decayed mean) → signature changes.
+    assert RankingsTab._signature_for_row(
+        {**base, "perf": {"tg_tps": 1300.0}}
+    ) != sig_base
 
 
 class _Host(App):
@@ -116,6 +127,34 @@ async def test_meta_columns_are_frozen(tmp_path, monkeypatch):
         tbl = app.query_one("#rank-matrix", DataTable)
         # Adapter (3rd column) is intentionally left scrollable.
         assert tbl.fixed_columns == 2
+
+
+@pytest.mark.asyncio
+async def test_row_selection_survives_reload(tmp_path, monkeypatch):
+    """Selecting a model's row and then a 5s poll rebuild must keep the
+    highlight on the SAME model, not snap back to the top row."""
+    monkeypatch.setenv("TOOLERY_RESULTS_DIR", str(tmp_path))
+    store = Store(tmp_path / "runs.db")
+    store.init_schema()
+    _seed(store, "ra", "alpha", "raw", "dual", [1.0, 1.0, 1.0])
+    _seed(store, "rb", "bravo", "raw", "dual", [1.0, 0.0, 1.0])
+    _seed(store, "rc", "charlie", "raw", "dual", [0.0, 0.0, 1.0])
+    app = _Host()
+    async with app.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        tab = app.query_one(RankingsTab)
+        tbl = app.query_one("#rank-matrix", DataTable)
+        assert tbl.row_count >= 3
+        tbl.move_cursor(row=2, animate=False)
+        await pilot.pause()
+        before = tbl.coordinate_to_cell_key(tbl.cursor_coordinate).row_key.value
+        # Force the rebuild path a real new run would take.
+        tab._last_render_sig = None
+        tab.reload()
+        await pilot.pause()
+        after = tbl.coordinate_to_cell_key(tbl.cursor_coordinate).row_key.value
+        assert tbl.cursor_row == 2, "cursor must not snap back to the top row"
+        assert after == before, "selection must follow the same model identity"
 
 
 @pytest.mark.asyncio
