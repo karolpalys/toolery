@@ -6,12 +6,31 @@ from collections import defaultdict
 from pathlib import Path
 
 from rich.text import Text
-from textual.containers import Container, Vertical, VerticalScroll
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.widgets import DataTable, Select, Static
 
-from toolery.core.models import Scenario
+from toolery.core.models import Category, Scenario, Tier
 from toolery.core.scenario import display_name, load_all_scenarios
 from toolery.core.store import Store
+
+# Difficulty ordering for the picker — empirical tier is the single source of
+# truth (scenario id prefixes are stale after re-tiering, so they are ignored).
+_TIER_ORDER = {"easy": 0, "medium": 1, "hard": 2, "very_hard": 3}
+
+
+def _humanize(value: str) -> str:
+    """snake_case enum value → English label, e.g. 'very_hard' → 'Very hard'."""
+    return value.replace("_", " ").capitalize()
+
+
+def _difficulty_options() -> list[tuple[str, str]]:
+    """(label, value) pairs for the difficulty filter, 'all' first."""
+    return [("All difficulties", "all")] + [(_humanize(t.value), t.value) for t in Tier]
+
+
+def _category_options() -> list[tuple[str, str]]:
+    """(label, value) pairs for the category filter, 'all' first."""
+    return [("All categories", "all")] + [(_humanize(c.value), c.value) for c in Category]
 
 
 class ScenariosTab(Container):
@@ -35,6 +54,16 @@ class ScenariosTab(Container):
         text-style: bold;
         color: $primary;
         margin-bottom: 1;
+    }
+
+    ScenariosTab #sc-filters {
+        height: auto;
+        margin-bottom: 1;
+    }
+
+    ScenariosTab #sc-filters Select {
+        width: 1fr;
+        margin-right: 1;
     }
 
     ScenariosTab #sc-pick {
@@ -67,6 +96,15 @@ class ScenariosTab(Container):
     def compose(self):
         with Vertical(id="scenario-browser"):
             yield Static("Per-scenario cross-model view", id="sc-heading")
+            with Horizontal(id="sc-filters"):
+                yield Select(
+                    _difficulty_options(), id="sc-filter-difficulty",
+                    value="all", allow_blank=False,
+                )
+                yield Select(
+                    _category_options(), id="sc-filter-category",
+                    value="all", allow_blank=False,
+                )
             yield Select(options=[], id="sc-pick")
             with VerticalScroll(id="sc-task"):
                 yield Static("", id="sc-task-body")
@@ -79,38 +117,90 @@ class ScenariosTab(Container):
             self.query_one("#sc-task").border_title = "Task"
         except Exception:
             pass
-        sel = self.query_one("#sc-pick", Select)
         try:
             scenarios = load_all_scenarios(Path("scenarios"))
         except FileNotFoundError:
             scenarios = []
         self._scenarios = {s.id: s for s in scenarios}
-        options = [(f"{s.tier.value} · {display_name(s.id)}", s.id) for s in scenarios]
-        sel.set_options(options)
-        if options:
-            sel.value = options[0][1]
-            self._render_scenario(options[0][1])
+        # Build the picker from the (default 'all'/'all') filters — also selects
+        # the first scenario and renders it.
+        self._apply_filters()
 
     def on_select_changed(self, event) -> None:
-        if event.select.id == "sc-pick" and event.value:
+        sid = event.select.id
+        if sid in ("sc-filter-difficulty", "sc-filter-category"):
+            self._apply_filters()
+        elif sid == "sc-pick" and isinstance(event.value, str):
+            # set_options() momentarily resets the picker to its blank sentinel
+            # and posts a Changed for it; only real (str) ids should render.
             self._render_scenario(event.value)
 
-    def _render_task(self, scenario_id: str) -> None:
+    # -- filtering --
+    def _filtered_sorted_scenarios(self, difficulty: str, category: str) -> list[Scenario]:
+        """Scenarios matching both filters ('all' = no constraint), sorted by
+        current tier (easy→very_hard) then display name. Tier is the live,
+        re-tiered value — the stale id prefix is never consulted."""
+        rows = list(self._scenarios.values())
+        if difficulty != "all":
+            rows = [s for s in rows if s.tier.value == difficulty]
+        if category != "all":
+            rows = [s for s in rows if s.category.value == category]
+        rows.sort(key=lambda s: (_TIER_ORDER.get(s.tier.value, 99), display_name(s.id)))
+        return rows
+
+    def _apply_filters(self) -> None:
+        diff = self.query_one("#sc-filter-difficulty", Select).value
+        cat = self.query_one("#sc-filter-category", Select).value
+        rows = self._filtered_sorted_scenarios(diff, cat)
+        pick = self.query_one("#sc-pick", Select)
+        prev = pick.value if isinstance(pick.value, str) else None
+        options = [(f"{s.tier.value} · {display_name(s.id)}", s.id) for s in rows]
+        pick.set_options(options)
+        if not options:
+            self._render_empty()
+            return
+        ids = [s.id for s in rows]
+        chosen = prev if prev in ids else options[0][1]
+        pick.value = chosen
+        self._render_scenario(chosen)
+
+    def _render_empty(self) -> None:
+        self.query_one("#sc-task-body", Static).update(
+            Text("No scenarios match the current filters.", style="dim italic")
+        )
+        tbl = self.query_one("#sc-table", DataTable)
+        tbl.clear(columns=True)
+        self.query_one("#sc-stats", Static).update("")
+
+    # -- rendering --
+    def _task_text(self, scenario_id: str) -> Text:
+        """Build the Task panel renderable: live difficulty/category/tags
+        metadata, then the scenario's title/description/prompts."""
         sc = self._scenarios.get(scenario_id)
         body = Text()
         if sc is None:
             body.append("Scenario definition not found.", style="dim")
-        else:
-            body.append(f"{sc.title}\n", style="bold")
-            if sc.description:
-                body.append(f"{sc.description}\n", style="dim")
-            body.append("\n")
-            if sc.system_prompt:
-                body.append("System prompt\n", style="bold cyan")
-                body.append(f"{sc.system_prompt}\n\n")
-            body.append("Prompt\n", style="bold cyan")
-            body.append(sc.prompt)
-        self.query_one("#sc-task-body", Static).update(body)
+            return body
+        body.append("Difficulty: ", style="bold")
+        body.append(_humanize(sc.tier.value), style="bold yellow")
+        body.append("      Category: ", style="bold")
+        body.append(_humanize(sc.category.value), style="bold cyan")
+        body.append("\nTags: ", style="bold")
+        body.append(" · ".join(sc.tags) if sc.tags else "—", style="dim")
+        body.append("\n\n")
+        body.append(f"{sc.title}\n", style="bold")
+        if sc.description:
+            body.append(f"{sc.description}\n", style="dim")
+        body.append("\n")
+        if sc.system_prompt:
+            body.append("System prompt\n", style="bold cyan")
+            body.append(f"{sc.system_prompt}\n\n")
+        body.append("Prompt\n", style="bold cyan")
+        body.append(sc.prompt)
+        return body
+
+    def _render_task(self, scenario_id: str) -> None:
+        self.query_one("#sc-task-body", Static).update(self._task_text(scenario_id))
 
     def _render_scenario(self, scenario_id: str) -> None:
         self._render_task(scenario_id)
