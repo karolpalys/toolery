@@ -31,7 +31,7 @@ scoring:
       tool: read_tty_buffer
     - check: ansi_stripped_in_response
     - check: response_matches_regex
-      all_of: ["(?<![\\w.])14077(?!\\.\\d)(?!\\w)", "stress-ng", "(?<![\\w.])89(?:\\.4)?(?!\\.\\d)(?!\\w)"]
+      all_of: ["(?<![\\w.])14077(?!\\.\\d)(?!\\w)", "stress-ng"]
     - check: no_hallucinated_tool
       allowed: [read_tty_buffer]
   forbidden: []

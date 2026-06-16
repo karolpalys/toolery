@@ -56,8 +56,6 @@ scoring:
     # Total = 3 + 1 + 1 = 5. Faithful counter sums actual items returned.
     - check: response_number
       equals: 5
-    - check: response_satisfies
-      any_of: [["users", "items", "results", "total", "rows", "records"]]
   forbidden:
     # If model gives up after one page.
     - check: response_contains

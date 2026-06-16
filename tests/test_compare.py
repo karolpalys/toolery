@@ -46,4 +46,7 @@ def test_compare_runs_writes_md(tmp_path):
     compare_runs(store=store, run_a="A", run_b="B", out_path=out)
     md = out.read_text()
     assert "A" in md and "B" in md
-    assert "hard-01-x" in md
+    # Scenario ids render with the historical tier prefix stripped (display_name);
+    # the tier column is the source of truth for difficulty. "hard-01-x" -> "01-x".
+    assert "01-x" in md
+    assert "hard-01-x" not in md

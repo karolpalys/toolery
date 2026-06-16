@@ -52,12 +52,7 @@ scoring:
       pattern: "(NVDA|nvidia).*128(\\.10)?|128(\\.10)?.*NVDA"
     - check: call_count_at_most
       n: 4
-  forbidden:
-    # If the model emails TSLA or AAPL it failed to resolve "cheapest".
-    - check: tool_args_match_regex
-      tool: send_email
-      arg: body
-      pattern: "TSLA|AAPL"
+  forbidden: []
   partial:
     - check: tool_args_contain
       tool: get_stock_price

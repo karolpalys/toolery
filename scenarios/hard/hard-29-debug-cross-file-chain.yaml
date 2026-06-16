@@ -69,7 +69,7 @@ scoring:
         - "cache\\.py:14\\s+is\\s+the\\s+bug"
     - check: response_satisfies
       any_of:
-        - ["line 6", "get_ttl", "return None", "default"]
+        - ["line 6", "config.py:6", "get_ttl", "return None", "default"]
   forbidden:
     - check: response_contains
       patterns: ["cache.py:14 is the root cause"]
@@ -79,7 +79,7 @@ scoring:
         - ["config.py:6", "line 6", "get_ttl"]
     - check: response_satisfies
       any_of:
-        - ["default", "60", "fallback"]
+        - ["default", "60", "fallback", "config.py:6"]
     - check: call_count_at_most
       n: 5
   weights:

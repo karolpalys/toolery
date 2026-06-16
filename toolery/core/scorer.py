@@ -318,12 +318,16 @@ def check_response_not_contains(calls, chk, response):
 def check_response_matches_schema(calls, chk, response):
     if response is None:
         return _bad("response_matches_schema", "no response")
-    schema = chk.model_dump()["schema"]
+    d = chk.model_dump()
+    schema = d["schema"]
     payload = unwrap_structured_payload(response)
     try:
         data = json.loads(payload)
     except json.JSONDecodeError as e:
         return _bad("response_matches_schema", f"not valid JSON: {e}")
+    unwrap_key = d.get("unwrap_key")
+    if unwrap_key is not None and isinstance(data, dict) and set(data) == {unwrap_key}:
+        data = data[unwrap_key]
     try:
         jsonschema.validate(data, schema)
         return _ok("response_matches_schema", "schema satisfied")

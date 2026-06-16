@@ -31,10 +31,19 @@ tool_responses:
       returns: { ok: true, message_id: "m-1" }
 scoring:
   required:
+    - check: tool_called
+      tool: send_email
+    - check: tool_args_match_regex
+      tool: send_email
+      arg: to
+      pattern: 'bob@company\.com'
+    - check: tool_args_match_regex
+      tool: send_email
+      arg: body
+      pattern: '(?i)meeting.*(?:4pm|4 pm|16:00)|(?:4pm|4 pm|16:00).*meeting'
     - check: response_satisfies
       all_of: ["bob"]
       any_of:
-        - ["meeting", "moved", "4pm", "4 pm", "16:00", "reschedul"]
         - ["sent", "send", "email", "message"]
       none_of: ["an error", "error:", "couldn't send", "could not send"]
   forbidden:

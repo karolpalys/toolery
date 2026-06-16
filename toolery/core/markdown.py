@@ -7,9 +7,15 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from toolery.core.models import ScenarioResult
+from toolery.core.scenario import display_name
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 _env = Environment(loader=FileSystemLoader(_TEMPLATES_DIR), autoescape=select_autoescape())
+# Strip the historical tier prefix from scenario ids in all rendered markdown
+# (summary / scenario / compare). The tier column is the source of truth for
+# difficulty; the raw prefix would read as a contradiction next to it. The id
+# itself stays unchanged as a stable key — only presentation drops the prefix.
+_env.filters["display_name"] = display_name
 
 
 def _pct(x: float) -> str:

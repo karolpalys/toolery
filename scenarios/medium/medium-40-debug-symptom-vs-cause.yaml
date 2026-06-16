@@ -32,6 +32,17 @@ tool_responses:
         2026-05-28T09:00:14 INFO  Request POST /orders
         2026-05-28T09:00:14 ERROR TypeError: 'NoneType' object is not subscriptable
           at handlers/orders.py:31 -> config['db_url']
+    - match: { path: "log.txt" }
+      returns: |
+        2026-05-28T09:00:01 INFO  Starting service
+        2026-05-28T09:00:01 INFO  Loading config from /etc/app/config.yaml
+        2026-05-28T09:00:01 ERROR Config load failed: PermissionError /etc/app/config.yaml
+        2026-05-28T09:00:01 WARN  Continuing with config=None
+        2026-05-28T09:00:02 INFO  Server listening on :8080
+        2026-05-28T09:00:14 INFO  Request GET /healthz
+        2026-05-28T09:00:14 INFO  Request POST /orders
+        2026-05-28T09:00:14 ERROR TypeError: 'NoneType' object is not subscriptable
+          at handlers/orders.py:31 -> config['db_url']
     - match: any
       returns: { error: "not found" }
 scoring:

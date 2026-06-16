@@ -135,6 +135,21 @@ def test_response_matches_schema_pass():
     assert check_response_matches_schema([], chk, '{"temp": 7}').result == "pass"
 
 
+
+def test_response_matches_schema_unwrap_key():
+    chk = ScoringCheck.model_validate({
+        "check": "response_matches_schema",
+        "unwrap_key": "customer_profile",
+        "schema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {"id": {"type": "integer", "const": 42}},
+        },
+    })
+    from toolery.core.scorer import check_response_matches_schema
+    assert check_response_matches_schema([], chk, '{"customer_profile":{"id":42}}').result == "pass"
+
+
 def test_response_language_pl():
     chk = ScoringCheck.model_validate({"check": "response_language", "language": "pl"})
     from toolery.core.scorer import check_response_language

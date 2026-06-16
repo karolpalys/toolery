@@ -6,7 +6,8 @@ domain: dev_ops
 description: |
   Rename function compute_total → calculate_total across all CODE files
   (not docs/CHANGELOG.md). Use grep to find call sites, then edit_file for each.
-  Budget 8 — model must skip the CHANGELOG match (distractor).
+  Budget 9 — allows one verification grep while still requiring the CHANGELOG
+  distractor to be skipped.
 tags: [coding, refactor, multi_file, distractor]
 ranking_dimensions: [overall, coding, agentic, budget_efficiency]
 prompt: |
@@ -15,7 +16,7 @@ prompt: |
   even if grep finds the old name there.
 tools: [grep, read_file, edit_file, list_files]
 budget:
-  max_tool_calls: 8
+  max_tool_calls: 9
   max_turns: 6
   timeout_seconds: 120
 tool_responses:
@@ -90,14 +91,14 @@ scoring:
       pattern: "CHANGELOG"
   partial:
     - check: call_count_at_most
-      n: 7
+      n: 9
     - check: tool_args_match_regex
       tool: edit_file
       arg: path
       pattern: "src/core/billing\\.py|src/api/handlers\\.py|src/cli\\.py|tests/test_billing\\.py"
     - check: tool_args_match_regex
       tool: edit_file
-      arg: content
+      arg: replace
       pattern: "calculate_total"
   weights:
     pass: 1.0

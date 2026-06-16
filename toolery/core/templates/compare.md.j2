@@ -13,12 +13,12 @@
 
 ## Regressions (B → A worse)
 {% for r in regressions -%}
-- ✗ {{ r.scenario_id }}: {{ r.b_pass }}/{{ r.b_total }} → {{ r.a_pass }}/{{ r.a_total }}
+- ✗ {{ r.scenario_id | display_name }}: {{ r.b_pass }}/{{ r.b_total }} → {{ r.a_pass }}/{{ r.a_total }}
 {% endfor %}
 
 ## Improvements (B → A better)
 {% for r in improvements -%}
-- ✓ {{ r.scenario_id }}: {{ r.b_pass }}/{{ r.b_total }} → {{ r.a_pass }}/{{ r.a_total }}
+- ✓ {{ r.scenario_id | display_name }}: {{ r.b_pass }}/{{ r.b_total }} → {{ r.a_pass }}/{{ r.a_total }}
 {% endfor %}
 
 ## Identical scenarios (no change)

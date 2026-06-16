@@ -4,7 +4,7 @@ adapters:
     base_url_env: TOOLERY_BASE_URL
     api_key_env: OPENAI_API_KEY
     request_timeout: 60
-    max_concurrent: 4
+    max_concurrent: 1
   hermes:
     enabled: false
     gateway_url: http://localhost:8642

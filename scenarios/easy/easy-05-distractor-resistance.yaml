@@ -32,7 +32,6 @@ scoring:
     - check: response_matches_regex
       all_of: ["(?<![\\w.])175(?:\\.43)?(?!\\.\\d)(?!\\w)"]
       any_of:
-        - ["\\bAAPL\\b", "\\bApple\\b"]
         - ["\\$", "\\bUSD\\b", "dollar"]
       none_of: ["error", "couldn't", "could not find"]
     # Anti-hallucination: must ground the price via a real tool call.

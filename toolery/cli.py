@@ -14,7 +14,7 @@ from toolery.adapters.base import Adapter
 from toolery.adapters.openai_raw import OpenAIRawAdapter
 from toolery.core.markdown import render_scenario, render_summary
 from toolery.core.runner import Runner
-from toolery.core.scenario import load_all_scenarios
+from toolery.core.scenario import display_name, load_all_scenarios
 from toolery.core.store import Store
 
 app = typer.Typer(no_args_is_help=True, help="LLM-test — deterministic LLM tool-calling benchmark.")
@@ -79,11 +79,13 @@ def scenarios(tier: str = typer.Option("all", help="easy|medium|hard|very_hard|a
     xs = load_all_scenarios(dir)
     if tier != "all":
         xs = [s for s in xs if s.tier.value == tier]
-    t = Table("id", "tier", "category", "domain", "tools", "title")
+    # Lead with the tier (source of truth for difficulty) and the prefix-stripped
+    # name; keep the raw id in a trailing column as the stable key for --ids.
+    t = Table("tier", "name", "category", "domain", "tools", "title", "id")
     for s in xs:
-        t.add_row(s.id, s.tier.value, s.category.value, s.domain,
+        t.add_row(s.tier.value, display_name(s.id), s.category.value, s.domain,
                   ",".join(s.tools[:3]) + ("…" if len(s.tools) > 3 else ""),
-                  s.title)
+                  s.title, s.id)
     console.print(t)
     console.print(f"\n[bold]{len(xs)} scenarios.[/bold]")
 
@@ -212,7 +214,9 @@ def run(
         xs = [s for s in xs if s.category.value in category_set]
     id_set = {i.strip() for i in ids.split(",") if i.strip()}
     if id_set:
-        xs = [s for s in xs if s.id in id_set]
+        # Accept either the full stable id (easy-39-…) or the prefix-stripped
+        # display name (39-…) so ids copied from `list`/reports still resolve.
+        xs = [s for s in xs if s.id in id_set or display_name(s.id) in id_set]
     if not xs and not perf_only:
         console.print("[red]No scenarios match filter.[/red]")
         raise typer.Exit(2)

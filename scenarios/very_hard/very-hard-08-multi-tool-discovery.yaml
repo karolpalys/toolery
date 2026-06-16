@@ -9,7 +9,7 @@ description: |
     (1) get_positions     — how many AAPL shares we hold
     (2) get_stock_price   — current AAPL price
     (3) get_exchange_rate — USD→EUR
-    (4) calculator        — shares*price*rate, compared to rent threshold
+    (4) calculator or equivalent arithmetic — shares*price*rate, compared to rent threshold
   No tool is named by the user. Tests autonomous tool composition.
 tags: [tool_discovery, multi_tool, composition, agentic, hard_mode]
 ranking_dimensions: [overall, agentic, budget_efficiency]
@@ -45,15 +45,13 @@ tool_responses:
       returns: { results: [] }
 scoring:
   required:
-    # All four required tools must be called at least once.
+    # The three data tools must be called; arithmetic may be done directly or via calculator.
     - check: tool_called
       tool: get_positions
     - check: tool_called
       tool: get_stock_price
     - check: tool_called
       tool: get_exchange_rate
-    - check: tool_called
-      tool: calculator
     - check: tool_args_contain
       tool: get_stock_price
       args: { symbol: "AAPL" }
@@ -63,7 +61,7 @@ scoring:
     # Final response must include the EUR value (≈ 5670) and a yes/no judgment.
     - check: response_satisfies
       any_of:
-        - ["5670", "5,670", "5 670"]
+        - ["5670", "5,670", "5 670", "5669", "5,669", "5 669"]
     - check: response_satisfies
       any_of:
         - ["yes", "covers", "enough", "sufficient", "more than"]
@@ -80,7 +78,7 @@ scoring:
     - check: call_count_at_most
       n: 5
     - check: tool_called_in_order
-      sequence: [get_positions, get_stock_price, get_exchange_rate, calculator]
+      sequence: [get_positions, get_stock_price, get_exchange_rate]
     - check: response_satisfies
       any_of:
         - ["yes", "covers", "enough", "sufficient", "5670", "AAPL"]

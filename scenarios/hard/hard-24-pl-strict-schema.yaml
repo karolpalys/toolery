@@ -43,6 +43,7 @@ scoring:
     - check: tool_called
       tool: sql_query
     - check: response_matches_schema
+      unwrap_key: customer_profile
       schema:
         type: object
         required: [id, email, name, joined_at, tier]

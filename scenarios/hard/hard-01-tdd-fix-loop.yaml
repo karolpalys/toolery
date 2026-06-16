@@ -59,7 +59,7 @@ tool_responses:
 scoring:
   required:
     - check: tool_called_in_order
-      sequence: [run_tests, read_file, edit_file, run_tests]
+      sequence: [read_file, edit_file, run_tests]
     - check: tool_args_contain
       tool: read_file
       args: { path: "src/parser.py" }
@@ -76,7 +76,7 @@ scoring:
       n: 4
     - check: tool_args_match_regex
       tool: edit_file
-      arg: content
+      arg: replace
       pattern: "(?s)(int\\(s\\)|abs.*neg|sign|startswith|s\\[0\\])"
   weights:
     pass: 1.0

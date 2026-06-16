@@ -47,8 +47,11 @@ scoring:
       tool: bash_exec
     - check: response_number
       equals: 5
+    # NOTE: bare "error" removed — it false-matched "no errors" / "no failures
+    # or errors" in correct answers. Real failure states are still caught by the
+    # specific tokens below (plus a Python traceback marker).
     - check: response_satisfies
-      none_of: ["error", "command not found", "0 passed", "0 testów", "żaden test"]
+      none_of: ["traceback", "command not found", "0 passed", "0 testów", "żaden test"]
   forbidden: []
   partial:
     - check: command_regex_match

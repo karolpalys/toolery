@@ -5,11 +5,14 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
+from toolery.core.scenario import display_name
 from toolery.core.stats import mcnemar_p
 from toolery.core.store import Store
 
 _TEMPLATES_DIR = Path(__file__).parent / "core" / "templates"
 _env = Environment(loader=FileSystemLoader(_TEMPLATES_DIR))
+# Tier prefix is historical; tier column is the source of truth (see display_name).
+_env.filters["display_name"] = display_name
 
 
 def compare_runs(*, store: Store, run_a: str, run_b: str, out_path: Path) -> None:

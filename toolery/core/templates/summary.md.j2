@@ -15,7 +15,7 @@
 
 ## Top failures
 {% for f in top_failures -%}
-- {{ f.scenario_id }} ({{ f.adapter }}): {{ f.failure_kind }} — {{ f.detail }}
+- {{ f.scenario_id | display_name }} ({{ f.adapter }}): {{ f.failure_kind }} — {{ f.detail }}
 {% endfor %}
 
 {% if perf_rows %}

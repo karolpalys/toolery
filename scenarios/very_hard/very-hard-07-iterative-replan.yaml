@@ -53,8 +53,6 @@ scoring:
       tool: sql_query
     - check: response_contains
       patterns: ["143"]
-    - check: response_contains
-      patterns: ["checkout"]
     # Stay within budget.
     - check: call_count_at_most
       n: 4

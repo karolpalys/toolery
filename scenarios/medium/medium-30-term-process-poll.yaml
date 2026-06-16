@@ -37,11 +37,11 @@ scoring:
     - check: response_satisfies
       any_of:
         - ["exit code 0", "exit 0", "code 0", "code: 0", "exit_code: 0",
-           "successfully", "success", "completed cleanly", "without error",
+           "successfully", "success", "succeeded", "completed cleanly", "without error",
            "zakończ"]
     - check: response_satisfies
       any_of:
-        - ["exit", "exited", "success", "completed"]
+        - ["exit", "exited", "success", "succeeded", "completed"]
     - check: no_hallucinated_tool
       allowed: [process_start, process_status]
   forbidden: []
@@ -52,7 +52,7 @@ scoring:
       tool: process_status
     - check: response_satisfies
       any_of:
-        - ["exit", "exited", "success", "completed", "finished", "done"]
+        - ["exit", "exited", "success", "succeeded", "completed", "finished", "done"]
     - check: tool_called_in_order
       sequence: [process_start, process_status]
   weights:
