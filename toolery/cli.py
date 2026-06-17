@@ -105,7 +105,8 @@ def run(
                             help="comma-separated scenario ids to run (exact match); "
                                  "empty = no id filtering"),
     trials: int = typer.Option(5, "--trials"),
-    base_url: str = typer.Option("http://localhost:8000", "--base-url"),
+    base_url: str = typer.Option("http://localhost:8000", "--base-url",
+                                  envvar="TOOLERY_BASE_URL"),
     scenarios_dir: Path = typer.Option(Path("scenarios")),  # noqa: B008
     concurrency: int = typer.Option(4),
     timeout_scale: float = typer.Option(2.0, "--timeout-scale",
@@ -407,7 +408,8 @@ def run(
 
 @app.command()
 def perf(model: str = typer.Option(..., "--model"),
-         base_url: str = typer.Option("http://localhost:8000", "--base-url"),
+         base_url: str = typer.Option("http://localhost:8000", "--base-url",
+                                      envvar="TOOLERY_BASE_URL"),
          pp: int = 4096, tg: int = 512,
          depth: str = "0,4096,8192", runs: int = 3):
     """Run llama-benchy only (no scoring)."""
